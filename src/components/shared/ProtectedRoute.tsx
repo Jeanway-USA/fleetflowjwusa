@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAreaAccess } from '@/hooks/useAreaAccess';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TierGate } from '@/components/shared/TierGate';
 import { Loader2 } from 'lucide-react';
@@ -33,6 +34,7 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
     setSimulatedRole,
   } = useAuth();
   const location = useLocation();
+  const { allowsFeature } = useAreaAccess();
   const toastedPathRef = useRef<string | null>(null);
 
   const stillLoading = loading || rolesLoading || orgLoading;
@@ -41,7 +43,7 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
   // Real owners can always access every protected route, regardless of any
   // simulated role they may be viewing the UI as. Simulation affects what
   // they see — it must never block their navigation.
-  const hasAccess = actuallyIsOwner || allowedRoles.some(role => hasRole(role));
+  const hasAccess = actuallyIsOwner || (allowedRoles.some(role => hasRole(role)) && allowsFeature(requiredFeature));
 
   const showAccessDeniedToast = authenticated && !stillLoading && !hasAccess;
 

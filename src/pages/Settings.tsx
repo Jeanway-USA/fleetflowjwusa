@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText, Percent } from 'lucide-react';
+import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText, Percent, Wallet, Briefcase } from 'lucide-react';
 import { CompanyTab } from '@/components/settings/CompanyTab';
 import { BrandingTab } from '@/components/settings/BrandingTab';
 import { BillingTab } from '@/components/settings/BillingTab';
@@ -15,9 +15,11 @@ import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPrefe
 import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { PayrollTaxesCard } from '@/components/settings/PayrollTaxesCard';
+import { PositionsTab } from '@/components/settings/positions/PositionsTab';
+import { PayPackagesTab } from '@/components/settings/pay-packages/PayPackagesTab';
 
 export default function Settings() {
-  const { canSimulateRoles, isDemoMode } = useAuth();
+  const { canSimulateRoles, isDemoMode, hasPayrollAccess } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const hasAdminAccess = canSimulateRoles;
@@ -56,6 +58,9 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          <PayPackagesTab />
+          {hasPayrollAccess && <PositionsTab />}
         </div>
       </>
     );
@@ -80,6 +85,10 @@ export default function Settings() {
           <TabsTrigger value="onboarding" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Onboarding & Documents
+          </TabsTrigger>
+          <TabsTrigger value="compensation" className="flex items-center gap-2">
+            <Wallet className="h-4 w-4" />
+            Compensation
           </TabsTrigger>
         </TabsList>
 
@@ -184,6 +193,27 @@ export default function Settings() {
 
             <TabsContent value="payroll" className="space-y-6">
               <PayrollTaxesCard />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="compensation" className="space-y-6">
+          <Tabs defaultValue="pay-packages" className="w-full">
+            <TabsList className="mb-6 w-full justify-start overflow-x-auto">
+              <TabsTrigger value="pay-packages" className="flex items-center gap-2">
+                <Wallet className="h-4 w-4" />
+                Pay Packages
+              </TabsTrigger>
+              <TabsTrigger value="positions" className="flex items-center gap-2">
+                <Briefcase className="h-4 w-4" />
+                Positions
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="pay-packages">
+              <PayPackagesTab />
+            </TabsContent>
+            <TabsContent value="positions">
+              <PositionsTab />
             </TabsContent>
           </Tabs>
         </TabsContent>

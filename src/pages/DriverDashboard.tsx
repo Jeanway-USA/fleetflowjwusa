@@ -24,6 +24,7 @@ import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { OnboardingRevisionBanner } from '@/components/driver/OnboardingRevisionBanner';
 
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { MyJobCard } from '@/components/driver/MyJobCard';
 import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
@@ -115,6 +116,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           driverId={driver.id}
           credentialsStatus={(driver as any).credentials_review_status ?? null}
         />
+        <ErrorBoundary compact>
+          <MyJobCard driverId={driver.id} />
+        </ErrorBoundary>
         {/* Compact Header */}
 
         <div className="flex items-center justify-between py-1">

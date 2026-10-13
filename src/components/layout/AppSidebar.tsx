@@ -26,6 +26,7 @@ import {
   LucideIcon
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAreaAccess } from '@/hooks/useAreaAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
 import { useOrganizationMode, type TmsMode } from '@/hooks/useOrganizationMode';
@@ -214,14 +215,16 @@ export function AppSidebar() {
 
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
 
+  const { allowsFeature } = useAreaAccess();
+
   const filterByRoleAndTier = useCallback((items: NavItem[]) => items.filter(item => {
     // Owners see every nav item (unless they're simulating a lower role,
     // in which case hasRole('owner') is false and normal filtering applies).
     const roleMatch = hasRole('owner') || item.roles.some(role => hasRole(role));
     const tierMatch = !item.feature || tierFeatures.has(item.feature);
     const modeMatch = !item.tmsMode || item.tmsMode === currentTmsMode;
-    return roleMatch && tierMatch && modeMatch;
-  }), [hasRole, tierFeatures, currentTmsMode]);
+    return roleMatch && tierMatch && modeMatch && allowsFeature(item.feature);
+  }), [hasRole, tierFeatures, currentTmsMode, allowsFeature]);
 
   // --- Dashboard items (non-collapsible) ---
   const dashboardNavItems: NavItem[] = actuallyIsOwner ? [

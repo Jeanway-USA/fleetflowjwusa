@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
 import { useSettlementDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
+import { SettlementPackageNote } from '@/components/settings/pay-packages/SettlementPackageNote';
 import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
 import { PayBreakdown as PayBreakdownPanel } from '@/components/finance/payroll/PayBreakdown';
 import type { TaxAuditSnapshot } from '@/lib/payroll/types';
@@ -230,6 +231,8 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
 
 
+
+            <SettlementPackageNote settlementId={settlement.id} />
 
             {hasBlockingDiscrepancy && (
               <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm font-medium text-destructive">

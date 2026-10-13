@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PaidByPackageNote } from '@/components/settings/pay-packages/PaidByPackageNote';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHighlightRow } from '@/hooks/useHighlightRow';
@@ -851,6 +852,7 @@ export default function Drivers() {
 
             </TabsContent>
             <TabsContent value="pay" className="mt-4 space-y-4 focus-visible:outline-none">
+            {editingDriver?.id && <PaidByPackageNote driverId={editingDriver.id} />}
             <div>
               <h4 className="font-condensed text-lg font-bold mb-3">Classification</h4>
               <div className="flex flex-col items-start gap-2">
