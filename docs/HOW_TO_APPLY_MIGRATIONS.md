@@ -26,3 +26,14 @@ In Lovable, open the Cloud (backend) view, find the SQL editor, paste the whole 
 ## If it fails
 
 Copy the exact error message to me. Nothing is half-applied if you ran it as one block, and running it again is safe.
+
+## Second file: staff pay (needs the first one applied)
+
+`docs/APPLY_STAFF_PAY.sql` adds pay statements for staff who are not drivers. Apply it the same way as the first
+file, after the first one is in. Until then, Settings, Compensation, Staff Pay shows "not switched on yet".
+
+## Third file: fix for creating positions
+
+`docs/APPLY_FIX_POSITIONS.sql` fixes the "new row violates row-level security policy for table positions" error
+(positions could not be created or seeded). Apply it the same way. It only replaces two read rules and adds two
+helper functions.

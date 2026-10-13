@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Archive, Briefcase, Pencil, Plus, RotateCcw } from 'lucide-react';
+import { Archive, Briefcase, Pencil, Plus, RotateCcw, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { BulkAssignDialog } from '@/components/settings/positions/BulkAssignDialog';
 import { PositionEditor } from '@/components/settings/positions/PositionEditor';
 import { useArchivePosition, usePositions, useSeedPositions } from '@/hooks/usePositions';
 import { isMissingTables, usePayPackages } from '@/hooks/usePayPackages';
@@ -22,6 +23,7 @@ export function PositionsTab() {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<Position | null>(null);
   const [creating, setCreating] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   // The first time a company opens this, create the standard positions. Existing ones are never overwritten.
   const seeded = useRef(false);
@@ -70,9 +72,14 @@ export function PositionsTab() {
           <CardDescription>A position carries the defaults for a kind of job: pay package, documents, permissions and onboarding steps.</CardDescription>
         </div>
         {hasPayrollAccess && (
-          <Button className="min-h-[44px] gradient-gold text-primary-foreground" onClick={() => setCreating(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />New position
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="min-h-[44px]" onClick={() => setBulkOpen(true)}>
+              <Users className="mr-1.5 h-4 w-4" />Assign to many drivers
+            </Button>
+            <Button className="min-h-[44px] gradient-gold text-primary-foreground" onClick={() => setCreating(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />New position
+            </Button>
+          </div>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
@@ -109,6 +116,7 @@ export function PositionsTab() {
           ))}
         </ul>
       </CardContent>
+      <BulkAssignDialog open={bulkOpen} onOpenChange={setBulkOpen} />
       <PositionEditor open={creating} onOpenChange={setCreating} position={null} />
       <PositionEditor open={!!editing} onOpenChange={(v) => !v && setEditing(null)} position={editing} />
     </Card>
