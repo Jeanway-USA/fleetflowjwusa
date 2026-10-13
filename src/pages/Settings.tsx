@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText, Percent, Wallet, Briefcase } from 'lucide-react';
+import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText, Percent, Wallet, Briefcase, Receipt } from 'lucide-react';
 import { CompanyTab } from '@/components/settings/CompanyTab';
 import { BrandingTab } from '@/components/settings/BrandingTab';
 import { BillingTab } from '@/components/settings/BillingTab';
@@ -15,6 +15,7 @@ import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPrefe
 import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { PayrollTaxesCard } from '@/components/settings/PayrollTaxesCard';
+import { StaffPayTab } from '@/components/settings/pay-packages/StaffPayTab';
 import { PositionsTab } from '@/components/settings/positions/PositionsTab';
 import { PayPackagesTab } from '@/components/settings/pay-packages/PayPackagesTab';
 
@@ -61,6 +62,7 @@ export default function Settings() {
 
           <PayPackagesTab />
           {hasPayrollAccess && <PositionsTab />}
+          <StaffPayTab />
         </div>
       </>
     );
@@ -208,12 +210,19 @@ export default function Settings() {
                 <Briefcase className="h-4 w-4" />
                 Positions
               </TabsTrigger>
+              <TabsTrigger value="staff-pay" className="flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                Staff Pay
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="pay-packages">
               <PayPackagesTab />
             </TabsContent>
             <TabsContent value="positions">
               <PositionsTab />
+            </TabsContent>
+            <TabsContent value="staff-pay">
+              <StaffPayTab />
             </TabsContent>
           </Tabs>
         </TabsContent>
