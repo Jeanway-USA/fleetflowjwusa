@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -17,7 +18,7 @@ import { suggestFromPosition } from '@/lib/positions/defaults';
 import { assignmentOn } from '@/lib/pay-packages/resolve';
 
 const NONE = '__none__';
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayLocal;
 
 interface Props {
   open: boolean;

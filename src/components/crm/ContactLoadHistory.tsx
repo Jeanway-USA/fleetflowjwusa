@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useContactLoads } from '@/hooks/useCRMData';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface ContactLoadHistoryProps {
   contactId: string;
@@ -46,7 +46,7 @@ export function ContactLoadHistory({ contactId }: ContactLoadHistoryProps) {
             return (
               <TableRow key={cl.id}>
                 <TableCell className="text-xs whitespace-nowrap">
-                  {load.pickup_date ? format(new Date(load.pickup_date), 'MM/dd/yy') : '—'}
+                  {load.pickup_date ? format(parseISO(load.pickup_date), 'MM/dd/yy') : '—'}
                 </TableCell>
                 <TableCell className="text-xs">
                   <span className="truncate max-w-[180px] inline-block">

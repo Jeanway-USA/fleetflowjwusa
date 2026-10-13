@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useEffect } from 'react';
 import { FileText, Landmark } from 'lucide-react';
 
@@ -64,7 +65,7 @@ export const EMPTY_CONTRACTOR_DOCS_STATE: ContractorDocsState = {
   ioo_businessName: '',
   ioo_mcNumber: '',
   ioo_dotNumber: '',
-  ioo_effectiveDate: new Date().toISOString().slice(0, 10),
+  ioo_effectiveDate: todayLocal(),
   ioo_agreeTerms: false,
   ioo_ackIcStatus: false,
   ioo_signature: null,
@@ -105,7 +106,7 @@ export function isContractorDocsValid(s: ContractorDocsState): boolean {
 // Shared subcomponents
 // ---------------------------------------------------------------------------
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => todayLocal();
 
 function DocCardShell({
   Icon,

@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -29,7 +30,7 @@ export default function DocumentSigningWorkspace() {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [printedName, setPrintedName] = useState('');
   const [signerTitle, setSignerTitle] = useState('');
-  const [dateSigned, setDateSigned] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateSigned, setDateSigned] = useState(() => todayLocal());
   const [consentValues, setConsentValues] = useState<Record<string, 'yes' | 'no'>>({});
 
   const { data, isLoading } = useQuery({

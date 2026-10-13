@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Wallet, X } from 'lucide-react';
@@ -28,7 +29,7 @@ import { checkFormula } from '@/lib/pay-packages/formula';
 import { FORMULA_VARIABLES, type ComponentOverride, type ExtraLine } from '@/lib/pay-packages/types';
 import { formatDate } from '@/lib/formatters';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocal();
 const VARIABLE_NAMES = FORMULA_VARIABLES.map((v) => v.name);
 
 interface OverrideRow {

@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { Wallet } from 'lucide-react';
 import { useDriverAssignments, usePayPackages } from '@/hooks/usePayPackages';
 import { assignmentOn } from '@/lib/pay-packages/resolve';
@@ -10,7 +11,7 @@ import { formatDate } from '@/lib/formatters';
 export function PaidByPackageNote({ driverId }: { driverId: string | null | undefined }) {
   const { data: assignments = [] } = useDriverAssignments(driverId ?? null);
   const { data: packages = [] } = usePayPackages();
-  const current = assignmentOn(assignments, new Date().toISOString().slice(0, 10));
+  const current = assignmentOn(assignments, todayLocal());
   if (!current) return null;
   const name = packages.find((p) => p.id === current.package_id)?.name ?? 'a pay package';
 

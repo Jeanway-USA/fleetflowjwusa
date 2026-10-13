@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Loader2, Upload } from 'lucide-react';
@@ -94,7 +95,7 @@ export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
       org_id: orgId,
       load_id: t.loadId,
       truck_id: t.loadId ? trucks.get(t.loadId) ?? null : (t.meta.tractor ? truckByUnit.get(t.meta.tractor) ?? null : null),
-      expense_date: t.pickup ?? t.week ?? new Date().toISOString().slice(0, 10),
+      expense_date: t.pickup ?? t.week ?? todayLocal(),
       ...(t.advanceOnly ? { notes: advanceOnlyNote(t.trip) } : {}),
     }));
     setBusy(true);

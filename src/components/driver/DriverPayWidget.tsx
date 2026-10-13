@@ -1,3 +1,4 @@
+import { toLocalIso } from '@/lib/datetime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -48,8 +49,8 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
         .from('fleet_loads')
         .select('*, load_accessorials(*)')
         .eq('driver_id', driverId)
-        .gte('delivery_date', weekStart.toISOString().split('T')[0])
-        .lte('delivery_date', weekEnd.toISOString().split('T')[0])
+        .gte('delivery_date', toLocalIso(weekStart))
+        .lte('delivery_date', toLocalIso(weekEnd))
         .eq('status', 'delivered')
         .is('deleted_at', null);
       if (error) throw error;

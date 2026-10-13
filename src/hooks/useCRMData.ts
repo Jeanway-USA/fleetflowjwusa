@@ -1,3 +1,4 @@
+import { toLocalIso } from '@/lib/datetime';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
@@ -587,7 +588,7 @@ export function useAgentVolumeStats() {
 
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 60);
-      const cutoffIso = cutoff.toISOString().slice(0, 10);
+      const cutoffIso = toLocalIso(cutoff);
 
       const map: Record<string, AgentVolumeStats & { _lanes: Record<string, number> }> = {};
       for (const l of (data || []) as any[]) {

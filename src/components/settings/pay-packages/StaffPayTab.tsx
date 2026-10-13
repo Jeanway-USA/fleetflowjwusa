@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Field } from '@/components/shared/FormParts';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { downloadCsv } from '@/components/fleet/Roster';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { isMissingTables } from '@/hooks/usePayPackages';
 import { loadPackageContext } from '@/lib/pay-packages/generate';
@@ -24,7 +26,7 @@ import {
 import { formatCurrency, formatDate } from '@/lib/formatters';
 
 const KEY = ['staff-pay-statements'] as const;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayLocal;
 
 /**
  * Pay statements for staff (people who are not drivers) from their pay package. Owners and payroll admins make,
@@ -49,7 +51,10 @@ export function StaffPayTab() {
       if (!orgId) throw new Error('Your organization has not finished loading.');
       if (!periodEnd) throw new Error('Choose the last day of the pay period.');
       const context = await loadPackageContext();
-      const staffIds = staffOnPackages(context, periodEnd);
+      // Anyone with a driver record is paid through settlements. Never pay them here as well.
+      const { data: driverUsers } = await supabase.from('drivers').select('user_id').not('user_id', 'is', null);
+      const driverUserIds = new Set((driverUsers ?? []).map((d) => d.user_id as string));
+      const staffIds = staffOnPackages(context, periodEnd).filter((id) => !driverUserIds.has(id));
       if (staffIds.length === 0) throw new Error('No staff have a pay package yet. Assign one from Team, Position & pay.');
       return generateStaffStatements({ orgId, userId: user?.id ?? null, staffIds, periodStart, periodEnd, context });
     },

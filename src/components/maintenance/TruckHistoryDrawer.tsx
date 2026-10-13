@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTruckHistory, useTruckProfitability } from '@/hooks/useMaintenanceData';
 import { calculateWearPartHealth } from '@/lib/truck-maintenance-profiles';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { Truck, DollarSign, Wrench, Calendar, FileText, Activity, TrendingUp, TrendingDown, AlertTriangle, ShieldAlert, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -309,7 +309,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                               </Badge>
                               <p className="text-sm">{log.description || 'No description'}</p>
                               <p className="text-xs text-muted-foreground">
-                                {format(new Date(log.service_date), 'MMM d, yyyy')}
+                                {format(parseISO(log.service_date), 'MMM d, yyyy')}
                                 {log.vendor && <> • {log.vendor}</>}
                               </p>
                             </div>

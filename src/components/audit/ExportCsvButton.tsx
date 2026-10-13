@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import type { AuditLogRow } from '@/hooks/useAuditLogs';
@@ -26,7 +27,7 @@ export function ExportCsvButton({ rows }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `audit-trail-${todayLocal()}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

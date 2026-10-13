@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,7 +41,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
     vendor: '',
     description: '',
     jurisdiction: '',
-    expense_date: new Date().toISOString().split('T')[0],
+    expense_date: todayLocal(),
   });
 
   const queryKey = relatedType === 'load' ? ['expenses', 'load', relatedId] : ['expenses', 'truck', relatedId];
@@ -117,7 +118,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
       vendor: '',
       description: '',
       jurisdiction: '',
-      expense_date: new Date().toISOString().split('T')[0],
+      expense_date: todayLocal(),
     });
     setShowAddForm(false);
   };

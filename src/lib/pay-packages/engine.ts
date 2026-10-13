@@ -84,7 +84,10 @@ export function calculatePackagePay(components: PayComponent[], week: PayWeekInp
   for (const c of ordered) {
     const { amount, detail, error } = calculateComponent(c, week, base, earnings);
     if (error) errors.push(error);
-    const deduction = isDeductionComponent(c);
+    // A negative result flips the line: an earning that works out below zero is taken off the pay, and a deduction
+    // below zero is paid back. (Taking the absolute value alone would turn a penalty into extra pay.)
+    const flipped = amount < 0;
+    const deduction = isDeductionComponent(c) !== flipped;
     // A deduction is kept as a positive number and flagged, the way a settlement stores it.
     const line: PayLine = {
       componentId: c.id,
@@ -94,7 +97,7 @@ export function calculatePackagePay(components: PayComponent[], week: PayWeekInp
       amount: Math.abs(amount),
       isDeduction: deduction,
       isTaxable: c.is_taxable,
-      detail,
+      detail: flipped ? `${detail} (worked out below zero, so ${deduction ? 'taken off' : 'added to'} the pay)` : detail,
       error,
       sortOrder: c.sort_order,
     };

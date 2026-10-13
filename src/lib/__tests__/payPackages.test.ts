@@ -254,3 +254,29 @@ describe('building a pay week from loads', () => {
     expect(w.daysWorked).toBe(2);
   });
 });
+
+describe('lines that work out below zero', () => {
+  it('turns a negative earning into a deduction instead of paying it as a plus', () => {
+    const r = calculatePackagePay(
+      [
+        comp({ calculation_method: 'flat_weekly', value: 1700, label: 'Base' }),
+        comp({ component_type: 'custom', calculation_method: 'formula', formula: 'incidents * 0 - 100', label: 'Penalty' }),
+      ],
+      week,
+    );
+    expect(r.lines[1]).toMatchObject({ label: 'Penalty', amount: 100, isDeduction: true });
+    expect(r.net).toBe(1600);
+  });
+
+  it('pays back a deduction that works out below zero', () => {
+    const r = calculatePackagePay(
+      [
+        comp({ calculation_method: 'flat_weekly', value: 1700, label: 'Base' }),
+        comp({ component_type: 'deduction', is_deduction: true, calculation_method: 'formula', formula: '0 - 50', label: 'Refund' }),
+      ],
+      week,
+    );
+    expect(r.lines[1]).toMatchObject({ amount: 50, isDeduction: false });
+    expect(r.net).toBe(1750);
+  });
+});
