@@ -278,11 +278,11 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
 
   const getServiceTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      pm: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-      repair: 'bg-red-100 text-red-800 border-red-300',
+      pm: 'bg-success/15 text-success border-success/40',
+      repair: 'bg-destructive/10 text-destructive border-destructive/40',
       tire: 'bg-slate-100 text-slate-800 border-slate-300',
-      inspection: 'bg-blue-100 text-blue-800 border-blue-300',
-      'oil change': 'bg-amber-100 text-amber-800 border-amber-300',
+      inspection: 'bg-primary/10 text-foreground border-primary/40',
+      'oil change': 'bg-warning/15 text-foreground border-warning/50',
     };
     const normalizedType = type.toLowerCase();
     return (
@@ -307,14 +307,14 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
 
         <div className="h-4 w-px bg-border" />
 
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-primary dark:text-primary">
           <Wrench className="h-3.5 w-3.5" />
           <span>{summary.woCount} Work Orders</span>
         </div>
 
         <div className="h-4 w-px bg-border" />
 
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-emerald-600 dark:text-emerald-400">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-success dark:text-success">
           <ClipboardList className="h-3.5 w-3.5" />
           <span>{summary.logCount} Manual Logs</span>
         </div>
@@ -393,9 +393,8 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
           ))}
         </div>
       ) : !filteredHistory.length ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
-          <History className="h-10 w-10 text-muted-foreground mb-3" />
-          <h3 className="text-base font-medium">
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <h3 className="text-[15px] font-semibold">
             {history?.length ? 'No matching records' : 'No Service History'}
           </h3>
           <p className="text-sm text-muted-foreground">

@@ -87,7 +87,7 @@ export function UpdateTruckStatusDialog({ open, onOpenChange }: Props) {
                 {(trucks as any[]).map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     Unit {t.unit_number}
-                    {t.make ? ` — ${t.make}${t.model ? ` ${t.model}` : ''}` : ''}
+                    {t.make ? `, ${t.make}${t.model ? ` ${t.model}` : ''}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>

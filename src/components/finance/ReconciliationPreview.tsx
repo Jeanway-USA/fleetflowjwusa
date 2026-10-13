@@ -12,12 +12,14 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import type { ReconciliationResult, ReconciledExpense, RevenueTripMismatch } from '@/lib/settlement-reconciliation';
+import { matchOneToOne, matchTripTotals } from '@/lib/expense-matching';
 
 interface FleetLoad {
   id: string;
   landstar_load_id: string | null;
   origin: string;
   destination: string;
+  truck_id?: string | null;
 }
 
 interface Truck {
@@ -31,6 +33,7 @@ interface ExistingExpense {
   expense_type: string;
   amount: number;
   load_id: string | null;
+  description?: string | null;
 }
 
 interface ReconciliationPreviewProps {
@@ -51,16 +54,47 @@ interface ExpenseRow extends ReconciledExpense {
   jurisdiction: string | null;
 }
 
+/**
+ * Match every incoming line (all three buckets) against saved expenses in one
+ * pass, so a saved row can be claimed by at most one incoming line.
+ */
+function findDuplicateIds(
+  buckets: ReconciledExpense[][],
+  existingExpenses: ExistingExpense[],
+  existingLoads: FleetLoad[],
+): string[][] {
+  const flat = buckets.flat();
+  // A saved expense knows its trip only through its load.
+  const tripByLoadId = new Map(existingLoads.map((l) => [l.id, l.landstar_load_id]));
+  const candidates = existingExpenses.map((e) => ({
+    date: e.expense_date,
+    expense_type: e.expense_type,
+    amount: e.amount,
+    description: e.description,
+    trip_number: e.load_id ? tripByLoadId.get(e.load_id) ?? null : null,
+  }));
+  // Line by line first, then trip totals: a summed saved line against itemized incoming lines.
+  const matches = matchTripTotals(flat, matchOneToOne(flat, candidates), candidates);
+  const ids = matches.map((i) => (i >= 0 ? existingExpenses[i].id : ''));
+  const out: string[][] = [];
+  let offset = 0;
+  for (const b of buckets) {
+    out.push(ids.slice(offset, offset + b.length));
+    offset += b.length;
+  }
+  return out;
+}
+
 function buildRows(
   items: ReconciledExpense[],
   existingLoads: FleetLoad[],
   trucks: Truck[],
-  existingExpenses: ExistingExpense[],
+  duplicateIds: string[],
   unitNumber: string | null
 ): ExpenseRow[] {
-  return items.map(exp => {
+  return items.map((exp, idx) => {
     const matchedLoad = findMatchingLoad(exp.trip_number, existingLoads);
-    const duplicateId = findDuplicateId(exp, existingExpenses);
+    const duplicateId = duplicateIds[idx] || null;
     const isFuelType = ['Fuel', 'DEF'].includes(exp.expense_type);
     const jurisdiction = isFuelType ? extractJurisdictionFromVendor(exp.vendor || exp.description) : null;
     return {
@@ -91,16 +125,6 @@ function findMatchingTruck(unitNumber: string | null, trucks: Truck[]): Truck | 
   return trucks.find(t => t.unit_number.includes(cleanUnit) || cleanUnit.includes(t.unit_number)) || null;
 }
 
-function findDuplicateId(expense: ReconciledExpense, existingExpenses: ExistingExpense[]): string | null {
-  const dup = existingExpenses.find(existing => {
-    const sameDate = existing.expense_date === expense.date;
-    const sameType = existing.expense_type === expense.expense_type;
-    const sameAmount = Math.abs(existing.amount - Math.abs(expense.amount)) < 0.01;
-    return sameDate && sameType && sameAmount;
-  });
-  return dup?.id || null;
-}
-
 export function ReconciliationPreview({
   result,
   existingLoads,
@@ -111,16 +135,25 @@ export function ReconciliationPreview({
   onCancel,
 }: ReconciliationPreviewProps) {
   const [isImporting, setIsImporting] = useState(false);
+  // Statement files rarely name the truck. With one truck every line is its own; with several, the dispatcher picks.
+  const [truckChoice, setTruckChoice] = useState<string>(() => {
+    const named = findMatchingTruck(result.unitNumber, trucks);
+    if (named) return named.id;
+    return trucks.length === 1 ? trucks[0].id : 'none';
+  });
   const [editingIndex, setEditingIndex] = useState<{ tab: string; index: number } | null>(null);
 
+  const [initialDupIds] = useState(() =>
+    findDuplicateIds([result.expenses, result.advances, result.credits], existingExpenses, existingLoads)
+  );
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(() =>
-    buildRows(result.expenses, existingLoads, trucks, existingExpenses, result.unitNumber)
+    buildRows(result.expenses, existingLoads, trucks, initialDupIds[0], result.unitNumber)
   );
   const [advanceRows, setAdvanceRows] = useState<ExpenseRow[]>(() =>
-    buildRows(result.advances, existingLoads, trucks, existingExpenses, result.unitNumber)
+    buildRows(result.advances, existingLoads, trucks, initialDupIds[1], result.unitNumber)
   );
   const [creditRows, setCreditRows] = useState<ExpenseRow[]>(() =>
-    buildRows(result.credits, existingLoads, trucks, existingExpenses, result.unitNumber)
+    buildRows(result.credits, existingLoads, trucks, initialDupIds[2], result.unitNumber)
   );
 
   const formatCurrency = (value: number) =>
@@ -171,6 +204,10 @@ export function ReconciliationPreview({
     setter(prev => prev.map((r, i) => i === index ? { ...r, date: newDate } : r));
   };
 
+  /** The line's own truck: named in the file, then its load's truck, then the one chosen above. */
+  const truckFor = (exp: ExpenseRow): string | null =>
+    exp.matchedTruck?.id || exp.matchedLoad?.truck_id || (truckChoice !== 'none' ? truckChoice : null);
+
   const handleImport = async () => {
     const allSelected = [
       ...selectedExpenses.map(e => ({ ...e, importType: 'expense' as const })),
@@ -212,7 +249,7 @@ export function ReconciliationPreview({
           vendor: exp.vendor,
           gallons: exp.gallons,
           load_id: exp.matchedLoad?.id || null,
-          truck_id: exp.matchedTruck?.id || null,
+          truck_id: truckFor(exp),
           notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
             : exp.is_reimbursement ? 'Reimbursement/Refund'
             : exp.is_discount ? 'Discount/Credit'
@@ -238,7 +275,7 @@ export function ReconciliationPreview({
             vendor: exp.vendor,
             gallons: exp.gallons,
             load_id: exp.matchedLoad?.id || null,
-            truck_id: exp.matchedTruck?.id || null,
+            truck_id: truckFor(exp),
             notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
               : exp.is_reimbursement ? 'Reimbursement/Refund'
               : exp.is_discount ? 'Discount/Credit'
@@ -388,7 +425,7 @@ export function ReconciliationPreview({
               <TableCell className="text-sm max-w-40 truncate" title={row.description}>
                 {row.vendor || row.description}
                 {row.gallons && (
-                  <span className="text-xs text-muted-foreground ml-1">({row.gallons.toFixed(1)} gal)</span>
+                  <span className="text-xs text-muted-foreground ml-1">({row.gallons.toFixed(2)} gal)</span>
                 )}
               </TableCell>
               <TableCell className={cn('text-right font-mono text-sm font-medium', colorClass)}>
@@ -490,7 +527,7 @@ export function ReconciliationPreview({
                     <TableRow>
                       <TableHead>Trip #</TableHead>
                       <TableHead>Dispatch Load</TableHead>
-                      <TableHead className="text-right">Expected (dispatch)</TableHead>
+                      <TableHead className="text-right">Your load</TableHead>
                       <TableHead className="text-right">Statement</TableHead>
                       <TableHead className="text-right">Δ</TableHead>
                     </TableRow>
@@ -536,7 +573,9 @@ export function ReconciliationPreview({
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Tolerance: ±$1 per trip, ±$5 per pay cycle. Logging the line errors will block this settlement until an owner or payroll admin resolves each row.
+              {revenue.tripMismatches.some((m) => m.actual_source_label === 'Freight Bill Details')
+                ? "These loads do not match what Landstar settled. Open the Settlement tab, use Match your loads to Landstar's settlement with the same Freight Bill Details file, then upload again."
+                : 'Tolerance: ±$1 per trip, ±$5 per pay cycle. Logging the line errors will block this settlement until an owner or payroll admin resolves each row.'}
             </p>
             <div className="flex justify-end">
               <Button variant="destructive" size="sm" onClick={persistDiscrepanciesAndHalt} disabled={isImporting}>
@@ -574,10 +613,72 @@ export function ReconciliationPreview({
           {duplicateCount > 0 && (
             <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
               <AlertTriangle className="h-3 w-3" />
-              {duplicateCount} duplicates
+              {duplicateCount} already imported
             </Badge>
           )}
         </div>
+
+        {/* Statement checks */}
+        {(result.crossCheck || result.datesInferred) && (
+          <div className="space-y-2 text-sm">
+            {result.crossCheck && result.crossCheck.mismatches.length === 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/5 p-3">
+                <CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                <p>
+                  Contractor statement matches the Settlement Details export line for line.
+                  {result.crossCheck.addedFromXlsx > 0 && (
+                    <> {result.crossCheck.addedFromXlsx} line{result.crossCheck.addedFromXlsx === 1 ? '' : 's'} missing from the PDF read {result.crossCheck.addedFromXlsx === 1 ? 'was' : 'were'} added from the spreadsheet.</>
+                  )}
+                </p>
+              </div>
+            )}
+            {result.crossCheck && result.crossCheck.mismatches.length > 0 && (
+              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-1">
+                <div className="flex items-center gap-2 font-medium">
+                  <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+                  The PDF read disagreed with the spreadsheet on these lines, so the spreadsheet amount is used
+                </div>
+                <ul className="pl-6 space-y-0.5 text-muted-foreground">
+                  {result.crossCheck.mismatches.map((m, i) => (
+                    <li key={i} className="tabular-nums">
+                      {m.description}{m.trip_number ? ` (trip ${m.trip_number})` : ''}: using {formatCurrency(m.xlsxAmount)} (the PDF read gave {formatCurrency(m.pdfAmount)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {result.datesInferred === 'latest_week' && (
+              <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3">
+                <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <p>
+                  The Settlement Details export has no dates, so lines are dated to the period ending{' '}
+                  <span className="font-medium">{result.periodEnd}</span>. If this file is for a different week,
+                  export it with that week selected (or upload it with that week's contractor statement).
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {trucks.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Which truck are these lines for?</p>
+              <p className="text-xs text-muted-foreground">
+                {trucks.length === 1 ? 'You have one truck, so every line goes to it.' : 'The file does not name a truck. Lines tied to a load use the truck of its load.'}
+              </p>
+            </div>
+            <Select value={truckChoice} onValueChange={setTruckChoice}>
+              <SelectTrigger className="h-11 w-full sm:w-[220px]" aria-label="Truck for these lines">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No truck (whole company)</SelectItem>
+                {trucks.map((t) => <SelectItem key={t.id} value={t.id}>Truck {t.unit_number}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

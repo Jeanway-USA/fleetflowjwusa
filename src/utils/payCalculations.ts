@@ -62,6 +62,8 @@ export interface PayLoad {
   rate?: number | null;
   fuel_surcharge?: number | null;
   booked_miles?: number | null;
+  /** Odometer miles; used only when booked_miles is missing. */
+  actual_miles?: number | null;
   load_accessorials?: Array<{ amount?: number | null; is_driver_pay?: boolean | null }> | null;
 }
 
@@ -133,6 +135,12 @@ export function sumAccessorials(load: PayLoad | null | undefined): number {
   return load.load_accessorials
     .filter((a) => a?.is_driver_pay !== false)
     .reduce((s, a) => s + n(a?.amount), 0);
+}
+
+/** Paid miles: booked miles, falling back to actual miles when none were booked. */
+export function payableMiles(load: PayLoad | null | undefined): number {
+  const booked = n(load?.booked_miles);
+  return booked > 0 ? booked : n(load?.actual_miles);
 }
 
 function effectiveLandstarSplit(settings?: PaySettings): number {
@@ -214,14 +222,15 @@ export function calculateLoadPay(
   }
 
   if (type === 'per_mile') {
-    const base = n(load.booked_miles) * rate;
+    const miles = payableMiles(load);
+    const base = miles * rate;
     return buildBreakdown({
       base,
       accessorialsTotal,
       payType: 'per_mile',
       driver,
       settings,
-      formulaLabel: `${n(load.booked_miles).toLocaleString()} mi × $${rate.toFixed(2)} + accessorials`,
+      formulaLabel: `${miles.toLocaleString()} mi × $${rate.toFixed(2)} + accessorials`,
     });
   }
 
@@ -300,7 +309,7 @@ export function calculateWeeklyPay({
   const employmentClass = classifyEmployment(driver);
   const loadArr = loads ?? [];
   const accessorialsTotal = loadArr.reduce((s, l) => s + sumAccessorials(l), 0);
-  const totalMiles = loadArr.reduce((s, l) => s + n(l.booked_miles), 0);
+  const totalMiles = loadArr.reduce((s, l) => s + payableMiles(l), 0);
   const loadCount = loadArr.length;
 
   if (!driver) {

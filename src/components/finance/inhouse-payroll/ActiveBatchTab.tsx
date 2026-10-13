@@ -2,14 +2,11 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -20,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import {
-  Lock, Loader2, RefreshCw, CheckCircle2, Pencil, Trash2, Ban, ChevronLeft, ChevronRight,
+  Lock, Loader2, RefreshCw, CheckCircle2, Pencil, Archive, Ban, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
@@ -460,21 +457,7 @@ export function ActiveBatchTab() {
     onError: (e: Error) => toast.error(e.message ?? 'Failed to finalize'),
   });
 
-  const deleteRow = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('internal_payroll_ledger')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Row deleted');
-      qc.invalidateQueries({ queryKey: ['w2_ledger'] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
+  // Nothing here is ever deleted for good: removing a draft marks it voided, and Restore brings it back.
   const voidRow = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -488,7 +471,24 @@ export function ActiveBatchTab() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Row voided');
+      toast.success('Row removed from the batch. You can restore it.');
+      qc.invalidateQueries({ queryKey: ['w2_ledger'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const restoreRow = useMutation({
+    mutationFn: async (row: LedgerRow) => {
+      // A row that was ever finalized goes back to finalized; a removed draft goes back to a draft.
+      const wasFinalized = !!(row as unknown as { finalized_at?: string | null }).finalized_at;
+      const { error } = await supabase
+        .from('internal_payroll_ledger')
+        .update({ status: wasFinalized ? 'finalized' : 'draft', voided_at: null, voided_by: null })
+        .eq('id', row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Row restored');
       qc.invalidateQueries({ queryKey: ['w2_ledger'] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -529,7 +529,7 @@ export function ActiveBatchTab() {
 
   // Batch totals (from withholding rows, no client-side math on tax)
   const totals = useMemo(() => {
-    let gross = 0, fit = 0, eeFica = 0, erFica = 0, suta = 0, sit = 0, net = 0;
+    let gross = 0, fit = 0, eeFica = 0, erFica = 0, suta = 0, sit = 0, net = 0, ded = 0;
     let count = 0;
     for (const r of ledgers) {
       if (r.status === 'voided') continue;
@@ -551,12 +551,13 @@ export function ActiveBatchTab() {
       suta += stSuta;
       sit += stSit;
       const oneTimeDed = Number(r.one_time_deduction) || 0;
+      ded += oneTimeDed;
       net += Math.max(
         0,
         g - (eeSS + eeMed + addlMed + stSit + (Number(wh.federal_income_withholding) || 0)) - oneTimeDed,
       );
     }
-    return { count, gross, fit, eeFica, erFica, suta, sit, net };
+    return { count, gross, fit, eeFica, erFica, suta, sit, net, ded };
 
   }, [ledgers, whMap]);
 
@@ -568,187 +569,206 @@ export function ActiveBatchTab() {
     setPeriod(p);
   };
 
+  const rowViews = ledgers.map((r) => {
+    const driver = driverMap.get(r.driver_id);
+    const name = driver
+      ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim()
+      : r.driver_id.slice(0, 8);
+    const w4 = w4Map.get(r.driver_id) ?? { filing_status: 'single' };
+    const missing: string[] = [];
+    if (!w4Map.has(r.driver_id)) missing.push('W-4');
+    if (!stateW4Map.has(r.driver_id)) missing.push('State Tax');
+    if (!i9Set.has(r.driver_id)) missing.push('I-9');
+    const wh = whMap.get(r.id);
+    const state = driver?.tax_state || driver?.license_state || config?.defaultTaxState || '—';
+    const gross = Number(r.gross_taxable_pay) || 0;
+    const fit = Number(wh?.federal_income_withholding) || 0;
+    const eeFica = (Number(wh?.ee_social_security) || 0) + (Number(wh?.ee_medicare) || 0) + (Number(wh?.additional_medicare) || 0);
+    const sit = Number(wh?.state_sit) || 0;
+    const suta = (Number(wh?.state_suta) || 0) || ((Number(wh?.tx_twc_unemployment) || 0) + (Number(wh?.fl_reemployment) || 0));
+    const deduction = Number(r.one_time_deduction) || 0;
+    const net = Math.max(0, gross - eeFica - fit - sit - deduction);
+    const note = [
+      String(w4.filing_status).replace('_', ' '),
+      state,
+      `base ${formatCurrency(Number(r.base_salary) || 0)}`,
+      (Number(r.one_time_bonus) || 0) > 0 ? `bonus ${formatCurrency(Number(r.one_time_bonus) || 0)}` : null,
+    ].filter(Boolean).join(', ');
+    return { r, name, note, missing, gross, fit, eeFica, sit, suta, deduction, net };
+  });
+
+  const statusBadge = (status: string) =>
+    status === 'finalized' ? (
+      <Badge className="gap-1"><Lock className="h-3 w-3" /> Finalized</Badge>
+    ) : status === 'voided' ? (
+      <Badge variant="destructive" className="gap-1"><Ban className="h-3 w-3" /> Voided</Badge>
+    ) : (
+      <Badge variant="secondary">Draft</Badge>
+    );
+
+  const rowActions = (r: LedgerRow) => (
+    <>
+      {r.status === 'draft' && (
+        <>
+          <Button size="icon" variant="ghost" className="h-11 w-11" onClick={() => openEdit(r)} aria-label="Edit bonus or deduction">
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <ConfirmButton
+            label="Remove row"
+            description="Takes this draft out of the batch. Nothing is deleted, and you can restore it."
+            onConfirm={() => voidRow.mutate(r.id)}
+            icon={<Archive className="h-4 w-4" />}
+          />
+        </>
+      )}
+      {r.status === 'voided' && (
+        <Button variant="outline" className="h-11" onClick={() => restoreRow.mutate(r)} disabled={restoreRow.isPending}>
+          Restore
+        </Button>
+      )}
+      {r.status === 'finalized' && (
+        <ConfirmButton
+          label="Void row"
+          description="Voiding marks the row as voided so it won't count toward YTD. Nothing is deleted, and you can restore it."
+          onConfirm={() => voidRow.mutate(r.id)}
+          icon={<Ban className="h-4 w-4" />}
+        />
+      )}
+    </>
+  );
+
+  const missingBadge = (missing: string[]) =>
+    missing.length > 0 && (
+      <Badge
+        variant="outline"
+        className="border-amber-500/60 text-amber-700 dark:text-amber-400 text-[11px]"
+        title={`Missing signed form(s): ${missing.join(', ')}. Withholding uses defaults until collected.`}
+      >
+        Missing: {missing.join(', ')}
+      </Badge>
+    );
+
   return (
-    <div className="space-y-4">
-      <Card className="card-elevated">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <CardTitle>W-2 Active Payroll Batch</CardTitle>
-            <CardDescription>
-              Automatic tax-ready payroll. FIT via IRS Pub 15-T (Worksheet 1A) using each driver's
-              W-4. FICA, additional Medicare, and per-state SUTA / SIT are computed from your
-              payroll settings. Pay frequency:{' '}
-              <span className="font-medium">{freq}</span> ({PAY_PERIODS_PER_YEAR[freq]}/yr).
-            </CardDescription>
+    <div className="space-y-5">
+      <Panel
+        title="W-2 payroll batch"
+        description={
+          <>
+            Tax-ready payroll for your W-2 employees. Federal tax follows IRS Pub 15-T using each driver's W-4;
+            Social Security, Medicare and state taxes come from your payroll settings. Paid {freq} ({PAY_PERIODS_PER_YEAR[freq]} times a year).
+          </>
+        }
+        aside={
+          <>
+            <Button className="h-11" onClick={() => generateBatch.mutate()} disabled={generateBatch.isPending || configLoading || !config}>
+              {generateBatch.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Generate batch
+            </Button>
+            <Button variant="outline" className="h-11" onClick={() => finalizeBatch.mutate()} disabled={finalizeBatch.isPending || !canFinalize}>
+              {finalizeBatch.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+              Finalize batch
+            </Button>
+          </>
+        }
+      >
+        <div className="flex items-center justify-between gap-2 border-t py-2">
+          <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => shift(-1)} aria-label="Previous period">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="text-center">
+            <div className="font-condensed text-lg font-bold leading-tight">{periodLabel}</div>
+            <div className="text-[13px] text-muted-foreground">{totals.count} {totals.count === 1 ? 'employee' : 'employees'} in this batch</div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => shift(-1)} aria-label="Previous period">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-sm font-medium min-w-[180px] text-center">{periodLabel}</div>
-            <Button variant="outline" size="icon" onClick={() => shift(1)} aria-label="Next period">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button onClick={() => generateBatch.mutate()}
-              disabled={generateBatch.isPending || configLoading || !config}>
-              {generateBatch.isPending
-                ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                : <RefreshCw className="h-4 w-4 mr-2" />}
-              Generate Batch
-            </Button>
-            <Button
-              variant="default"
-              onClick={() => finalizeBatch.mutate()}
-              disabled={finalizeBatch.isPending || !canFinalize}
-            >
-              {finalizeBatch.isPending
-                ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              Finalize Batch
-            </Button>
-          </div>
-        </CardHeader>
+          <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => shift(1)} aria-label="Next period">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
-        <CardContent className="space-y-4">
-          {/* Totals */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-            <TotalTile label="Employees" value={String(totals.count)} />
-            <TotalTile label="Gross" value={formatCurrency(totals.gross)} />
-            <TotalTile label="FIT" value={formatCurrency(totals.fit)} />
-            <TotalTile label="FICA (EE)" value={formatCurrency(totals.eeFica)} />
-            <TotalTile label="FICA (ER)" value={formatCurrency(totals.erFica)} />
-            <TotalTile label="SUTA (ER)" value={formatCurrency(totals.suta)} />
-            <TotalTile label="Net Pay" value={formatCurrency(totals.net)} highlight />
-          </div>
+        <div className="border-t">
+          <StatementLine label="Gross pay" value={formatCurrency(totals.gross)} />
+          <StatementLine label="Federal income tax withheld" value={`−${formatCurrency(totals.fit)}`} />
+          <StatementLine label="Social Security and Medicare (employee share)" value={`−${formatCurrency(totals.eeFica)}`} />
+          <StatementLine label="State income tax withheld" value={`−${formatCurrency(totals.sit)}`} />
+          {totals.ded > 0 && <StatementLine label="One-time deductions" value={`−${formatCurrency(totals.ded)}`} />}
+          <StatementLine label="Net pay to employees" value={formatCurrency(totals.net)} strong rule="double" />
+        </div>
+        <div className="border-t">
+          <StatementLine label="Social Security and Medicare (your share)" note="Paid by you on top of gross pay" value={formatCurrency(totals.erFica)} muted />
+          <StatementLine label="State unemployment tax" note="Paid by you on top of gross pay" value={formatCurrency(totals.suta)} muted />
+        </div>
+      </Panel>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Driver</TableHead>
-                  <TableHead>Filing</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead className="text-right">Base</TableHead>
-                  <TableHead className="text-right">One-Time Bonus</TableHead>
-                  <TableHead className="text-right">Gross</TableHead>
-                  <TableHead className="text-right">FIT</TableHead>
-                  <TableHead className="text-right">FICA (EE)</TableHead>
-                  <TableHead className="text-right">SUTA (ER)</TableHead>
-                  <TableHead className="text-right">One-Time Ded.</TableHead>
-                  <TableHead className="text-right">Net Payout</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  <TableRow><TableCell colSpan={13} className="text-center py-6">
-                    <Loader2 className="h-4 w-4 animate-spin inline" />
-                  </TableCell></TableRow>
-                )}
-                {!isLoading && ledgers.length === 0 && (
-                  <TableRow><TableCell colSpan={13} className="text-center py-6 text-muted-foreground">
-                    No batch generated for this period yet. Click <b>Generate Batch</b> to create one.
-                  </TableCell></TableRow>
-                )}
-                {ledgers.map((r) => {
-                  const driver = driverMap.get(r.driver_id);
-                  const name = driver
-                    ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim()
-                    : r.driver_id.slice(0, 8);
-                  const w4 = w4Map.get(r.driver_id) ?? { filing_status: 'single' };
-                  const hasW4 = w4Map.has(r.driver_id);
-                  const hasStateTax = stateW4Map.has(r.driver_id);
-                  const hasI9 = i9Set.has(r.driver_id);
-                  const missing: string[] = [];
-                  if (!hasW4) missing.push('W-4');
-                  if (!hasStateTax) missing.push('State Tax');
-                  if (!hasI9) missing.push('I-9');
-                  const wh = whMap.get(r.id);
-                  const state = driver?.tax_state || driver?.license_state || config?.defaultTaxState || '—';
-                  const gross = Number(r.gross_taxable_pay) || 0;
-                  const fit = Number(wh?.federal_income_withholding) || 0;
-                  const eeFica = (Number(wh?.ee_social_security) || 0) + (Number(wh?.ee_medicare) || 0) + (Number(wh?.additional_medicare) || 0);
-                  const sit = Number(wh?.state_sit) || 0;
-                  const suta = (Number(wh?.state_suta) || 0) || ((Number(wh?.tx_twc_unemployment) || 0) + (Number(wh?.fl_reemployment) || 0));
-                  const oneTimeDed = Number(r.one_time_deduction) || 0;
-                  const net = Math.max(0, gross - eeFica - fit - sit - oneTimeDed);
-                  const locked = r.status === 'finalized' || r.status === 'voided';
-
-                  return (
-                    <TableRow key={r.id} className={r.status === 'voided' ? 'opacity-60' : ''}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span>{name}</span>
-                          {missing.length > 0 && (
-                            <Badge
-                              variant="outline"
-                              className="border-amber-500/60 text-amber-700 dark:text-amber-400 text-[10px]"
-                              title={`Missing signed form(s): ${missing.join(', ')}. Withholding uses defaults until collected.`}
-                            >
-                              Missing: {missing.join(', ')}
-                            </Badge>
-                          )}
+      <Panel title="Pay by employee" description="Draft rows can be edited or removed. Finalized rows can be voided. Removed and voided rows can always be restored." flush>
+        {isLoading ? (
+          <div className="flex justify-center border-t py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        ) : rowViews.length === 0 ? (
+          <p className="border-t px-4 py-4 text-sm text-muted-foreground">
+            No batch for this period yet. Press <b>Generate batch</b> to create one.
+          </p>
+        ) : (
+          <>
+            <ul className="divide-y border-t md:hidden">
+              {rowViews.map((v) => (
+                <li key={v.r.id} className={`px-4 py-3 ${v.r.status === 'voided' ? 'opacity-60' : ''}`}>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-condensed text-lg font-bold leading-tight">{v.name}</span>
+                    <span className="figure ml-auto text-lg font-semibold">{formatCurrency(v.net)}</span>
+                  </div>
+                  <div className="text-[13px] capitalize text-muted-foreground">{v.note}</div>
+                  <div className="mt-1 text-[13px] tabular-nums text-muted-foreground">
+                    Gross {formatCurrency(v.gross)}, federal {formatCurrency(v.fit)}, Social Security and Medicare {formatCurrency(v.eeFica)}, state {formatCurrency(v.sit)}
+                    {v.deduction > 0 && `, deduction ${formatCurrency(v.deduction)}`}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {statusBadge(v.r.status)}
+                    {missingBadge(v.missing)}
+                    <div className="ml-auto flex">{rowActions(v.r)}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto border-t md:block">
+              <table className="w-full text-[15px]">
+                <caption className="sr-only">W-2 payroll for {periodLabel}</caption>
+                <thead>
+                  <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th scope="col" className="py-2 pl-4">Employee</th>
+                    <th scope="col" className="py-2 text-right">Gross</th>
+                    <th scope="col" className="py-2 text-right">Federal</th>
+                    <th scope="col" className="py-2 text-right">SS and Medicare</th>
+                    <th scope="col" className="py-2 text-right">State</th>
+                    <th scope="col" className="py-2 text-right">Deduction</th>
+                    <th scope="col" className="py-2 text-right">Net pay</th>
+                    <th scope="col" className="py-2 pl-6">Status</th>
+                    <th scope="col" className="py-2 pr-4"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {rowViews.map((v) => (
+                    <tr key={v.r.id} className={v.r.status === 'voided' ? 'opacity-60' : ''}>
+                      <td className="py-2 pl-4 pr-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{v.name}</span>
+                          {missingBadge(v.missing)}
                         </div>
-                      </TableCell>
-
-                      <TableCell className="capitalize text-xs">
-                        {String(w4.filing_status).replace('_', ' ')}
-                      </TableCell>
-                      <TableCell>{state}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(Number(r.base_salary) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(Number(r.one_time_bonus) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(gross)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(fit)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(eeFica)}</TableCell>
-                      <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(suta)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(oneTimeDed)}</TableCell>
-                      <TableCell className="text-right font-semibold">{formatCurrency(net)}</TableCell>
-                      <TableCell>
-                        {r.status === 'finalized' ? (
-                          <Badge className="gap-1"><Lock className="h-3 w-3" /> Finalized</Badge>
-                        ) : r.status === 'voided' ? (
-                          <Badge variant="destructive" className="gap-1"><Ban className="h-3 w-3" /> Voided</Badge>
-                        ) : (
-                          <Badge variant="secondary">Draft</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-1 justify-end">
-                          {r.status === 'draft' && (
-                            <>
-                              <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <ConfirmButton
-                                label="Delete row"
-                                description="This deletes the draft payroll row and its withholding record."
-                                onConfirm={() => deleteRow.mutate(r.id)}
-                                icon={<Trash2 className="h-3.5 w-3.5" />}
-                              />
-                            </>
-                          )}
-                          {r.status === 'finalized' && (
-                            <ConfirmButton
-                              label="Void row"
-                              description="Voiding marks the row as voided so it won't count toward YTD. Finalized rows can't be deleted."
-                              onConfirm={() => voidRow.mutate(r.id)}
-                              icon={<Ban className="h-3.5 w-3.5" />}
-                            />
-                          )}
-                          {locked && r.status === 'voided' && (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                        <div className="text-[13px] capitalize text-muted-foreground">{v.note}</div>
+                      </td>
+                      <td className="figure py-2 text-right">{formatCurrency(v.gross)}</td>
+                      <td className="figure py-2 text-right">{formatCurrency(v.fit)}</td>
+                      <td className="figure py-2 text-right">{formatCurrency(v.eeFica)}</td>
+                      <td className="figure py-2 text-right">{formatCurrency(v.sit)}</td>
+                      <td className="figure py-2 text-right">{formatCurrency(v.deduction)}</td>
+                      <td className="figure py-2 text-right font-semibold">{formatCurrency(v.net)}</td>
+                      <td className="py-2 pl-6">{statusBadge(v.r.status)}</td>
+                      <td className="py-2 pr-4"><div className="flex justify-end">{rowActions(v.r)}</div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </Panel>
 
       {/* Edit dialog */}
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
@@ -761,9 +781,11 @@ export function ActiveBatchTab() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label>One-time bonus ($)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="w2-bonus">One-time bonus ($)</Label>
               <Input
+                id="w2-bonus"
+                className="h-11"
                 type="number"
                 step="0.01"
                 min="0"
@@ -771,9 +793,11 @@ export function ActiveBatchTab() {
                 onChange={(e) => setEditBonus(e.target.value)}
               />
             </div>
-            <div>
-              <Label>One-time deduction ($)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="w2-deduction">One-time deduction ($)</Label>
               <Input
+                id="w2-deduction"
+                className="h-11"
                 type="number"
                 step="0.01"
                 min="0"
@@ -783,23 +807,14 @@ export function ActiveBatchTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={() => saveEdit.mutate()} disabled={saveEdit.isPending}>
-              {saveEdit.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Save & recompute
+            <Button variant="ghost" className="h-11" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button className="h-11" onClick={() => saveEdit.mutate()} disabled={saveEdit.isPending}>
+              {saveEdit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save and recompute
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function TotalTile({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div className={`rounded-md border p-3 ${highlight ? 'bg-primary/5 border-primary/40' : 'bg-muted/30'}`}>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`text-lg font-semibold ${highlight ? 'text-primary' : ''}`}>{value}</div>
     </div>
   );
 }
@@ -810,7 +825,7 @@ function ConfirmButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button size="sm" variant="ghost">{icon}</Button>
+        <Button size="icon" variant="ghost" className="h-11 w-11" aria-label={label}>{icon}</Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

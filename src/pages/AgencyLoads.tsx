@@ -1,27 +1,53 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Field, FormSection } from '@/components/shared/FormParts';
+import { Roster, RosterToolbar, RosterBulkBar, downloadCsv, type RosterEntry } from '@/components/fleet/Roster';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Pencil, Trash2, MoreHorizontal, Briefcase, Archive, ChevronDown } from 'lucide-react';
+import { Pencil, MoreHorizontal, Briefcase, Archive, Download } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Database } from '@/integrations/supabase/types';
-import { cn } from '@/lib/utils';
+import { cityState, formatCurrency } from '@/lib/formatters';
+import { DEFAULT_BCO_SPLIT_PCT, bcoPayout, landstarBilled, marginPercent, summarizeAgencyLoads } from '@/lib/agency-load-math';
 
 type AgencyLoad = Database['public']['Tables']['agency_loads']['Row'];
 type AgencyLoadInsert = Database['public']['Tables']['agency_loads']['Insert'];
+
+const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'booked', label: 'Booked' },
+  { value: 'in_transit', label: 'In transit' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+const day = (d: string | null | undefined) => {
+  if (!d) return null;
+  try {
+    return format(parseISO(d.length === 10 ? `${d}T00:00:00` : d), 'EEE MMM d');
+  } catch {
+    return null;
+  }
+};
+
+const wholeDollars = (v: number) => formatCurrency(v, { maximumFractionDigits: 0 });
 
 export default function AgencyLoads() {
   const queryClient = useQueryClient();
@@ -32,6 +58,8 @@ export default function AgencyLoads() {
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['agency_loads'],
@@ -71,12 +99,7 @@ export default function AgencyLoads() {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { archiveWithUndo } = await import('@/lib/soft-delete');
-      await archiveWithUndo({
-        table: 'agency_loads',
-        id,
-        queryClient,
-        invalidateKeys: [['agency_loads']],
-      });
+      await archiveWithUndo({ table: 'agency_loads', id, queryClient, invalidateKeys: [['agency_loads']] });
     },
     onError: (error) => toast.error(error.message),
   });
@@ -96,7 +119,7 @@ export default function AgencyLoads() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.origin || !formData.destination) {
-      toast.error('Origin and destination are required');
+      toast.error('Pickup and delivery are required');
       return;
     }
     if (editingLoad) {
@@ -106,344 +129,130 @@ export default function AgencyLoads() {
     }
   };
 
-  // Split a "City, ST 12345" style string into pieces so we can stack City/ST above ZIP.
-  const formatAddressDisplay = (address: string | null) => {
-    if (!address) return { city: '-', state: '', zip: '', full: '' };
-    const parts = address.split(',').map((p) => p.trim());
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const m = parts[i].match(/\b([A-Z]{2})\s*(\d{5}(-\d{4})?)?\b/);
-      if (m) {
-        const city = i > 0 ? parts[i - 1].trim() : '';
-        return { city, state: m[1], zip: m[2] || '', full: address };
-      }
-    }
-    return { city: parts[0] || '-', state: '', zip: '', full: address };
-  };
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
-  const fmtMoney = (n: number | null | undefined) =>
-    `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const filtered = loads.filter((l) => {
+    if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [l.load_reference, l.broker_name, l.carrier_name, l.origin, l.destination, l.status, l.notes].filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+  const totals = summarizeAgencyLoads(filtered);
 
-  const fmtDate = (d: string | null | undefined) => {
-    if (!d) return '-';
-    try {
-      return new Date(d.length === 10 ? d + 'T00:00:00' : d).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
-      });
-    } catch { return '-'; }
-  };
-
-  const fmtDateTime = (d: string | null | undefined, tz?: string | null) => {
-    if (!d) return '-';
-    try {
-      const dt = new Date(d);
-      const s = dt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-      return tz ? `${s} ${tz}` : s;
-    } catch { return '-'; }
-  };
-
-  const marginPct = (l: AgencyLoad) => {
-    const br = Number(l.broker_rate) || 0;
-    if (!br) return null;
-    return ((Number(l.margin) || 0) / br) * 100;
-  };
-
-  const RowActions = ({ load }: { load: AgencyLoad }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => openDialog(load)}>
-          <Pencil className="mr-2 h-4 w-4" /> Edit
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-          <Archive className="mr-2 h-4 w-4" /> Archive
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  const columns = [
-    {
-      key: 'load',
-      header: 'Load',
-      render: (l: AgencyLoad) => (
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="font-mono font-semibold text-foreground whitespace-normal break-words">
-            {l.load_reference || l.id.slice(0, 8)}
-          </span>
-          {l.load_reference && (
-            <span className="text-xs text-muted-foreground">{l.id.slice(0, 8)}</span>
+  const entries: RosterEntry[] = filtered.map((l) => {
+    const pct = marginPercent(l);
+    const margin = Number(l.margin) || 0;
+    const reference = l.load_reference || `#${l.id.slice(0, 8)}`;
+    const dates = [day(l.pickup_date), day(l.delivery_date)].filter(Boolean).join(' to ');
+    const landstarSide = Number(l.gross_linehaul) > 0;
+    return {
+      id: l.id,
+      title: reference,
+      onOpen: () => openDialog(l),
+      chips: (
+        <>
+          <StatusBadge status={l.status} />
+          {l.exception_status && l.exception_status !== 'normal' && (
+            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${l.exception_status === 'disrupted' ? 'bg-destructive/15 text-destructive' : 'bg-warning/15 text-warning'}`}>
+              {l.exception_status === 'disrupted' ? 'Disrupted' : 'Update pending'}
+            </span>
           )}
-        </div>
+          {l.pay2day && <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">Pay2Day</span>}
+        </>
       ),
-    },
-    {
-      key: 'agency',
-      header: 'Agency / Carrier',
-      render: (l: AgencyLoad) => (
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="font-medium text-foreground whitespace-normal break-words">
-            {l.broker_name || 'Unassigned agency'}
-          </span>
-          <span className="text-xs text-muted-foreground whitespace-normal break-words">
-            {l.carrier_name || 'Unassigned carrier'}
-          </span>
-        </div>
+      subtitle: (
+        <>
+          <span className="font-medium text-foreground">{cityState(l.origin) || 'Pickup not set'} to {cityState(l.destination) || 'Delivery not set'}</span>
+          {dates && <span className="block tabular-nums">{dates}</span>}
+        </>
       ),
-    },
-    {
-      key: 'origin',
-      header: 'Origin',
-      render: (l: AgencyLoad) => {
-        const a = formatAddressDisplay(l.origin);
-        return (
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="font-medium text-foreground whitespace-normal break-words">
-              {[a.city, a.state].filter(Boolean).join(', ') || a.full || '-'}
-            </span>
-            {a.zip && <span className="text-xs text-muted-foreground">{a.zip}</span>}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'destination',
-      header: 'Destination',
-      render: (l: AgencyLoad) => {
-        const a = formatAddressDisplay(l.destination);
-        return (
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="font-medium text-foreground whitespace-normal break-words">
-              {[a.city, a.state].filter(Boolean).join(', ') || a.full || '-'}
-            </span>
-            {a.zip && <span className="text-xs text-muted-foreground">{a.zip}</span>}
-          </div>
-        );
-      },
-    },
-    { key: 'status', header: 'Status', render: (l: AgencyLoad) => <StatusBadge status={l.status} /> },
-    {
-      key: 'margin',
-      header: 'Margin',
-      render: (l: AgencyLoad) => {
-        const pct = marginPct(l);
-        return (
-          <div className="flex flex-col items-end gap-0.5">
-            <span className={cn('font-semibold', Number(l.margin) >= 0 ? 'text-success' : 'text-destructive')}>
-              {fmtMoney(l.margin)}
-            </span>
-            {pct !== null && (
-              <span className="text-xs text-muted-foreground">{pct.toFixed(1)}%</span>
-            )}
-          </div>
-        );
-      },
-    },
-    { key: 'actions', header: '', render: (load: AgencyLoad) => <RowActions load={load} /> },
-  ];
+      facts: [
+        { label: 'Broker', value: l.broker_name || <span className="font-normal text-muted-foreground">Not set</span> },
+        { label: 'Carrier', value: l.carrier_name || <span className="font-normal text-muted-foreground">Not set</span> },
+        { label: 'Margin', value: `${formatCurrency(margin)}${pct !== null ? `, ${pct.toFixed(1)}%` : ''}`, tone: margin >= 0 ? ('good' as const) : ('bad' as const) },
+        ...(landstarSide ? [{ label: 'You are paid', value: formatCurrency(bcoPayout(l)) }] : []),
+      ],
+      menu: (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for load ${reference}`}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openDialog(l)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(l.id)}><Archive className="mr-2 h-4 w-4" /> Archive</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    };
+  });
 
-  const exceptionMeta = (status: string | null | undefined) => {
-    switch (status) {
-      case 'disrupted':
-        return { label: 'Disrupted', cls: 'bg-destructive/15 text-destructive border-destructive/30' };
-      case 'pending_update':
-        return { label: 'Pending Update', cls: 'bg-warning/15 text-warning border-warning/30' };
-      default:
-        return { label: 'Normal', cls: 'bg-success/15 text-success border-success/30' };
-    }
-  };
-
-  const renderExpanded = (l: AgencyLoad) => {
-    const linehaul = Number(l.gross_linehaul) || 0;
-    const fsc = Number(l.fuel_surcharge) || 0;
-    const tarp = Number(l.tarp_fee) || 0;
-    const splitPct = Number(l.bco_split_pct) || 72;
-    const linehaulPay = linehaul * (splitPct / 100);
-    const totalRevenue = linehaul + fsc + tarp;
-    const bcoPayout = linehaulPay + fsc + tarp;
-    const exc = exceptionMeta(l.exception_status);
-
-    const Line = ({ label, value, strong, accent }: { label: string; value: string; strong?: boolean; accent?: boolean }) => (
-      <div className="flex items-baseline justify-between gap-3 py-1.5">
-        <span className={cn('text-sm', accent ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
-        <span className={cn('text-sm font-mono tabular-nums', strong ? 'font-semibold text-foreground' : 'text-foreground')}>
-          {value}
-        </span>
-      </div>
+  const exportCsv = () =>
+    downloadCsv(
+      'agency-loads',
+      ['Reference', 'Status', 'Broker', 'Carrier', 'Pickup', 'Delivery', 'Pickup date', 'Delivery date', 'Broker rate', 'Carrier rate', 'Margin', 'Gross linehaul', 'Fuel surcharge', 'Tarp fee', 'Split %', 'You are paid'],
+      filtered.map((l) => [l.load_reference, l.status, l.broker_name, l.carrier_name, l.origin, l.destination, l.pickup_date, l.delivery_date, l.broker_rate, l.carrier_rate, l.margin, l.gross_linehaul, l.fuel_surcharge, l.tarp_fee, l.bco_split_pct, bcoPayout(l)]),
     );
 
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Revenue Segregation */}
-          <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-              Revenue Segregation
-            </div>
-            <Line label="Gross Linehaul" value={fmtMoney(linehaul)} />
-            <Line label="Fuel Surcharge" value={fmtMoney(fsc)} />
-            <Line label="Accessorials (Tarp)" value={fmtMoney(tarp)} />
-            <div className="border-t border-border/60 mt-2 pt-2">
-              <Line label="Total Load Revenue" value={fmtMoney(totalRevenue)} strong accent />
-            </div>
-          </div>
-
-          {/* BCO Pay Calculation */}
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-              BCO Pay Calculation
-            </div>
-            <Line label={`Linehaul split (${splitPct}% of Gross Linehaul)`} value={fmtMoney(linehaulPay)} />
-            <Line label="+ Fuel Surcharge (100% pass-through)" value={fmtMoney(fsc)} />
-            <Line label="+ Tarp Fee (100% pass-through)" value={fmtMoney(tarp)} />
-            <div className="border-t border-primary/30 mt-2 pt-2">
-              <Line label="BCO Payout" value={fmtMoney(bcoPayout)} strong accent />
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-              Split applies to linehaul only. Fuel and accessorials pay through at 100%. Deductions are handled at the truck-gross level and are not shown here.
-            </p>
-          </div>
-        </div>
-
-        {/* Tracking & Settlement Variables */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mr-1">
-            Exception:
-          </span>
-          <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold', exc.cls)}>
-            {exc.label}
-          </span>
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold ml-3 mr-1">
-            Settlement:
-          </span>
-          <span
-            className={cn(
-              'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
-              l.pay2day
-                ? 'bg-primary/15 text-primary border-primary/30'
-                : 'bg-muted text-muted-foreground border-border'
-            )}
-          >
-            {l.pay2day ? 'Pay2Day Fast Settlement' : 'Standard Settlement'}
-          </span>
-        </div>
-
-        {/* Timing + reference + notes */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-border/60">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Pickup</div>
-            <div className="text-sm">{l.pickup_at ? fmtDateTime(l.pickup_at, l.pickup_tz) : fmtDate(l.pickup_date)}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Delivery</div>
-            <div className="text-sm">{l.delivery_at ? fmtDateTime(l.delivery_at, l.delivery_tz) : fmtDate(l.delivery_date)}</div>
-          </div>
-          <div className="col-span-2">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Reference</div>
-            <div className="text-sm font-mono break-all">{l.load_reference || '—'}</div>
-          </div>
-        </div>
-        {l.notes && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Notes</div>
-            <div className="text-sm whitespace-pre-wrap break-words rounded-md border border-border/60 bg-muted/30 p-3">
-              {l.notes}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderMobileCard = (l: AgencyLoad) => {
-    const o = formatAddressDisplay(l.origin);
-    const d = formatAddressDisplay(l.destination);
-    const pct = marginPct(l);
-    return (
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <div className="font-mono font-semibold text-sm break-words">
-              {l.load_reference || l.id.slice(0, 8)}
-            </div>
-            <div className="text-sm font-medium text-foreground break-words">
-              {l.broker_name || 'Unassigned agency'}
-            </div>
-            <div className="text-xs text-muted-foreground break-words">
-              Carrier: {l.carrier_name || 'Unassigned'}
-            </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <StatusBadge status={l.status} />
-            <RowActions load={l} />
-          </div>
-        </div>
-        <div className="space-y-2 text-sm">
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">From</div>
-            <div className="font-medium break-words">
-              {[o.city, o.state].filter(Boolean).join(', ') || o.full || '-'}
-            </div>
-            {o.zip && <div className="text-xs text-muted-foreground">{o.zip}</div>}
-          </div>
-          <div className="flex items-center text-muted-foreground pl-0.5" aria-hidden>
-            <ChevronDown className="h-3.5 w-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">To</div>
-            <div className="font-medium break-words">
-              {[d.city, d.state].filter(Boolean).join(', ') || d.full || '-'}
-            </div>
-            {d.zip && <div className="text-xs text-muted-foreground">{d.zip}</div>}
-          </div>
-        </div>
-        <div className="flex items-center justify-between text-xs pt-2 border-t border-border/60">
-          <span className={cn('font-semibold', Number(l.margin) >= 0 ? 'text-success' : 'text-destructive')}>
-            {fmtMoney(l.margin)}
-          </span>
-          {pct !== null && <span className="text-muted-foreground">{pct.toFixed(1)}% margin</span>}
-          <span className="text-muted-foreground">{fmtDate(l.pickup_date)}</span>
-        </div>
-      </div>
-    );
-  };
+  const split = Number(formData.bco_split_pct) || DEFAULT_BCO_SPLIT_PCT;
+  const set = (patch: Partial<AgencyLoadInsert>) => setFormData({ ...formData, ...patch });
+  const money = (v: string, key: keyof AgencyLoadInsert) => set({ [key]: v === '' ? null : parseFloat(v) } as Partial<AgencyLoadInsert>);
 
   return (
     <>
-      <PageHeader title="Agency Loads" description="Manage brokerage and agency loads" action={{ label: 'Add Load', onClick: () => openDialog() }} />
-      <DataTable
-        columns={columns}
-        data={loads}
-        loading={isLoading}
-        emptyMessage="No agency loads yet"
-        emptyDescription="Add your first brokerage load to start tracking margins."
-        emptyIcon={Briefcase}
-        emptyAction={{ label: 'Add First Load', onClick: () => openDialog() }}
-        tableId="agency-loads"
-        exportFilename="agency-loads"
-        onRowDoubleClick={(load) => openDialog(load)}
-        wrapCells
-        expandable
-        renderExpanded={renderExpanded}
-        renderMobileCard={renderMobileCard}
-        selectable
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        bulkActions={(ids) => (
-          <>
-            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
-              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+      <PageHeader title="Agency Loads" description="Brokerage loads, and what each one leaves you" action={{ label: 'Add load', onClick: () => openDialog() }} />
+
+      {!isLoading && loads.length === 0 ? (
+        <EmptyState icon={Briefcase} title="No agency loads yet" description="Add your first brokerage load to start tracking margins." action={{ label: 'Add first load', onClick: () => openDialog() }} />
+      ) : (
+        <>
+          <Panel title="Margin on these loads" description="Cancelled loads are left out." className="mb-5">
+            <StatementLine label="Brokers pay" note={`${totals.loads} ${totals.loads === 1 ? 'load' : 'loads'}, ${totals.open} not delivered`} value={isLoading ? '…' : wholeDollars(totals.brokerPays)} />
+            <StatementLine label="Carriers are paid" value={isLoading ? '…' : `−${wholeDollars(totals.carrierCost)}`} rule="single" />
+            <StatementLine label="Margin" note={totals.brokerPays > 0 ? `${((totals.margin / totals.brokerPays) * 100).toFixed(1)}% of what brokers pay` : undefined} value={isLoading ? '…' : wholeDollars(totals.margin)} strong rule="double" />
+            {totals.bcoPayout > 0 && <StatementLine label="Paid to you on Landstar loads" note="Your split of linehaul, plus fuel surcharge and tarp fee in full" value={wholeDollars(totals.bcoPayout)} muted rule="single" />}
+          </Panel>
+
+          <RosterToolbar search={search} onSearch={setSearch} placeholder="Search reference, broker, carrier, city">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 w-full sm:w-[170px]" aria-label="Status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="h-11" onClick={exportCsv}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-              <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
+          </RosterToolbar>
+
+          <RosterBulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+            <Button variant="outline" className="h-11" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" /> Change status
             </Button>
-          </>
-        )}
-      />
+            <Button variant="outline" className="h-11 text-destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Archive className="mr-2 h-4 w-4" /> Archive
+            </Button>
+          </RosterBulkBar>
+
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground">Loading…</div>
+          ) : (
+            <Roster entries={entries} selectedIds={selectedIds} onToggle={toggleSelect} empty="No loads match your filters." />
+          )}
+        </>
+      )}
+
       <ConfirmDeleteDialog
         open={massDeleteOpen}
         onOpenChange={setMassDeleteOpen}
@@ -451,12 +260,7 @@ export default function AgencyLoads() {
           setBulkUpdating(true);
           try {
             const { archiveManyWithUndo } = await import('@/lib/soft-delete');
-            await archiveManyWithUndo({
-              table: 'agency_loads',
-              ids: [...selectedIds],
-              queryClient,
-              invalidateKeys: [['agency_loads']],
-            });
+            await archiveManyWithUndo({ table: 'agency_loads', ids: [...selectedIds], queryClient, invalidateKeys: [['agency_loads']] });
             setSelectedIds(new Set());
             setMassDeleteOpen(false);
           } catch (e: any) { toast.error(e.message); }
@@ -484,135 +288,111 @@ export default function AgencyLoads() {
         count={selectedIds.size}
         entityName="loads"
         isUpdating={bulkUpdating}
-        statusOptions={[
-          { value: 'pending', label: 'Pending' },
-          { value: 'booked', label: 'Booked' },
-          { value: 'in_transit', label: 'In Transit' },
-          { value: 'delivered', label: 'Delivered' },
-          { value: 'cancelled', label: 'Cancelled' },
-        ]}
+        statusOptions={STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[92vh] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>{editingLoad ? 'Edit Agency Load' : 'Add New Agency Load'}</DialogTitle>
+            <DialogTitle>{editingLoad ? `Edit load ${editingLoad.load_reference || ''}`.trim() : 'Add an agency load'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="load_reference">Load Reference</Label>
-                <Input id="load_reference" value={formData.load_reference || ''} onChange={(e) => setFormData({ ...formData, load_reference: e.target.value })} placeholder="REF-12345" />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <FormSection title="The load">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Load reference" htmlFor="load_reference">
+                  <Input id="load_reference" value={formData.load_reference || ''} onChange={(e) => set({ load_reference: e.target.value })} placeholder="REF-12345" />
+                </Field>
+                <Field label="Status" htmlFor="status">
+                  <Select value={formData.status || 'pending'} onValueChange={(v) => set({ status: v })}>
+                    <SelectTrigger id="status"><SelectValue /></SelectTrigger>
+                    <SelectContent>{STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Broker" htmlFor="broker_name">
+                  <Input id="broker_name" value={formData.broker_name || ''} onChange={(e) => set({ broker_name: e.target.value })} />
+                </Field>
+                <Field label="Carrier" htmlFor="carrier_name">
+                  <Input id="carrier_name" value={formData.carrier_name || ''} onChange={(e) => set({ carrier_name: e.target.value })} />
+                </Field>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status || 'pending'} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="booked">Booked</SelectItem>
-                    <SelectItem value="in_transit">In Transit</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
+            </FormSection>
+
+            <FormSection title="Route and dates">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Pickup" htmlFor="origin">
+                  <Input id="origin" value={formData.origin || ''} onChange={(e) => set({ origin: e.target.value })} placeholder="City, State" required />
+                </Field>
+                <Field label="Delivery" htmlFor="destination">
+                  <Input id="destination" value={formData.destination || ''} onChange={(e) => set({ destination: e.target.value })} placeholder="City, State" required />
+                </Field>
+                <Field label="Pickup date" htmlFor="pickup_date">
+                  <Input id="pickup_date" type="date" value={formData.pickup_date || ''} onChange={(e) => set({ pickup_date: e.target.value })} />
+                </Field>
+                <Field label="Delivery date" htmlFor="delivery_date">
+                  <Input id="delivery_date" type="date" value={formData.delivery_date || ''} onChange={(e) => set({ delivery_date: e.target.value })} />
+                </Field>
               </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="broker_name">Broker Name</Label>
-                <Input id="broker_name" value={formData.broker_name || ''} onChange={(e) => setFormData({ ...formData, broker_name: e.target.value })} />
+            </FormSection>
+
+            <FormSection title="Rates" description="What the broker pays and what the carrier is paid. The difference is your margin.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Broker rate" htmlFor="broker_rate">
+                  <CurrencyInput id="broker_rate" value={formData.broker_rate ?? ''} onChange={(v) => money(v, 'broker_rate')} placeholder="0.00" />
+                </Field>
+                <Field label="Carrier rate" htmlFor="carrier_rate">
+                  <CurrencyInput id="carrier_rate" value={formData.carrier_rate ?? ''} onChange={(v) => money(v, 'carrier_rate')} placeholder="0.00" />
+                </Field>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="carrier_name">Carrier Name</Label>
-                <Input id="carrier_name" value={formData.carrier_name || ''} onChange={(e) => setFormData({ ...formData, carrier_name: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="origin">Origin *</Label>
-                <Input id="origin" value={formData.origin || ''} onChange={(e) => setFormData({ ...formData, origin: e.target.value })} placeholder="City, State" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="destination">Destination *</Label>
-                <Input id="destination" value={formData.destination || ''} onChange={(e) => setFormData({ ...formData, destination: e.target.value })} placeholder="City, State" required />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="pickup_date">Pickup Date</Label>
-                <Input id="pickup_date" type="date" value={formData.pickup_date || ''} onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="delivery_date">Delivery Date</Label>
-                <Input id="delivery_date" type="date" value={formData.delivery_date || ''} onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="broker_rate">Broker Rate ($)</Label>
-                <Input id="broker_rate" type="number" step="0.01" value={formData.broker_rate || ''} onChange={(e) => setFormData({ ...formData, broker_rate: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="carrier_rate">Carrier Rate ($)</Label>
-                <Input id="carrier_rate" type="number" step="0.01" value={formData.carrier_rate || ''} onChange={(e) => setFormData({ ...formData, carrier_rate: parseFloat(e.target.value) || 0 })} />
-              </div>
-            </div>
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-4">
-              <div className="text-sm font-semibold">Landstar / Revenue</div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="gross_linehaul">Gross Linehaul ($)</Label>
-                  <Input id="gross_linehaul" type="number" step="0.01" value={formData.gross_linehaul ?? ''} onChange={(e) => setFormData({ ...formData, gross_linehaul: e.target.value === '' ? null : parseFloat(e.target.value) })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fuel_surcharge">Fuel Surcharge ($)</Label>
-                  <Input id="fuel_surcharge" type="number" step="0.01" value={formData.fuel_surcharge ?? ''} onChange={(e) => setFormData({ ...formData, fuel_surcharge: e.target.value === '' ? null : parseFloat(e.target.value) })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tarp_fee">Tarp Fee ($)</Label>
-                  <Input id="tarp_fee" type="number" step="0.01" value={formData.tarp_fee ?? ''} onChange={(e) => setFormData({ ...formData, tarp_fee: e.target.value === '' ? null : parseFloat(e.target.value) })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="bco_split_pct">BCO Split % (65–75)</Label>
-                  <Input id="bco_split_pct" type="number" step="0.5" min={65} max={75} value={formData.bco_split_pct ?? 72} onChange={(e) => setFormData({ ...formData, bco_split_pct: e.target.value === '' ? 72 : parseFloat(e.target.value) })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="exception_status">Exception Status</Label>
-                  <Select value={formData.exception_status || 'normal'} onValueChange={(v) => setFormData({ ...formData, exception_status: v })}>
+            </FormSection>
+
+            <FormSection title="If it runs on Landstar" description="Leave these empty for a load you broker to another carrier.">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Gross linehaul" htmlFor="gross_linehaul">
+                  <CurrencyInput id="gross_linehaul" value={formData.gross_linehaul ?? ''} onChange={(v) => money(v, 'gross_linehaul')} placeholder="0.00" />
+                </Field>
+                <Field label="Fuel surcharge" htmlFor="fuel_surcharge">
+                  <CurrencyInput id="fuel_surcharge" value={formData.fuel_surcharge ?? ''} onChange={(v) => money(v, 'fuel_surcharge')} placeholder="0.00" />
+                </Field>
+                <Field label="Tarp fee" htmlFor="tarp_fee">
+                  <CurrencyInput id="tarp_fee" value={formData.tarp_fee ?? ''} onChange={(v) => money(v, 'tarp_fee')} placeholder="0.00" />
+                </Field>
+                <Field label="Your split of linehaul (%)" htmlFor="bco_split_pct" hint="Landstar pays 65 to 75 percent.">
+                  <Input id="bco_split_pct" type="number" step="0.5" min={65} max={75} value={formData.bco_split_pct ?? DEFAULT_BCO_SPLIT_PCT} onChange={(e) => set({ bco_split_pct: e.target.value === '' ? DEFAULT_BCO_SPLIT_PCT : parseFloat(e.target.value) })} />
+                </Field>
+                <Field label="Problems with this load" htmlFor="exception_status">
+                  <Select value={formData.exception_status || 'normal'} onValueChange={(v) => set({ exception_status: v })}>
                     <SelectTrigger id="exception_status"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="normal">None</SelectItem>
                       <SelectItem value="disrupted">Disrupted</SelectItem>
-                      <SelectItem value="pending_update">Pending Update</SelectItem>
+                      <SelectItem value="pending_update">Waiting on an update</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pay2day">Settlement</Label>
-                  <label className="flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
-                    <input
-                      id="pay2day"
-                      type="checkbox"
-                      className="h-4 w-4 accent-primary"
-                      checked={!!formData.pay2day}
-                      onChange={(e) => setFormData({ ...formData, pay2day: e.target.checked })}
-                    />
-                    <span className="text-sm">Pay2Day fast settlement</span>
-                  </label>
+                </Field>
+                <div className="flex items-end pb-1">
+                  <div className="flex h-11 items-center gap-3">
+                    <Checkbox id="pay2day" checked={!!formData.pay2day} onCheckedChange={(checked) => set({ pay2day: !!checked })} />
+                    <Label htmlFor="pay2day" className="cursor-pointer font-normal">Pay2Day fast settlement</Label>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" value={formData.notes || ''} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createMutation.isPending || updateMutation.isPending}>
-                {editingLoad ? 'Save Changes' : 'Add Load'}
+
+              <Panel title="What this pays you" description="Split applies to linehaul only. Fuel surcharge and tarp fee pay through in full." className="mt-4">
+                <StatementLine label="Billed on the Landstar side" note="Gross linehaul, fuel surcharge and tarp fee" value={formatCurrency(landstarBilled(formData))} />
+                <StatementLine label={`Your ${split}% of linehaul`} value={formatCurrency((Number(formData.gross_linehaul) || 0) * (split / 100))} rule="single" />
+                <StatementLine label="Fuel surcharge and tarp fee" value={formatCurrency((Number(formData.fuel_surcharge) || 0) + (Number(formData.tarp_fee) || 0))} rule="single" />
+                <StatementLine label="You are paid" value={formatCurrency(bcoPayout(formData))} strong rule="double" />
+              </Panel>
+            </FormSection>
+
+            <FormSection title="Notes">
+              <Textarea id="notes" aria-label="Notes" value={formData.notes || ''} onChange={(e) => set({ notes: e.target.value })} placeholder="Anything the next person should know" rows={3} />
+            </FormSection>
+
+            <DialogFooter className="sticky -bottom-4 z-10 -mx-4 mt-2 flex-row justify-end gap-2 border-t bg-background px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:space-x-0 sm:px-6">
+              <Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none" onClick={closeDialog}>Cancel</Button>
+              <LoadingButton type="submit" className="h-11 flex-1 gradient-gold text-primary-foreground sm:flex-none" loading={createMutation.isPending || updateMutation.isPending}>
+                {editingLoad ? 'Save changes' : 'Add load'}
               </LoadingButton>
             </DialogFooter>
           </form>

@@ -24,9 +24,20 @@ const StatementUpload = lazy(() =>
   import('@/components/finance/StatementUpload').then(m => ({ default: m.StatementUpload })),
 );
 import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks';
-import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
+import { YearToDateCheck } from '@/components/finance/YearToDateCheck';
+import { TrueUpLoads } from '@/components/finance/TrueUpLoads';
+import { WeeklyProof } from '@/components/finance/WeeklyProof';
+import { YearLedger } from '@/components/finance/YearLedger';
+import { RevenueOverview } from '@/components/finance/RevenueOverview';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
+import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
+import { PossibleDuplicates } from '@/components/finance/PossibleDuplicates';
+import { ImportedLinesToCheck } from '@/components/finance/ImportedLinesToCheck';
+import { ExpenseSummary } from '@/components/finance/ExpenseSummary';
+import { ExpensesList } from '@/components/finance/ExpensesList';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
+import { driverPayTotals, fuelStats } from '@/lib/pl-metrics';
 const RevenueTab = lazy(() =>
   import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
 );
@@ -38,7 +49,8 @@ import { ActiveBatchTab } from '@/components/finance/inhouse-payroll/ActiveBatch
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
 import { SafetyBonusPayouts } from '@/components/finance/SafetyBonusPayouts';
-import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
+import { format, parseISO, endOfMonth, endOfQuarter, endOfDay, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
+import { settlementWeek } from '@/lib/settlement-week';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { FactoringTab } from '@/components/finance/FactoringTab';
@@ -62,13 +74,14 @@ export default function Finance() {
   const canManagePayroll = hasRole('owner') || hasRole('payroll_admin');
   const { isIndependent } = useOrganizationMode();
   // Default to current month
-  const now = new Date();
-  const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
+  // Opens on the current Landstar settlement week: "this week's settlement" is a top phone job.
+  const defaultPeriod = 'week';
   const [selectedPeriod, setSelectedPeriod] = useState<string>(defaultPeriod);
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [showW2Batch, setShowW2Batch] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
@@ -95,7 +108,7 @@ export default function Finance() {
     },
   });
 
-  const { data: loads = [] } = useQuery({
+  const { data: loads = [], isLoading: loadsLoading } = useQuery({
     queryKey: ['fleet_loads'],
     queryFn: async () => {
       const { data, error } = await supabase.from('fleet_loads').select('*').is('deleted_at', null).order('pickup_date', { ascending: false });
@@ -113,7 +126,7 @@ export default function Finance() {
     },
   });
 
-  const { data: expenses = [] } = useQuery({
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery({
     queryKey: ['expenses'],
     queryFn: async () => {
       const { data, error } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false });
@@ -131,6 +144,20 @@ export default function Finance() {
     },
   });
 
+  // Truck loan payments are a real operating cost. The loan ledger (Trucks page)
+  // is the source of truth; any auto-posted 'Truck Loan' expense rows mirror it
+  // and are excluded below so a payment is never counted twice.
+  const { data: truckLoanPayments = [] } = useQuery({
+    queryKey: ['truck_loan_payments'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('truck_loan_payments')
+        .select('id, truck_id, payment_date, amount');
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; truck_id: string; payment_date: string; amount: number }>;
+    },
+  });
+
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
@@ -144,6 +171,32 @@ export default function Finance() {
     queryKey: ['driver_payroll'],
     queryFn: async () => {
       const { data, error } = await supabase.from('driver_payroll').select('*').is('deleted_at', null).order('period_end', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Driver pay lives in generated settlement statements as well as W-2 payroll batches.
+  const { data: driverSettlements = [] } = useQuery({
+    queryKey: ['driver_settlements_cost'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_settlements')
+        .select('driver_id, period_end, status, gross_pay, reimbursements')
+        .is('deleted_at', null);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Approved or paid safety bonuses are driver pay too.
+  const { data: safetyBonuses = [] } = useQuery({
+    queryKey: ['safety_bonus_payouts_cost'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('safety_bonus_payouts')
+        .select('period_end, status, earned_amount, paid_in_settlement_id')
+        .is('deleted_at', null);
       if (error) throw error;
       return data;
     },
@@ -178,11 +231,11 @@ export default function Finance() {
   });
 
   const deleteExpenseMutation = useMutation({
+    // Archived, not erased: the Archive page can restore it, and the toast offers Undo.
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expenses').delete().eq('id', id);
-      if (error) throw error;
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({ table: 'expenses', id, queryClient, invalidateKeys: [['expenses']] });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); toast.success('Expense deleted'); },
     onError: (error) => toast.error(error.message),
   });
 
@@ -205,14 +258,12 @@ export default function Finance() {
     setIsMassDeleting(true);
     try {
       const ids = Array.from(selectedExpenseIds);
-      const { error } = await supabase.from('expenses').delete().in('id', ids);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast.success(`${ids.length} expenses deleted`);
+      const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+      await archiveManyWithUndo({ table: 'expenses', ids, queryClient, invalidateKeys: [['expenses']] });
       setSelectedExpenseIds(new Set());
       setMassDeleteDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to delete expenses');
+      toast.error(error.message || 'Failed to archive expenses');
     } finally {
       setIsMassDeleting(false);
     }
@@ -242,111 +293,54 @@ export default function Finance() {
   };
 
   // ===== PERIOD FILTERING =====
+  // One place that turns the period picker into a date range.
+  // 'week' is the current Landstar settlement week (Thu to the period-ending Wed).
+  const periodInterval = (): { start: Date; end: Date } | null => {
+    if (selectedPeriod === 'all') return null;
+    if (selectedPeriod === 'week') {
+      const w = settlementWeek(new Date());
+      return { start: w.start, end: endOfDay(w.end) };
+    }
+    const [year, period] = selectedPeriod.split('-');
+    const yearNum = parseInt(year);
+    if (period.startsWith('Q')) {
+      const start = new Date(yearNum, (parseInt(period.substring(1)) - 1) * 3, 1);
+      return { start, end: endOfQuarter(start) };
+    }
+    const start = new Date(yearNum, parseInt(period) - 1, 1);
+    return { start, end: endOfMonth(start) };
+  };
+  const inPeriod = (date: string | null | undefined) => {
+    const range = periodInterval();
+    if (!range) return true;
+    return !!date && isWithinInterval(parseISO(date), range);
+  };
+
   const filterByPeriod = <T extends Record<string, any>>(items: T[], dateField: string): T[] => {
     let filtered = items;
     if (selectedTruck !== 'all' && 'truck_id' in (filtered[0] || {})) {
       filtered = filtered.filter((item) => (item as any).truck_id === selectedTruck);
     }
-    if (selectedPeriod === 'all') return filtered;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return filtered.filter((item) => {
-        if (!item[dateField]) return false;
-        const date = parseISO(item[dateField]);
-        return isWithinInterval(date, { start, end });
-      });
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return filtered.filter((item) => {
-        if (!item[dateField]) return false;
-        const date = parseISO(item[dateField]);
-        return isWithinInterval(date, { start, end });
-      });
-    }
+    return filtered.filter((item) => inPeriod(item[dateField]));
   };
 
   const getFilteredLoads = () => {
     let filtered = loads;
     if (selectedTruck !== 'all') filtered = filtered.filter((l: any) => l.truck_id === selectedTruck);
-    if (selectedPeriod === 'all') return filtered;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return filtered.filter((l: any) => l.pickup_date && isWithinInterval(parseISO(l.pickup_date), { start, end }));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return filtered.filter((l: any) => l.pickup_date && isWithinInterval(parseISO(l.pickup_date), { start, end }));
-    }
+    // Revenue is recognized on delivery (that's when Landstar pays), matching the
+    // Executive Dashboard. Loads without a delivery date fall back to pickup.
+    return filtered.filter((l: any) => inPeriod(l.delivery_date || l.pickup_date));
   };
 
   const getFilteredExpenses = () => {
     let filtered = expenses;
     if (selectedTruck !== 'all') filtered = filtered.filter((e: Expense) => e.truck_id === selectedTruck);
-    if (selectedPeriod === 'all') return filtered;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return filtered.filter((e: Expense) => e.expense_date && isWithinInterval(parseISO(e.expense_date), { start, end }));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return filtered.filter((e: Expense) => e.expense_date && isWithinInterval(parseISO(e.expense_date), { start, end }));
-    }
+    return filtered.filter((e: Expense) => inPeriod(e.expense_date));
   };
 
-  const getFilteredPayrolls = () => {
-    if (selectedPeriod === 'all') return payrolls;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return payrolls.filter((p: DriverPayroll) => p.period_end && isWithinInterval(parseISO(p.period_end), { start, end }));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return payrolls.filter((p: DriverPayroll) => p.period_end && isWithinInterval(parseISO(p.period_end), { start, end }));
-    }
-  };
+  const getFilteredPayrolls = () => payrolls.filter((p: DriverPayroll) => inPeriod(p.period_end));
 
-  const getFilteredCommissions = () => {
-    if (selectedPeriod === 'all') return commissions;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return commissions.filter((c: AgentCommission) => c.payout_date && isWithinInterval(parseISO(c.payout_date), { start, end }));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return commissions.filter((c: AgentCommission) => c.payout_date && isWithinInterval(parseISO(c.payout_date), { start, end }));
-    }
-  };
+  const getFilteredCommissions = () => commissions.filter((c: AgentCommission) => inPeriod(c.payout_date));
 
   const filteredLoads = getFilteredLoads();
   const deliveredLoads = filteredLoads.filter((l: any) => l.status === 'delivered');
@@ -429,7 +423,11 @@ export default function Finance() {
     operatingTotal: acc.operatingTotal + (exp.operating_total || 0),
   }), { fuelCost: 0, truckPayment: 0, operatingTotal: 0 });
 
-  const standaloneExpenses = filteredExpenses.filter((e: Expense) => !e.load_id);
+  const TRUCK_LOAN_TYPE = 'Truck Loan';
+  const filteredTruckPayments = filterByPeriod(truckLoanPayments, 'payment_date');
+  const truckPaymentsTotal = filteredTruckPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  const standaloneExpenses = filteredExpenses.filter((e: Expense) => !e.load_id && e.expense_type !== TRUCK_LOAN_TYPE);
   const loadLinkedExpenses = filteredExpenses.filter((e: Expense) => e.load_id && loadIds.includes(e.load_id));
 
   // Split into actual / advance / credit buckets
@@ -469,9 +467,15 @@ export default function Finance() {
     amount: acc.amount + (c.commission_amount || 0),
   }), { count: 0, amount: 0 });
 
-  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total - creditsTotal;
-  const grossExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
-  const totalPayroll = payrollTotals.netPay;
+  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal - creditsTotal;
+  const grossExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal;
+  // Driver pay: approved or paid settlement statements (gross pay plus reimbursements) and W-2 payroll batches.
+  const driverPay = driverPayTotals(
+    driverSettlements.filter((st: any) => inPeriod(st.period_end)),
+    filteredPayrolls,
+    safetyBonuses.filter((b: any) => inPeriod(b.period_end)),
+  );
+  const totalPayroll = driverPay.total;
   const totalRevenueWithCommissions = revenueTotals.netRevenue + commissionTotals.amount;
   const netProfit = totalRevenueWithCommissions - totalExpenses - totalPayroll;
   const profitMargin = totalRevenueWithCommissions > 0 ? (netProfit / totalRevenueWithCommissions) * 100 : 0;
@@ -536,27 +540,14 @@ export default function Finance() {
   };
 
 
-  return (
-    <>
-      <PageHeader
-        title="Financial Hub"
-        description="Revenue, expenses, profitability, and payouts in one place"
-      >
-        <Button
-          onClick={() => setUploadDialogOpen(true)}
-          className="w-full sm:w-auto gradient-gold text-primary-foreground"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          Upload Statement
-        </Button>
-      </PageHeader>
-
-      {/* Period and Truck Selector */}
-      <div className="flex flex-wrap gap-4 mb-6">
+  // Period and truck pickers. The period applies to Profit & loss and Expenses; the settlement tab has its own week.
+  const renderFilters = (showTruck = true) => (
+      <div className="grid grid-cols-2 gap-2 mb-4 sm:flex sm:flex-wrap sm:gap-3">
         <Select value={selectedPeriod} onValueChange={(v) => { setSelectedPeriod(v); setExpensePage(0); }}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Select period" /></SelectTrigger>
+          <SelectTrigger className="h-11 sm:h-10 sm:w-48" aria-label="Period"><SelectValue placeholder="Select period" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="week">This settlement week</SelectItem>
+            <SelectItem value="all">All time</SelectItem>
             {(() => {
               // Dynamically generate periods from data
               const dates: Date[] = [];
@@ -585,403 +576,129 @@ export default function Finance() {
             })()}
           </SelectContent>
         </Select>
-        <Select value={selectedTruck} onValueChange={setSelectedTruck}>
-          <SelectTrigger className="w-56">
-            <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Select truck" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Units (Company)</SelectItem>
-            {trucks.map((truck: any) => (
-              <SelectItem key={truck.id} value={truck.id}>Unit #{truck.unit_number}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {showTruck && (
+          <Select value={selectedTruck} onValueChange={setSelectedTruck}>
+            <SelectTrigger className="h-11 sm:h-10 sm:w-56" aria-label="Truck">
+              <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Select truck" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Units (Company)</SelectItem>
+              {trucks.map((truck: any) => (
+                <SelectItem key={truck.id} value={truck.id}>Unit #{truck.unit_number}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
+  );
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(revenueTotals.netRevenue)}</div>
-            <p className="text-xs text-muted-foreground">{revenueTotals.loadCount} loads · Gross: {formatCurrency(revenueTotals.grossRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses + totalPayroll)}</div>
-            <p className="text-xs text-muted-foreground">
-              Operating + Payroll {creditsTotal > 0 && <span className="text-success">· Credits: -{formatCurrency(creditsTotal)}</span>}
-            </p>
-            {advancesTotal > 0 && (
-              <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
-                <Banknote className="h-3 w-3" /> Advances: {formatCurrency(advancesTotal)} (non-P&L)
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            <PiggyBank className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</div>
-            <p className="text-xs text-muted-foreground">Margin: {profitMargin.toFixed(1)}%</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Equipment Debt</CardTitle>
-            <Landmark className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const activeLoanTrucks = trucks.filter((t: any) => t.status === 'active' && t.monthly_payment != null && t.monthly_payment > 0);
-              const totalMonthly = activeLoanTrucks.reduce((sum: number, t: any) => sum + (t.monthly_payment || 0), 0);
-              return (
-                <>
-                  <div className="text-2xl font-bold">{formatCurrency(totalMonthly)}</div>
-                  <p className="text-xs text-muted-foreground">{activeLoanTrucks.length} truck{activeLoanTrucks.length !== 1 ? 's' : ''} with active loans · /mo</p>
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
-      </div>
+  const VIEWS = ['settlement', 'overview', 'pnl', 'expenses', 'payroll', 'settings'];
+  // Old links used these names; keep them working.
+  const VIEW_ALIASES: Record<string, string> = { payouts: 'payroll', compliance: 'expenses', analytics: 'pnl', settlements: 'settlement', 'inhouse-payroll': 'payroll' };
+  const rawView = searchParams.get('view') ?? searchParams.get('tab') ?? 'settlement';
+  const view = VIEWS.includes(rawView) ? rawView : (VIEW_ALIASES[rawView] ?? 'settlement');
+
+  return (
+    <>
+      <PageHeader
+        title="Money"
+        description="Revenue, expenses, and Landstar settlements"
+      >
+        <Button
+          variant="outline"
+          onClick={() => setUploadDialogOpen(true)}
+          className="h-11 sm:h-10 w-full sm:w-auto"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Statement
+        </Button>
+      </PageHeader>
 
       <Tabs
-        value={(searchParams.get('view') as 'payouts' | 'compliance' | 'analytics') || 'payouts'}
+        value={view}
         onValueChange={(v) => {
           const next = new URLSearchParams(searchParams);
+          next.delete('tab');
           next.set('view', v);
           setSearchParams(next, { replace: true });
         }}
         className="w-full"
       >
-        <TabsList className="grid grid-cols-3 gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-2xl mx-auto mb-6">
-          <TabsTrigger value="payouts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            1. Run Payouts
-          </TabsTrigger>
-          <TabsTrigger value="compliance" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            2. Expenses
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            3. Analytics & Audit Logs
-          </TabsTrigger>
+        <TabsList className="mb-5 h-auto w-full justify-start gap-1 overflow-x-auto bg-muted p-1">
+          {([
+            ['settlement', 'Settlement'],
+            ['overview', 'Overview'],
+            ['pnl', 'Profit & loss'],
+            ['expenses', 'Expenses'],
+            ['payroll', 'Payroll'],
+            ['settings', 'Settings'],
+          ] as const).map(([value, label]) => (
+            <TabsTrigger key={value} value={value} className="h-11 shrink-0 px-4 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              {label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        {/* ===== VIEW 1 — RUN PAYOUTS ===== */}
-        <TabsContent value="payouts">
-          <div className="space-y-8 animate-in fade-in-50">
-            {canManagePayroll && (
-              <section className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" /> W-2 Active Payroll Batch
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Automatic tax-ready W-2 payroll — FIT via IRS Pub 15-T, FICA, additional Medicare,
-                  and per-state SUTA/SIT computed from each driver's W-4 and tax state.
-                </p>
-                <ActiveBatchTab />
-              </section>
+        {/* ===== SETTLEMENT: the weekly Landstar statement ===== */}
+        <TabsContent value="settlement">
+          <div className="animate-in fade-in-50">
+            {trucks.length > 1 && (
+              <div className="mb-4">
+                <Select value={selectedTruck} onValueChange={setSelectedTruck}>
+                  <SelectTrigger className="h-11 sm:h-10 sm:w-56" aria-label="Truck">
+                    <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Select truck" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Units (Company)</SelectItem>
+                    {trucks.map((truck: any) => (
+                      <SelectItem key={truck.id} value={truck.id}>Unit #{truck.unit_number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
-
-
-            <section className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" /> Contractor Settlements (1099)
-              </h3>
-              <DriverSettlementsTab />
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Percent className="h-5 w-5 text-primary" /> Agent Commissions
-              </h3>
-              <CommissionsTab
-                filteredCommissions={filteredCommissions}
-                commissionTotals={commissionTotals}
-                commissionsLoading={commissionsLoading}
-              />
-            </section>
+            <SettlementStatementTab
+              loads={loads as any}
+              expenses={expenses as any}
+              truckId={selectedTruck}
+              isLoading={loadsLoading || expensesLoading}
+              onUpload={() => setUploadDialogOpen(true)}
+            />
+            <div className="mt-5">
+              <YearToDateCheck loads={loads as any} />
+            </div>
+            <div className="mt-5">
+              <TrueUpLoads getSetting={getSetting} />
+            </div>
+            <div className="mt-5">
+              <WeeklyProof getSetting={getSetting} onTick={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))} />
+            </div>
+            <div className="mt-5">
+              <YearLedger />
+            </div>
           </div>
         </TabsContent>
 
-        {/* ===== VIEW 2 — TAX & COMPLIANCE ===== */}
-        <TabsContent value="compliance">
-          <div className="space-y-8 animate-in fade-in-50">
-            <Card className="card-elevated">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" /> Historical Expenses</CardTitle>
-                  <CardDescription>Track expenses by type, optionally link to a load or truck</CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Select onValueChange={selectExpensesByType}>
-                    <SelectTrigger className="w-44"><SelectValue placeholder="Select by type" /></SelectTrigger>
-                    <SelectContent>
-                      {[...new Set(sortedFilteredExpenses.map(e => e.expense_type))].sort().map(type => {
-                        const count = sortedFilteredExpenses.filter(e => e.expense_type === type).length;
-                        return <SelectItem key={type} value={type}>{type} ({count})</SelectItem>;
-                      })}
-                    </SelectContent>
-                  </Select>
-                  {selectedExpenseIds.size > 0 && (
-                    <>
-                      <Button variant="outline" onClick={() => { setMassEditFormData({}); setMassEditDialogOpen(true); }}>
-                        <CheckSquare className="h-4 w-4 mr-2" /> Edit {selectedExpenseIds.size} Selected
-                      </Button>
-                      <Button variant="destructive" onClick={() => setMassDeleteDialogOpen(true)}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedExpenseIds.size} Selected
-                      </Button>
-                    </>
-                  )}
-                  <Button onClick={() => openExpenseDialog()} className="gradient-gold text-primary-foreground">
-                    <Plus className="h-4 w-4 mr-2" /> Add Expense
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-lg border border-border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="w-10">
-                          <Checkbox checked={sortedFilteredExpenses.length > 0 && selectedExpenseIds.size === sortedFilteredExpenses.length} onCheckedChange={toggleSelectAllExpenses} />
-                        </TableHead>
-                        {(['expense_date', 'expense_type', 'description', 'amount', 'gallons', 'truck_id', 'load_id'] as SortField[]).map(field => (
-                          <TableHead key={field} className="cursor-pointer hover:bg-muted/80 select-none" onClick={() => handleSort(field)}>
-                            <div className="flex items-center">
-                              {{ expense_date: 'Date', expense_type: 'Type', description: 'Description', amount: 'Amount', gallons: 'Gallons', truck_id: 'Truck', load_id: 'Load' }[field]}
-                              <SortIcon field={field} />
-                            </div>
-                          </TableHead>
-                        ))}
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedFilteredExpenses.length === 0 ? (
-                        <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No expenses for this period</TableCell></TableRow>
-                      ) : (
-                        sortedFilteredExpenses.slice(expensePage * EXPENSES_PER_PAGE, (expensePage + 1) * EXPENSES_PER_PAGE).map((expense) => {
-                          const isRefund = isCreditExpense(expense);
-                          const isAdvance = isAdvanceExpense(expense);
-                          const absAmount = Math.abs(Number(expense.amount));
-                          return (
-                            <TableRow key={expense.id} className={`${selectedExpenseIds.has(expense.id) ? 'bg-primary/5' : ''} ${isAdvance ? 'opacity-70' : ''}`}>
-                              <TableCell><Checkbox checked={selectedExpenseIds.has(expense.id)} onCheckedChange={() => toggleExpenseSelection(expense.id)} /></TableCell>
-                              <TableCell>{expense.expense_date ? format(parseISO(expense.expense_date), 'MM/dd/yyyy') : '-'}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  {isRefund && <TrendingUp className="h-4 w-4 text-success" />}
-                                  {isAdvance && <Banknote className="h-4 w-4 text-warning" />}
-                                  <span className={isRefund ? 'text-success font-medium' : isAdvance ? 'text-warning font-medium' : ''}>{expense.expense_type}</span>
-                                  {isAdvance && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/30 text-warning">Non-P&L</Badge>}
-                                </div>
-                              </TableCell>
-                              <TableCell>{expense.description || '-'}</TableCell>
-                              <TableCell>
-                                <span className={`font-medium ${isRefund ? 'text-success' : isAdvance ? 'text-warning' : 'text-destructive'}`}>
-                                  {isRefund ? '+' : '-'}{formatCurrency(absAmount)}
-                                </span>
-                              </TableCell>
-                              <TableCell>{expense.gallons ? `${expense.gallons} gal` : '-'}</TableCell>
-                              <TableCell>{getTruckName(expense.truck_id)}</TableCell>
-                              <TableCell>{getLoadName(expense.load_id)}</TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => openExpenseDialog(expense)}>
-                                      <Pencil className="mr-2 h-4 w-4" /> Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteConfirmId(expense.id)}>
-                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                {sortedFilteredExpenses.length > EXPENSES_PER_PAGE && (
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Showing {expensePage * EXPENSES_PER_PAGE + 1}–{Math.min((expensePage + 1) * EXPENSES_PER_PAGE, sortedFilteredExpenses.length)} of {sortedFilteredExpenses.length}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" disabled={expensePage === 0} onClick={() => setExpensePage(p => p - 1)}>Previous</Button>
-                      <Button variant="outline" size="sm" disabled={(expensePage + 1) * EXPENSES_PER_PAGE >= sortedFilteredExpenses.length} onClick={() => setExpensePage(p => p + 1)}>Next</Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="card-elevated">
-              <CardHeader>
-                <CardTitle>Expense Breakdown</CardTitle>
-                <CardDescription>Summary by category for the selected period</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-semibold mb-3">Standalone Expenses</h4>
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {Object.keys(standaloneExpenseTotals.byType).sort().map(type => {
-                          const amount = standaloneExpenseTotals.byType[type] || 0;
-                          const gallons = standaloneExpenseTotals.gallonsByType[type] || 0;
-                          if (amount === 0) return null;
-                          return (
-                            <TableRow key={type}>
-                              <TableCell className="flex items-center gap-2">
-                                {(type === 'Fuel' || type === 'DEF') && <Fuel className="h-4 w-4" />}
-                                {type}
-                                {gallons > 0 && <span className="text-xs text-muted-foreground">({gallons.toFixed(1)} gal)</span>}
-                              </TableCell>
-                              <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                        <TableRow className="bg-warning/10">
-                          <TableCell className="font-bold">Total Standalone</TableCell>
-                          <TableCell className="text-right font-bold text-warning">{formatCurrency(standaloneExpenseTotals.total)}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-3">Load-Linked Expenses</h4>
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {Object.keys(loadLinkedExpenseTotals.byType).sort().map(type => {
-                          const amount = loadLinkedExpenseTotals.byType[type] || 0;
-                          if (amount === 0) return null;
-                          return (
-                            <TableRow key={type}>
-                              <TableCell>{type}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                        {loadExpenseTotals.operatingTotal > 0 && (
-                          <TableRow>
-                            <TableCell>Operating (Legacy)</TableCell>
-                            <TableCell className="text-right">{formatCurrency(loadExpenseTotals.operatingTotal)}</TableCell>
-                          </TableRow>
-                        )}
-                        <TableRow className="bg-destructive/10">
-                          <TableCell className="font-bold">Total Load-Linked</TableCell>
-                          <TableCell className="text-right font-bold text-destructive">{formatCurrency(loadLinkedExpenseTotals.total + loadExpenseTotals.operatingTotal)}</TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-
-                {(creditsTotal > 0 || advancesTotal > 0) && (
-                  <div className="grid md:grid-cols-2 gap-6 mt-6">
-                    {creditsTotal > 0 && (
-                      <div>
-                        <h4 className="font-semibold mb-3 text-success">Credits & Reimbursements</h4>
-                        <Table>
-                          <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                          <TableBody>
-                            {creditExpenses.map((e) => (
-                              <TableRow key={e.id}>
-                                <TableCell className="text-success">{e.expense_type}</TableCell>
-                                <TableCell className="text-right text-success">+{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
-                              </TableRow>
-                            ))}
-                            <TableRow className="bg-success/10">
-                              <TableCell className="font-bold">Total Credits</TableCell>
-                              <TableCell className="text-right font-bold text-success">+{formatCurrency(creditsTotal)}</TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                    {advancesTotal > 0 && (
-                      <div>
-                        <h4 className="font-semibold mb-3 text-warning">Advances (Non-P&L)</h4>
-                        <Table>
-                          <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                          <TableBody>
-                            {advanceExpenses.map((e) => (
-                              <TableRow key={e.id}>
-                                <TableCell className="text-warning">{e.expense_type}</TableCell>
-                                <TableCell className="text-right text-warning">{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
-                              </TableRow>
-                            ))}
-                            <TableRow className="bg-warning/10">
-                              <TableCell className="font-bold">Total Advances</TableCell>
-                              <TableCell className="text-right font-bold text-warning">{formatCurrency(advancesTotal)}</TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="mt-6 p-4 bg-muted rounded-lg space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Actual Expenses</span>
-                    <span className="font-medium text-destructive">{formatCurrency(grossExpenses)}</span>
-                  </div>
-                  {creditsTotal > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Credits / Discounts</span>
-                      <span className="font-medium text-success">-{formatCurrency(creditsTotal)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center border-t border-border pt-2">
-                    <span className="font-bold text-lg">NET EXPENSE IMPACT</span>
-                    <span className="font-bold text-2xl text-destructive">{formatCurrency(totalExpenses)}</span>
-                  </div>
-                  {advancesTotal > 0 && (
-                    <div className="flex justify-between items-center pt-1">
-                      <span className="text-sm text-warning flex items-center gap-1"><Banknote className="h-3 w-3" /> Advances Taken (neutral)</span>
-                      <span className="text-sm text-warning">{formatCurrency(advancesTotal)}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+        {/* ===== OVERVIEW: the all-in rate and the year against last year ===== */}
+        <TabsContent value="overview">
+          <div className="animate-in fade-in-50">
+            <RevenueOverview />
           </div>
         </TabsContent>
 
-        {/* ===== VIEW 3 — ANALYTICS & AUDIT LOGS ===== */}
-        <TabsContent value="analytics">
+        {/* ===== PROFIT & LOSS ===== */}
+        <TabsContent value="pnl">
           <div className="space-y-8 animate-in fade-in-50">
+            {renderFilters()}
             <PLSummaryTab
               revenueTotals={revenueTotals}
               loadExpenseTotals={loadExpenseTotals}
               standaloneExpenseTotals={standaloneExpenseTotals}
               loadLinkedExpenseTotals={loadLinkedExpenseTotals}
               payrollTotals={payrollTotals}
+              driverPay={driverPay}
               commissionTotals={commissionTotals}
               deadheadMiles={deadheadMiles}
               totalEmptyMiles={totalEmptyMiles}
@@ -990,6 +707,10 @@ export default function Finance() {
               profitMargin={profitMargin}
               totalExpenses={totalExpenses}
               totalRevenueWithCommissions={totalRevenueWithCommissions}
+              fuel={fuelStats(filteredExpenses)}
+              truckPaymentsTotal={truckPaymentsTotal}
+              advancesTotal={advancesTotal}
+              creditsTotal={creditsTotal}
               getSetting={getSetting}
             />
             <Suspense fallback={<ChartSkeleton height={320} />}>
@@ -1008,20 +729,136 @@ export default function Finance() {
                 isIndependent={isIndependent}
               />
             </Suspense>
-            <AuditReconciliation loads={loads} />
+          </div>
+        </TabsContent>
 
+        {/* ===== EXPENSES ===== */}
+        <TabsContent value="expenses">
+          <PossibleDuplicates
+            expenses={expenses}
+            loads={loads}
+            selectedIds={selectedExpenseIds}
+            onSelect={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))}
+          />
+          <ImportedLinesToCheck
+            expenses={expenses.filter((e: any) => !e.deleted_at)}
+            selectedIds={selectedExpenseIds}
+            onSelect={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))}
+          />
+          {renderFilters()}
+          <div className="animate-in fade-in-50">
+            <ExpenseSummary
+              standalone={standaloneExpenseTotals}
+              loadLinked={loadLinkedExpenseTotals}
+              legacyOperating={loadExpenseTotals.operatingTotal}
+              truckPayments={truckPaymentsTotal}
+              credits={creditExpenses}
+              creditsTotal={creditsTotal}
+              advances={advanceExpenses}
+              advancesTotal={advancesTotal}
+              netCosts={totalExpenses}
+            />
+            <ExpensesList
+              rows={sortedFilteredExpenses.slice(expensePage * EXPENSES_PER_PAGE, (expensePage + 1) * EXPENSES_PER_PAGE)}
+              totalCount={sortedFilteredExpenses.length}
+              page={expensePage}
+              pageSize={EXPENSES_PER_PAGE}
+              onPage={setExpensePage}
+              selectedIds={selectedExpenseIds}
+              allSelected={sortedFilteredExpenses.length > 0 && selectedExpenseIds.size === sortedFilteredExpenses.length}
+              onToggle={toggleExpenseSelection}
+              onToggleAll={toggleSelectAllExpenses}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              typeOptions={[...new Set(sortedFilteredExpenses.map((e) => e.expense_type))].sort().map((type) => ({
+                type,
+                count: sortedFilteredExpenses.filter((e) => e.expense_type === type).length,
+              }))}
+              onSelectByType={selectExpensesByType}
+              truckName={getTruckName}
+              loadName={getLoadName}
+              onAdd={() => openExpenseDialog()}
+              onEdit={(expense) => openExpenseDialog(expense)}
+              onDelete={(id) => setDeleteConfirmId(id)}
+              onBulkEdit={() => { setMassEditFormData({}); setMassEditDialogOpen(true); }}
+              onBulkDelete={() => setMassDeleteDialogOpen(true)}
+            />
+          </div>
+        </TabsContent>
 
+        {/* ===== PAYROLL: W-2 batch, contractor settlements, agent commissions, safety bonuses ===== */}
+        <TabsContent value="payroll">
+          <div className="animate-in fade-in-50 space-y-5">
+            {renderFilters(false)}
 
+            <Panel title="Payroll this period" description="What your drivers cost, and what you earn as the agency.">
+              <StatementLine
+                label="Driver pay"
+                note={
+                  driverPay.total > 0
+                    ? [
+                        driverPay.settlementCount > 0 ? `${driverPay.settlementCount} approved or paid settlement${driverPay.settlementCount === 1 ? '' : 's'}` : '',
+                        driverPay.batchCount > 0 ? `${driverPay.batchCount} payroll batch${driverPay.batchCount === 1 ? '' : 'es'}` : '',
+                        driverPay.bonusCount > 0 ? `${driverPay.bonusCount} safety bonus${driverPay.bonusCount === 1 ? '' : 'es'}` : '',
+                        revenueTotals.netRevenue > 0 ? `${Math.round((driverPay.total / revenueTotals.netRevenue) * 100)}% of your revenue` : '',
+                      ].filter(Boolean).join(', ')
+                    : 'No approved or paid settlements or bonuses in this period'
+                }
+                value={driverPay.total > 0 ? `−${formatCurrency(driverPay.total)}` : 'None yet'}
+                muted
+              />
+              <StatementLine
+                label="Agent commissions"
+                note={commissionTotals.count > 0 ? `${commissionTotals.count} earned, counted as revenue` : 'None earned in this period'}
+                value={commissionTotals.count > 0 ? `+${formatCurrency(commissionTotals.amount)}` : 'None yet'}
+                rule="single"
+              />
+            </Panel>
+
+            <DriverSettlementsTab />
+
+            <CommissionsTab
+              filteredCommissions={filteredCommissions}
+              commissionTotals={commissionTotals}
+              commissionsLoading={commissionsLoading}
+            />
+
+            <SafetyBonusPayouts />
+
+            {canManagePayroll && (
+              payrolls.length > 0 || showW2Batch ? (
+                <section>
+                  <ActiveBatchTab />
+                </section>
+              ) : (
+                <Panel
+                  title="W-2 payroll batch"
+                  description="Weekly payroll with tax withholding for W-2 employees."
+                  aside={
+                    <Button variant="outline" className="h-11" onClick={() => setShowW2Batch(true)}>Open batch tools</Button>
+                  }
+                >
+                  <p className="pb-2 text-sm text-muted-foreground">
+                    No W-2 payroll has been run yet, so there is nothing to show. Open the tools when you want to run a batch.
+                  </p>
+                </Panel>
+              )
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ===== SETTINGS: pay rules, audit, invoicing ===== */}
+        <TabsContent value="settings">
+          <div className="space-y-8 animate-in fade-in-50">
+            <CompensationSettingsTab getSetting={getSetting} />
             {isIndependent && (
               <>
                 <InvoicingTab />
                 <FactoringTab />
               </>
             )}
-
-            <CompensationSettingsTab getSetting={getSetting} />
             <SafetyBonusSettings />
-            <SafetyBonusPayouts />
           </div>
         </TabsContent>
       </Tabs>
@@ -1035,9 +872,9 @@ export default function Finance() {
           </DialogHeader>
           <Suspense fallback={<DialogSkeleton />}>
             <StatementUpload
-              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, delivery_date: l.delivery_date }))}
+              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, net_revenue: l.net_revenue, delivery_date: l.delivery_date, truck_id: l.truck_id }))}
               trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
-              existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
+              existingExpenses={expenses.filter((e: any) => !e.deleted_at).map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id, description: e.description }))}
               onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
               orgId={orgId}
             />
@@ -1189,9 +1026,10 @@ export default function Finance() {
         open={massDeleteDialogOpen}
         onOpenChange={setMassDeleteDialogOpen}
         onConfirm={handleMassDelete}
-        title={`Delete ${selectedExpenseIds.size} Expenses`}
-        description={`Are you sure you want to delete ${selectedExpenseIds.size} selected expenses? This action cannot be undone.`}
+        title={`Archive ${selectedExpenseIds.size} expenses`}
+        description={`Archive ${selectedExpenseIds.size} selected expenses? They leave your totals and can be restored from the Archive page.`}
         isDeleting={isMassDeleting}
+        confirmLabel="Archive"
       />
 
       {/* Single Delete Confirmation */}
@@ -1204,9 +1042,10 @@ export default function Finance() {
             setDeleteConfirmId(null);
           }
         }}
-        title="Delete Expense"
-        description="Are you sure you want to delete this expense? This action cannot be undone."
+        title="Archive expense"
+        description="Archive this expense? It leaves your totals and can be restored from the Archive page."
         isDeleting={deleteExpenseMutation.isPending}
+        confirmLabel="Archive"
       />
     </>
   );

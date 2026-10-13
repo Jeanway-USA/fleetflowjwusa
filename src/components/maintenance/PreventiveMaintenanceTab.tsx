@@ -97,7 +97,7 @@ function CollapsibleTableSection({
                 </span>
               )}
               {!hasIssues && totalCount > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-success/15 dark:bg-success/15 text-success dark:text-success">
                   All on track
                 </span>
               )}
@@ -526,9 +526,8 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
 
   if (!trucks?.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Wrench className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-medium">No Trucks Found</h3>
+      <div className="rounded-lg border bg-card px-4 py-3">
+        <h3 className="text-[15px] font-semibold">No Trucks Found</h3>
         <p className="text-sm text-muted-foreground">
           Add trucks to your fleet to see preventive maintenance schedules.
         </p>
@@ -598,9 +597,8 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
 
       {/* Results */}
       {filteredTrucks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
-          <Wrench className="h-10 w-10 text-muted-foreground mb-3" />
-          <h3 className="text-base font-medium">No matching trucks</h3>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <h3 className="text-[15px] font-semibold">No matching trucks</h3>
           <p className="text-sm text-muted-foreground">
             Try adjusting your filters or search query.
           </p>

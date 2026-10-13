@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -22,17 +23,13 @@ const chartConfig = {
 };
 
 export function CostBreakdownChart({ data, isLoading }: CostBreakdownChartProps) {
-  // Initialize with all categories selected
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => 
-    new Set(data.map(d => d.name))
+  // Track what the user hid, so every category shows by default (including
+  // ones that arrive after the first render).
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const selectedCategories = useMemo(
+    () => new Set(data.map(d => d.name).filter(name => !hidden.has(name))),
+    [data, hidden],
   );
-
-  // Update selected categories when data changes
-  useMemo(() => {
-    if (data.length > 0 && selectedCategories.size === 0) {
-      setSelectedCategories(new Set(data.map(d => d.name)));
-    }
-  }, [data]);
 
   // Filter data based on selection
   const filteredData = useMemo(() => 
@@ -42,7 +39,7 @@ export function CostBreakdownChart({ data, isLoading }: CostBreakdownChartProps)
   );
 
   const toggleCategory = (name: string) => {
-    setSelectedCategories(prev => {
+    setHidden(prev => {
       const next = new Set(prev);
       if (next.has(name)) {
         next.delete(name);
@@ -54,11 +51,11 @@ export function CostBreakdownChart({ data, isLoading }: CostBreakdownChartProps)
   };
 
   const selectAll = () => {
-    setSelectedCategories(new Set(data.map(d => d.name)));
+    setHidden(new Set());
   };
 
   const clearAll = () => {
-    setSelectedCategories(new Set());
+    setHidden(new Set(data.map(d => d.name)));
   };
 
   if (isLoading) {
@@ -75,6 +72,18 @@ export function CostBreakdownChart({ data, isLoading }: CostBreakdownChartProps)
   }
 
   const total = filteredData.reduce((sum, item) => sum + item.value, 0);
+
+  if (data.length === 0) {
+    return (
+      <section className="h-full rounded-lg border bg-card px-4 py-3">
+        <h2 className="font-condensed text-xl font-bold">Where the money went</h2>
+        <p className="mt-1 text-[15px] text-muted-foreground">
+          No expenses recorded for this period yet.{' '}
+          <Link to="/finance?view=expenses" className="font-semibold text-primary underline">Add or import expenses</Link>
+        </p>
+      </section>
+    );
+  }
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', {
@@ -108,7 +117,7 @@ export function CostBreakdownChart({ data, isLoading }: CostBreakdownChartProps)
     <Card className="border-border h-full">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Cost Breakdown</CardTitle>
+          <CardTitle className="text-xl font-bold">Where the money went</CardTitle>
           <div className="flex gap-2 text-xs">
             <button 
               onClick={selectAll}
@@ -190,7 +199,7 @@ export function CostBreakdownChart({ data, isLoading }: CostBreakdownChartProps)
           </ChartContainer>
         ) : (
           <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-            Select categories to view
+            {data.length === 0 ? 'No expenses recorded for this period yet.' : 'Select categories to view'}
           </div>
         )}
 

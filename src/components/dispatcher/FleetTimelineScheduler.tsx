@@ -1,11 +1,15 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel } from '@/components/finance/statement-ui';
+import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cityState } from '@/lib/formatters';
+import { isPastDue, ON_ROAD_STATUSES } from '@/lib/dispatch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarRange, ChevronLeft, ChevronRight, GripVertical, Package, MapPin, AlertTriangle, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, GripVertical, Package, MapPin, AlertTriangle, Home } from 'lucide-react';
 import { format, addDays, startOfDay, isSameDay, isWithinInterval, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -45,14 +49,11 @@ interface HometimeWindow {
 const WINDOW_DAYS = 14;
 const MILES_PER_DAY = 500;
 
-const LOAD_COLORS = [
-  'bg-primary/80 text-primary-foreground',
-  'bg-accent/80 text-accent-foreground',
-  'bg-secondary/80 text-secondary-foreground',
-];
-
-function getLoadColor(index: number) {
-  return LOAD_COLORS[index % LOAD_COLORS.length];
+/** A bar's colour says what the load is doing: late, on the road, or waiting to start. */
+function barClass(load: { status: string; delivery_date: string | null }, today: string) {
+  if (isPastDue(load, today)) return 'bg-destructive text-destructive-foreground';
+  if ((ON_ROAD_STATUSES as readonly string[]).includes(load.status)) return 'bg-primary text-primary-foreground';
+  return 'bg-primary/35 text-foreground border border-primary/40';
 }
 
 // Diagonal striping used to lock hometime cells.
@@ -76,6 +77,9 @@ interface FleetTimelineSchedulerProps {
 
 export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTimelineSchedulerProps = {}) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [weekOffset, setWeekOffset] = useState(0);
   const [draggedLoad, setDraggedLoad] = useState<TimelineLoad | null>(null);
   const [assigningLoad, setAssigningLoad] = useState<string | null>(null);
@@ -141,7 +145,8 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id, booked_miles')
         .not('driver_id', 'is', null)
-        .in('status', ['assigned', 'loading', 'in_transit', 'unloading', 'booked'])
+        .is('deleted_at', null)
+        .in('status', ['assigned', 'at_pickup', 'loading', 'in_transit', 'at_delivery', 'unloading', 'booked'])
         .or(`pickup_date.lte.${windowEndIso},delivery_date.gte.${windowStartIso},and(pickup_date.gte.${windowStartIso},pickup_date.lte.${windowEndIso})`);
 
       return (data || []) as TimelineLoad[];
@@ -157,7 +162,8 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id, booked_miles')
         .is('driver_id', null)
-        .in('status', ['pending', 'booked'])
+        .is('deleted_at', null)
+        .in('status', ['pending', 'booked', 'assigned'])
         .order('pickup_date', { ascending: true })
         .limit(20);
 
@@ -520,213 +526,237 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
 
 
 
+  /**
+   * Loads that share a day for one driver (a same-day handoff, or a double booking) sit in separate lanes
+   * so neither bar covers the other.
+   */
+  const lanesFor = (driverId: string) => {
+    const sorted = getLoadsForDriver(driverId)
+      .filter((l) => l.pickup_date)
+      .sort((a, b) => (a.pickup_date ?? '').localeCompare(b.pickup_date ?? ''));
+    const laneEnds: string[] = [];
+    const laneOf = new Map<string, number>();
+    for (const l of sorted) {
+      const start = (l.pickup_date ?? '').slice(0, 10);
+      const end = (l.delivery_date || l.pickup_date || '').slice(0, 10);
+      let lane = laneEnds.findIndex((e) => e < start);
+      if (lane === -1) lane = laneEnds.length;
+      laneEnds[lane] = end;
+      laneOf.set(l.id, lane);
+    }
+    return { laneOf, count: Math.max(1, laneEnds.length) };
+  };
+
   const isLoading = driversLoading;
+  const rangeLabel = `${format(windowStart, 'MMM d')} to ${format(windowEnd, 'MMM d, yyyy')}`;
+
+  const controls = (
+    <div className="flex items-center gap-1">
+      <Button variant="outline" size="icon" className="h-11 w-11" aria-label="Back one week" onClick={() => setWeekOffset(o => o - 1)}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Button variant="outline" className="h-11" onClick={() => setWeekOffset(0)}>Today</Button>
+      <Button variant="outline" size="icon" className="h-11 w-11" aria-label="Forward one week" onClick={() => setWeekOffset(o => o + 1)}>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  const legend = (
+    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm bg-primary" /> On the road</span>
+      <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm border border-primary/40 bg-primary/35" /> Booked, not started</span>
+      <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm bg-destructive" /> Past due</span>
+      <span className="flex items-center gap-1.5"><span className={`inline-block h-3 w-4 rounded-sm ${HOMETIME_STRIPE}`} /> Hometime</span>
+      <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm border border-dashed border-amber-500 bg-amber-400/40" /> Free to reload</span>
+    </div>
+  );
+
+  // On a phone the grid is replaced by one short list per driver.
+  const agenda = (
+    <div className="divide-y rounded-lg border">
+      {(drivers ?? []).map(driver => {
+        const mine = getLoadsForDriver(driver.id)
+          .filter(l => l.pickup_date)
+          .sort((a, b) => (a.pickup_date ?? '').localeCompare(b.pickup_date ?? ''));
+        const away = getHometimeForDriver(driver.id);
+        return (
+          <div key={driver.id} className="px-4 py-3">
+            <div className="font-condensed text-lg font-bold leading-tight">{driver.first_name} {driver.last_name}</div>
+            {mine.length === 0 && away.length === 0 && <div className="text-[13px] text-muted-foreground">Nothing scheduled in this window.</div>}
+            {away.map(h => (
+              <div key={h.start_date} className="mt-1 flex items-center gap-1.5 text-[13px] text-purple-600">
+                <Home className="h-3.5 w-3.5" /> Hometime {format(parseDate(h.start_date)!, 'MMM d')} to {format(parseDate(h.end_date)!, 'MMM d')}
+              </div>
+            ))}
+            {mine.map(l => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => navigate(`/fleet-loads?highlight=${l.id}`)}
+                className={`mt-2 block min-h-11 w-full rounded-md px-3 py-2 text-left text-[13px] ${barClass(l, todayStr)}`}
+              >
+                <span className="font-semibold">{l.landstar_load_id || l.id.slice(0, 6)}</span>{' '}
+                {cityState(l.origin) || l.origin} to {cityState(l.destination) || l.destination}
+                <span className="block opacity-90">{format(parseDate(l.pickup_date)!, 'EEE MMM d')}{l.delivery_date ? ` to ${format(parseDate(l.delivery_date)!, 'EEE MMM d')}` : ''}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
+      {(!drivers || drivers.length === 0) && <div className="px-4 py-6 text-center text-sm text-muted-foreground">No active drivers yet.</div>}
+    </div>
+  );
 
   return (
-    <Card className="card-elevated">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <CalendarRange className="h-4 w-4 text-primary" />
-            Fleet Timeline · 14 Days
-          </CardTitle>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setWeekOffset(o => o - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setWeekOffset(0)}>
-              Today
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setWeekOffset(o => o + 1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs text-muted-foreground">
-            {format(windowStart, 'MMM d')} — {format(windowEnd, 'MMM d, yyyy')}
-          </p>
-          {/* Legend */}
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-3 rounded-sm bg-primary/70" /> Active Transit
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className={`inline-block h-2.5 w-3 rounded-sm ${HOMETIME_STRIPE}`} /> Pre-Approved Hometime
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-3 rounded-sm bg-amber-400/40 border border-dashed border-amber-500" /> Outbound Planning
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-3 rounded-sm bg-muted" /> Unassigned / Idle
-            </span>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
+    <>
+      <Panel title="Schedule" description={rangeLabel} aside={controls}>
         {isLoading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 pb-2">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
           </div>
         ) : (
           <>
-            {/* Timeline Grid */}
-            <div className="overflow-x-auto">
-              <div
-                className="grid min-w-[1080px]"
-                style={{
-                  gridTemplateColumns: `140px repeat(${WINDOW_DAYS}, minmax(56px, 1fr))`,
-                }}
-              >
-                {/* Header row */}
-                <div className="p-2 text-xs font-medium text-muted-foreground border-b border-border">Driver</div>
-                {days.map((day, idx) => (
-                  <div
-                    key={day.toISOString()}
-                    ref={idx === 0 ? dayCellRef : undefined}
-                    className={`p-2 text-center text-xs font-medium border-b border-border ${
-                      isSameDay(day, new Date()) ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
-                    }`}
-                  >
-                    <div>{format(day, 'EEE')}</div>
-                    <div className="text-[10px]">{format(day, 'M/d')}</div>
-                  </div>
-                ))}
-
-                {/* Driver rows */}
-                {drivers?.map(driver => {
-                  const driverLoads = getLoadsForDriver(driver.id);
-                  const hometimeWindows = getHometimeForDriver(driver.id);
-                  const outbound = getOutboundPlanning(driver.id);
-
-                  return (
-                    <div key={driver.id} className="contents">
-                      {/* Driver label */}
-                      <div className="p-2 text-sm font-medium border-b border-border truncate flex items-center gap-1.5">
-                        <span className="truncate">
-                          {driver.first_name} {driver.last_name?.charAt(0)}.
-                        </span>
-                        {hometimeWindows.some(h => {
-                          const s = parseDate(h.start_date);
-                          const e = parseDate(h.end_date);
-                          return s && e && new Date() >= s && new Date() <= e;
-                        }) && <Home className="h-3 w-3 text-purple-500 shrink-0" />}
+            {legend}
+            {isMobile ? agenda : (
+              <div className="overflow-x-auto pb-2">
+                <div
+                  className="grid min-w-[1080px]"
+                  style={{ gridTemplateColumns: `160px repeat(${WINDOW_DAYS}, minmax(56px, 1fr))` }}
+                >
+                  {/* Header row */}
+                  <div className="border-b border-border p-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Driver</div>
+                  {days.map((day, idx) => {
+                    const today = isSameDay(day, new Date());
+                    const weekend = day.getDay() === 0 || day.getDay() === 6;
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        ref={idx === 0 ? dayCellRef : undefined}
+                        className={`border-b border-border p-2 text-center text-xs font-medium ${today ? 'bg-primary/15 text-foreground' : weekend ? 'bg-muted/40 text-muted-foreground' : 'text-muted-foreground'}`}
+                      >
+                        <div className={today ? 'font-bold' : ''}>{today ? 'Today' : format(day, 'EEE')}</div>
+                        <div className="text-[11px]">{format(day, 'M/d')}</div>
                       </div>
+                    );
+                  })}
 
-                      {/* Day cells */}
-                      {days.map((day, dayIdx) => {
-                        const onHometime = isDayOnHometime(driver.id, day);
-                        const onLoad = isDayOnLoad(driver.id, day);
-                        const outboundHit =
-                          outbound && dayIdx + 2 >= outbound.startCol && dayIdx + 2 < outbound.startCol + outbound.span;
+                  {/* Driver rows */}
+                  {drivers?.map(driver => {
+                    const driverLoads = getLoadsForDriver(driver.id);
+                    const hometimeWindows = getHometimeForDriver(driver.id);
+                    const outbound = getOutboundPlanning(driver.id);
+                    const { laneOf, count: laneCount } = lanesFor(driver.id);
 
-                        return (
-                          <div
-                            key={day.toISOString()}
-                            onDragOver={onHometime ? undefined : handleDragOver}
-                            onDrop={onHometime ? undefined : (e) => handleDrop(driver.id, dayIdx, e)}
-                            className={[
-                              'relative border-b border-l border-border min-h-[44px] transition-colors',
-                              onHometime
-                                ? `${HOMETIME_STRIPE} pointer-events-none`
-                                : onLoad
-                                ? 'bg-primary/5'
-                                : outboundHit
-                                ? 'bg-amber-100/30 dark:bg-amber-900/10'
-                                : '',
-                              draggedLoad && !onHometime ? 'hover:bg-primary/10' : '',
-                              isSameDay(day, new Date()) && !onHometime ? 'bg-primary/5' : '',
-                            ].join(' ')}
-                          >
-                            {/* Outbound planning chip on first day of the window */}
-                            {outbound && dayIdx + 2 === outbound.startCol && (
-                              <div
-                                className="absolute inset-y-1 left-0.5 right-0.5 flex items-center rounded border border-dashed border-amber-500/70 bg-amber-100/50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-[9px] px-1 font-medium truncate z-[5] pointer-events-none"
-                                style={{ width: `calc(${outbound.span * 100}% - 4px)` }}
-                                title={`Outbound planning window — pre-book reload near ${outbound.region}`}
-                              >
-                                <MapPin className="h-2.5 w-2.5 mr-0.5 shrink-0" />
-                                Reload {outbound.region}
-                              </div>
-                            )}
+                    return (
+                      <div key={driver.id} className="contents">
+                        <div className="flex items-center gap-1.5 truncate border-b border-border p-2 text-sm font-medium">
+                          <span className="truncate">{driver.first_name} {driver.last_name}</span>
+                          {hometimeWindows.some(h => {
+                            const s = parseDate(h.start_date);
+                            const e = parseDate(h.end_date);
+                            return s && e && new Date() >= s && new Date() <= e;
+                          }) && <Home className="h-3 w-3 shrink-0 text-purple-500" aria-label="On hometime" />}
+                        </div>
 
-                            {/* Load bars starting on this day */}
-                            {driverLoads.map((load, loadIdx) => {
-                              const isBeingResized = resizing?.loadId === load.id && !!previewDates;
-                              const pickup = isBeingResized
-                                ? previewDates!.pickup
-                                : parseDate(load.pickup_date);
-                              if (!pickup) return null;
-                              if (!isSameDay(pickup, day) && !(dayIdx === 0 && pickup < day)) return null;
-                              if (dayIdx > 0 && pickup < day) return null;
+                        {days.map((day, dayIdx) => {
+                          const onHometime = isDayOnHometime(driver.id, day);
+                          const onLoad = isDayOnLoad(driver.id, day);
+                          const today = isSameDay(day, new Date());
+                          const outboundHit = outbound && dayIdx + 2 >= outbound.startCol && dayIdx + 2 < outbound.startCol + outbound.span;
 
-                              const delivery = isBeingResized
-                                ? previewDates!.delivery
-                                : parseDate(load.delivery_date) || pickup;
-                              const spanDays = Math.min(
-                                differenceInDays(delivery, day) + 1,
-                                WINDOW_DAYS - dayIdx
-                              );
-                              const widthPercent = spanDays * 100;
-
-                              return (
+                          return (
+                            <div
+                              key={day.toISOString()}
+                              style={{ minHeight: Math.max(48, laneCount * 30 + 8) }}
+                              onDragOver={onHometime ? undefined : handleDragOver}
+                              onDrop={onHometime ? undefined : (e) => handleDrop(driver.id, dayIdx, e)}
+                              className={[
+                                'relative border-b border-l border-border transition-colors',
+                                onHometime ? `${HOMETIME_STRIPE} pointer-events-none` : onLoad ? 'bg-primary/5' : outboundHit ? 'bg-amber-100/30 dark:bg-amber-900/10' : '',
+                                draggedLoad && !onHometime ? 'hover:bg-primary/10' : '',
+                                today && !onHometime ? 'bg-primary/10' : '',
+                              ].join(' ')}
+                            >
+                              {outbound && dayIdx + 2 === outbound.startCol && (
                                 <div
-                                  key={load.id}
-                                  className={`group/bar absolute inset-y-0.5 left-0.5 right-0.5 rounded text-[10px] px-1.5 py-0.5 flex items-center font-medium z-10 ${getLoadColor(loadIdx)} ${
-                                    isBeingResized ? 'ring-2 ring-primary shadow-lg' : ''
-                                  }`}
-                                  style={{ width: `calc(${widthPercent}% - 4px)`, minWidth: 'calc(100% - 4px)' }}
-                                  title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${load.origin} → ${load.destination}${
-                                    load.booked_miles ? ` · ${load.booked_miles} mi` : ''
-                                  }`}
+                                  className="pointer-events-none absolute inset-y-1 left-0.5 right-0.5 z-[5] flex items-center truncate rounded border border-dashed border-amber-500/70 bg-amber-100/50 px-1 text-[10px] font-medium text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
+                                  style={{ width: `calc(${outbound.span * 100}% - 4px)` }}
+                                  title={`Free to reload near ${outbound.region}`}
                                 >
-                                  {/* Left resize handle */}
-                                  <div
-                                    role="button"
-                                    aria-label="Resize load start"
-                                    onMouseDown={(e) => startResize(load, driver.id, 'left', e)}
-                                    className="absolute left-0 top-0 bottom-0 w-1.5 cursor-w-resize flex items-center justify-center opacity-40 hover:opacity-100 group-hover/bar:opacity-70 transition-opacity"
-                                  >
-                                    <div className="h-3/5 w-0.5 rounded-full bg-current" />
-                                  </div>
-
-                                  <span className="truncate px-1 flex-1 pointer-events-none">
-                                    {load.landstar_load_id || load.id.slice(0, 6)}
-                                  </span>
-
-                                  {/* Right resize handle */}
-                                  <div
-                                    role="button"
-                                    aria-label="Resize load end"
-                                    onMouseDown={(e) => startResize(load, driver.id, 'right', e)}
-                                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-e-resize flex items-center justify-center opacity-40 hover:opacity-100 group-hover/bar:opacity-70 transition-opacity"
-                                  >
-                                    <div className="h-3/5 w-0.5 rounded-full bg-current" />
-                                  </div>
+                                  <MapPin className="mr-0.5 h-2.5 w-2.5 shrink-0" />
+                                  Reload {outbound.region}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+                              )}
 
-                {(!drivers || drivers.length === 0) && (
-                  <div className="col-span-full text-center py-6 text-sm text-muted-foreground">
-                    No active drivers
-                  </div>
-                )}
+                              {driverLoads.map((load) => {
+                                const isBeingResized = resizing?.loadId === load.id && !!previewDates;
+                                const pickup = isBeingResized ? previewDates!.pickup : parseDate(load.pickup_date);
+                                if (!pickup) return null;
+                                if (!isSameDay(pickup, day) && !(dayIdx === 0 && pickup < day)) return null;
+                                if (dayIdx > 0 && pickup < day) return null;
+
+                                const delivery = isBeingResized ? previewDates!.delivery : parseDate(load.delivery_date) || pickup;
+                                const spanDays = Math.min(differenceInDays(delivery, day) + 1, WINDOW_DAYS - dayIdx);
+                                const widthPercent = spanDays * 100;
+                                const late = isPastDue(load, todayStr);
+
+                                return (
+                                  <div
+                                    key={load.id}
+                                    role="link"
+                                    tabIndex={0}
+                                    onClick={() => navigate(`/fleet-loads?highlight=${load.id}`)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/fleet-loads?highlight=${load.id}`); }}
+                                    className={`group/bar absolute left-0.5 right-0.5 z-10 flex overflow-hidden cursor-pointer items-center rounded px-2 py-0.5 text-[11px] font-semibold ${barClass(load, todayStr)} ${isBeingResized ? 'shadow-lg ring-2 ring-primary' : ''}`}
+                                    style={{ width: `calc(${widthPercent}% - 4px)`, minWidth: 'calc(100% - 4px)', top: `calc(${((laneOf.get(load.id) ?? 0) * 100) / laneCount}% + 3px)`, height: `calc(${100 / laneCount}% - 6px)` }}
+                                    title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${cityState(load.origin) || load.origin} to ${cityState(load.destination) || load.destination}${load.booked_miles ? ` · ${load.booked_miles} mi` : ''}${late ? ' · past due' : ''}. Click to open.`}
+                                  >
+                                    <div
+                                      role="button"
+                                      aria-label="Drag to change the pickup day"
+                                      onMouseDown={(e) => startResize(load, driver.id, 'left', e)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="absolute bottom-0 left-0 top-0 flex w-2 cursor-w-resize items-center justify-center opacity-40 transition-opacity hover:opacity-100 group-hover/bar:opacity-80"
+                                    >
+                                      <div className="h-3/5 w-0.5 rounded-full bg-current" />
+                                    </div>
+
+                                    <span className="pointer-events-none flex-1 truncate px-1">
+                                      {late ? 'Late ' : ''}{load.landstar_load_id || load.id.slice(0, 6)}
+                                      {spanDays > 1 && <span className="font-normal opacity-90"> {cityState(load.origin)?.split(',')[0]} to {cityState(load.destination)?.split(',')[0]}</span>}
+                                    </span>
+
+                                    <div
+                                      role="button"
+                                      aria-label="Drag to change the delivery day"
+                                      onMouseDown={(e) => startResize(load, driver.id, 'right', e)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="absolute bottom-0 right-0 top-0 flex w-2 cursor-e-resize items-center justify-center opacity-40 transition-opacity hover:opacity-100 group-hover/bar:opacity-80"
+                                    >
+                                      <div className="h-3/5 w-0.5 rounded-full bg-current" />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {(!drivers || drivers.length === 0) && (
+                    <div className="col-span-full py-6 text-center text-sm text-muted-foreground">No active drivers yet.</div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Unassigned Loads Tray (hidden when external drawer is used) */}
             {!hideUnassignedTray && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">
-                  Unassigned Loads — drag onto a driver row ({unassignedLoads?.length || 0})
+              <div className="mt-3">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  Loads needing a driver, drag onto a driver row ({unassignedLoads?.length || 0})
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {unassignedLoads && unassignedLoads.length > 0 ? (
@@ -736,43 +766,39 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                         draggable
                         onDragStart={() => handleDragStart(load)}
                         onDragEnd={handleDragEnd}
-                        className={`flex items-center gap-1.5 p-2 rounded-md border border-border bg-muted/30 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors text-xs ${
+                        className={`flex cursor-grab items-center gap-1.5 rounded-md border border-border bg-muted/30 p-2 text-xs transition-colors hover:bg-muted/50 active:cursor-grabbing ${
                           draggedLoad?.id === load.id ? 'opacity-50 ring-2 ring-primary' : ''
-                        } ${assigningLoad === load.id ? 'opacity-50 pointer-events-none' : ''}`}
+                        } ${assigningLoad === load.id ? 'pointer-events-none opacity-50' : ''}`}
                       >
-                        <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <Package className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
                         <span className="font-medium">{load.landstar_load_id || load.id.slice(0, 8)}</span>
-                        <span className="text-muted-foreground hidden sm:inline">
-                          <MapPin className="h-2.5 w-2.5 inline" /> {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
+                        <span className="hidden text-muted-foreground sm:inline">
+                          {cityState(load.origin)} to {cityState(load.destination)}
                         </span>
-                        {load.pickup_date && (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1">
-                            {format(parseISO(load.pickup_date), 'M/d')}
-                          </Badge>
-                        )}
+                        {load.pickup_date && <Badge variant="outline" className="h-4 px-1 text-[10px]">{format(parseISO(load.pickup_date), 'M/d')}</Badge>}
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-muted-foreground py-2">No unassigned loads</p>
+                    <p className="py-2 text-xs text-muted-foreground">Every load has a driver.</p>
                   )}
                 </div>
               </div>
             )}
           </>
         )}
-      </CardContent>
+      </Panel>
 
       {/* Floating resize tooltip */}
       {resizing && previewDates && tooltipPos && (
         <div
-          className="pointer-events-none fixed z-[9999] bg-popover text-popover-foreground border rounded px-2 py-1 text-xs shadow-md font-medium"
+          className="pointer-events-none fixed z-[9999] rounded border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md"
           style={{ left: tooltipPos.x + 12, top: tooltipPos.y + 12 }}
         >
           {resizing.edge === 'left' ? 'Pickup: ' : 'Delivery: '}
           {format(resizing.edge === 'left' ? previewDates.pickup : previewDates.delivery, 'EEE, MMM d')}
         </div>
       )}
-    </Card>
+    </>
   );
 }

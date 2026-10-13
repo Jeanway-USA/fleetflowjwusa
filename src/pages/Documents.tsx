@@ -167,10 +167,10 @@ export default function Documents() {
         <Alert className="mb-6 border-primary/30 bg-primary/5">
           <Cloud className="h-4 w-4" />
           <AlertTitle>Google Drive Storage Active</AlertTitle>
-          <AlertDescription className="flex items-center justify-between">
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>Your documents are stored in your connected Google Drive account.</span>
             {driveFolderUrl && (
-              <Button variant="outline" size="sm" asChild className="ml-4 shrink-0">
+              <Button variant="outline" size="sm" asChild className="shrink-0 self-start sm:ml-4 sm:self-auto">
                 <a href={driveFolderUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Open in Google Drive

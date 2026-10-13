@@ -36,7 +36,7 @@ interface OperationalData {
   totalMiles: number;
   revenuePerMile: number;
   fleetUtilization: number;
-  onTimeRate: number;
+  onTimeRate: number | null;
   totalEmptyMiles?: number;
   emptyMilesRatio?: number;
 }
@@ -106,7 +106,7 @@ export function PrintableExecutiveSummary({
       <div className="mx-auto max-w-4xl px-8 py-6 space-y-8 print:px-0 print:py-0 print:space-y-6">
         {/* Header */}
         <header className="text-center border-b-2 border-black pb-4">
-          <h1 className="text-2xl font-bold tracking-tight">Executive Summary — End of Week Report</h1>
+          <h1 className="text-2xl font-bold tracking-tight">End of week report</h1>
           <p className="text-sm text-gray-600 mt-1">
             Period: <span className="font-medium capitalize">{period}</span> &middot; Generated {generatedAt}
           </p>
@@ -191,7 +191,7 @@ export function PrintableExecutiveSummary({
               { label: 'Miles Driven', value: `${fmtNumber(operationalData?.totalMiles ?? 0)} mi` },
               { label: 'Revenue / Mile', value: `$${(operationalData?.revenuePerMile ?? 0).toFixed(2)}` },
               { label: 'Fleet Utilization', value: fmtPct(operationalData?.fleetUtilization ?? 0) },
-              { label: 'On-Time Delivery', value: fmtPct(operationalData?.onTimeRate ?? 0) },
+              { label: 'On-Time Delivery', value: operationalData?.onTimeRate == null ? 'n/a' : fmtPct(operationalData.onTimeRate) },
               { label: 'Empty Miles Ratio', value: fmtPct(operationalData?.emptyMilesRatio ?? 0) },
             ].map((item) => (
               <div key={item.label} className="border border-gray-300 rounded p-2 text-center">

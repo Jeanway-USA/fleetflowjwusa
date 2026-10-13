@@ -2,98 +2,202 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fleet Flow TMS Design System - Dark Theme with Gold Accents */
+/*
+ * Fleet Flow, JeanWay USA.
+ * Colors from the JeanWay brand guide: black shell carrying gold and white,
+ * white pages, dark gold for actions, gold for the current item, brand gray
+ * for secondary text. Layout vocabulary from the driver's logbook: one hairline
+ * grid weight, ruled statement lines, state marks. Barlow for UI, Barlow
+ * Condensed for labels and figures.
+ */
+
+@font-face {
+  font-family: "Barlow";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/barlow-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/barlow-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/barlow-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/barlow-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");
+}
 
 @layer base {
   :root {
-    /* Light Mode - Professional with Gold Accents */
-    --background: 0 0% 98%;
-    --foreground: 0 0% 10%;
+    /* Brand palette (JeanWay brand guide):
+       light gold #FDED6F, gold #FFD34D, dark gold #AC7524, black, white,
+       secondary gray #6D6E70. Gold and white sit on black; pages are white. */
+
+    /* Stock and ink */
+    --background: 40 10% 97%;
+    --foreground: 0 0% 7%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 0 0% 7%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover-foreground: 0 0% 7%;
 
-    --primary: 45 80% 45%;
+    /* Dark gold (#AC7524, deepened slightly so white text on it passes AA):
+       actions, links, active states */
+    --primary: 36 66% 34%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 94%;
-    --secondary-foreground: 0 0% 15%;
+    --secondary: 40 8% 92%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 0 0% 92%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 40 6% 93%;
+    /* Brand secondary gray #6D6E70 */
+    --muted-foreground: 220 1% 43%;
 
-    --accent: 45 80% 45%;
-    --accent-foreground: 0 0% 100%;
+    /* Pale light-gold tint for hovers and menu highlights */
+    --accent: 52 96% 92%;
+    --accent-foreground: 0 0% 7%;
 
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
+    /* Gold #FFD34D: the current item, selection, today */
+    --carbon: 45 100% 65%;
+    --carbon-foreground: 0 0% 5%;
 
-    --success: 142 70% 40%;
-    --success-foreground: 0 0% 98%;
+    /* Functional status colors; not brand colors */
+    --destructive: 4 64% 46%;
+    --destructive-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 5%;
+    --success: 146 44% 31%;
+    --success-foreground: 0 0% 100%;
 
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 45 80% 45%;
+    --warning: 36 66% 40%;
+    --warning-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    /* One hairline weight everywhere */
+    --border: 40 6% 86%;
+    --input: 40 6% 80%;
+    --ring: 36 66% 40%;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 15%;
-    --sidebar-primary: 45 80% 45%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 94%;
-    --sidebar-accent-foreground: 0 0% 15%;
-    --sidebar-border: 0 0% 88%;
-    --sidebar-ring: 45 80% 45%;
+    --radius: 0.375rem;
 
-    /* Custom gradients */
-    --gradient-gold: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(0 0% 98%) 0%, hsl(0 0% 94%) 100%);
+    /* Chart series: dark gold, black, gold, brand gray, red */
+    --chart-1: 36 66% 38%;
+    --chart-2: 0 0% 12%;
+    --chart-3: 45 100% 58%;
+    --chart-4: 220 1% 47%;
+    --chart-5: 4 64% 46%;
+
+    /* Shell: brand black in both themes, with gold and white on it */
+    --shell: 0 0% 4%;
+    --shell-foreground: 0 0% 98%;
+    --shell-muted: 40 6% 66%;
+    --shell-border: 0 0% 15%;
+    --shell-active: 0 0% 12%;
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 45 100% 65%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 45 100% 65%;
   }
 
   .dark {
+    /* A step above the brand-black shell so the header and tab bar stay distinct. */
     --background: 0 0% 7%;
-    --foreground: 45 10% 95%;
+    --foreground: 40 10% 94%;
 
     --card: 0 0% 10%;
-    --card-foreground: 45 10% 95%;
+    --card-foreground: 40 10% 94%;
 
-    --popover: 0 0% 10%;
-    --popover-foreground: 45 10% 95%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 40 10% 94%;
 
-    --primary: 45 80% 50%;
+    /* Gold carries actions on black */
+    --primary: 45 100% 65%;
     --primary-foreground: 0 0% 5%;
 
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 45 10% 95%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 40 10% 94%;
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 40 4% 64%;
 
-    --accent: 45 80% 50%;
-    --accent-foreground: 0 0% 5%;
+    --accent: 40 20% 16%;
+    --accent-foreground: 40 10% 96%;
 
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --carbon: 45 100% 65%;
+    --carbon-foreground: 0 0% 5%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 45 80% 50%;
+    --destructive: 4 70% 60%;
+    --destructive-foreground: 0 0% 5%;
 
-    --sidebar-background: 0 0% 8%;
-    --sidebar-foreground: 45 10% 90%;
-    --sidebar-primary: 45 80% 50%;
+    --success: 146 40% 52%;
+    --success-foreground: 0 0% 5%;
+
+    --warning: 42 90% 60%;
+    --warning-foreground: 0 0% 5%;
+
+    --border: 0 0% 17%;
+    --input: 0 0% 21%;
+    --ring: 45 100% 65%;
+
+    --chart-1: 45 100% 65%;
+    --chart-2: 40 10% 88%;
+    --chart-3: 36 66% 52%;
+    --chart-4: 220 2% 62%;
+    --chart-5: 4 70% 62%;
+
+    --shell: 0 0% 4%;
+    --shell-foreground: 0 0% 98%;
+    --shell-muted: 40 6% 66%;
+    --shell-border: 0 0% 15%;
+    --shell-active: 0 0% 12%;
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 45 100% 65%;
     --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 45 10% 95%;
-    --sidebar-border: 0 0% 18%;
-    --sidebar-ring: 45 80% 50%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 45 100% 65%;
   }
 }
 
@@ -102,78 +206,120 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+  html {
+    -webkit-tap-highlight-color: transparent;
   }
 
-  /* Custom scrollbar for dark theme */
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Barlow", system-ui, sans-serif;
+    font-feature-settings: "kern" 1;
+    caret-color: hsl(var(--primary));
+  }
+
+  h1, h2, h3 {
+    font-family: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  /* Figures line up in every table and list. */
+  table, td, th, input, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: hsl(var(--carbon) / 0.55);
+    color: hsl(var(--carbon-foreground));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  a {
+    text-underline-offset: 3px;
+  }
+
+  /* Scrollbars in grid ink */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-
   ::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
+    background: transparent;
   }
-
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
     border-radius: 4px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.5);
+    background: hsl(var(--muted-foreground) / 0.5);
   }
 }
 
 @layer utilities {
   [data-highlight="true"] {
-    animation: row-highlight-pulse 2.5s ease-out;
+    animation: row-highlight 2.5s ease-out;
     position: relative;
     z-index: 1;
   }
 
-  @keyframes row-highlight-pulse {
+  @keyframes row-highlight {
     0% {
-      background-color: hsl(var(--primary) / 0.18);
-      box-shadow: inset 0 0 0 2px hsl(var(--primary) / 0.6);
-    }
-    60% {
-      background-color: hsl(var(--primary) / 0.10);
-      box-shadow: inset 0 0 0 2px hsl(var(--primary) / 0.35);
+      background-color: hsl(var(--carbon) / 0.35);
     }
     100% {
       background-color: transparent;
-      box-shadow: inset 0 0 0 0 transparent;
     }
   }
 
+  /*
+   * Legacy class names kept so every existing screen adopts the new world.
+   * The gold gradients and glows are retired: primary actions are solid
+   * brand dark gold, emphasis comes from weight, not effects.
+   */
   .gradient-gold {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+  .gradient-gold:hover {
+    background: hsl(var(--primary) / 0.9);
   }
 
   .text-gradient-gold {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(var(--primary));
   }
 
-  .glow-gold {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+  .glow-gold,
+  .pulse-glow-gold {
+    box-shadow: none;
   }
 
   .card-elevated {
-    @apply bg-card border border-border rounded-lg shadow-lg;
+    @apply bg-card border border-border rounded-lg;
+    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
   }
 
   .animate-float {
-    animation: float 6s ease-in-out infinite;
+    animation: none;
   }
 
-  .pulse-glow-gold {
-    animation: pulse-glow 2s ease-in-out infinite;
+  /* Big money figures: condensed, tabular, tight. */
+  .figure {
+    font-family: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Space for the phone tab bar and the home indicator. */
+  .pb-tabbar {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
   }
 
   .scrollbar-hide {
@@ -185,14 +331,14 @@
   }
 }
 
-@keyframes float {
-  0%, 100% { transform: perspective(1000px) rotateY(-8deg) rotateX(4deg) translateY(0px); }
-  50% { transform: perspective(1000px) rotateY(-8deg) rotateX(4deg) translateY(-12px); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 15px hsl(45 80% 50% / 0.3), 0 0 30px hsl(45 80% 50% / 0.1); }
-  50% { box-shadow: 0 0 25px hsl(45 80% 50% / 0.5), 0 0 50px hsl(45 80% 50% / 0.2); }
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Leaflet map marker styles */
@@ -204,8 +350,8 @@
 .leaflet-popup-content-wrapper {
   background: hsl(var(--card));
   color: hsl(var(--card-foreground));
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.12);
 }
 
 .leaflet-popup-tip {

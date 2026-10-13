@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { Progress } from '@/components/ui/progress';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -66,11 +67,24 @@ interface FuelPurchase {
 
 // US_STATES is now imported from @/lib/us-states
 
-const QUARTERS = ['2026-Q1', '2026-Q2', '2026-Q3', '2026-Q4', '2025-Q4', '2025-Q3'];
+/** The current quarter and the seven before it, newest first, so the list never goes stale. */
+function recentQuarters(count = 8, today = new Date()): string[] {
+  let year = today.getFullYear();
+  let quarter = Math.floor(today.getMonth() / 3) + 1;
+  const list: string[] = [];
+  for (let i = 0; i < count; i++) {
+    list.push(`${year}-Q${quarter}`);
+    quarter -= 1;
+    if (quarter === 0) { quarter = 4; year -= 1; }
+  }
+  return list;
+}
+
+const QUARTERS = recentQuarters();
 
 export default function IFTA() {
   const queryClient = useQueryClient();
-  const [selectedQuarter, setSelectedQuarter] = useState('2026-Q1');
+  const [selectedQuarter, setSelectedQuarter] = useState(QUARTERS[0]);
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [fuelDialogOpen, setFuelDialogOpen] = useState(false);
   const [editingFuel, setEditingFuel] = useState<FuelPurchase | null>(null);
@@ -725,15 +739,15 @@ export default function IFTA() {
   return (
     <>
       <TooltipProvider>
-      <PageHeader 
-        title="IFTA Reporting" 
-        description="Track fuel purchases and mileage by jurisdiction for quarterly IFTA tax filing"
+      <PageHeader
+        title="IFTA"
+        description="Fuel purchases and mileage by state, for the quarterly filing"
       />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-6">
         <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="h-11 w-40" aria-label="Quarter">
             <SelectValue placeholder="Select quarter" />
           </SelectTrigger>
           <SelectContent>
@@ -744,7 +758,7 @@ export default function IFTA() {
         </Select>
 
         <Select value={selectedTruck} onValueChange={setSelectedTruck}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="h-11 w-48" aria-label="Truck">
             <SelectValue placeholder="Select truck" />
           </SelectTrigger>
           <SelectContent>
@@ -757,8 +771,7 @@ export default function IFTA() {
 
         <Button
           variant="outline"
-          size="sm"
-          className="gap-1.5 text-destructive hover:text-destructive"
+          className="h-11 gap-1.5 text-destructive hover:text-destructive"
           onClick={() => setResetDialogOpen(true)}
         >
           <RotateCcw className="h-4 w-4" />
@@ -766,75 +779,32 @@ export default function IFTA() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Miles
-              <IFTATooltip term="Total Miles" />
-            </CardTitle>
-            <Route className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.totalMiles.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">All jurisdictions</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Gallons
-              <IFTATooltip term="Gal Purchased" />
-            </CardTitle>
-            <Fuel className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.totalGallons.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">
-              Fleet MPG: {avgMpg > 0 ? avgMpg.toFixed(2) : '—'}
-              <IFTATooltip term="Fleet MPG" />
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Net Fuel Cost
-              <IFTATooltip term="Net Fuel Cost" />
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summary.totalFuelCost)}</div>
-            {discountCount > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                <span className="text-destructive">{formatCurrency(grossFuelCost)}</span>
-                {' gross · '}
-                <span className="text-success">-{formatCurrency(discountTotal)}</span>
-                {` (${discountCount} discount${discountCount !== 1 ? 's' : ''})`}
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">No discounts applied</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Tax Liability
-              <IFTATooltip term="Tax Liability" />
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${summary.taxOwed >= 0 ? 'text-destructive' : 'text-success'}`}>
-              {formatCurrency(Math.abs(summary.taxOwed))}
-            </div>
-            <p className="text-xs text-muted-foreground">{summary.taxOwed >= 0 ? 'Owed' : 'Credit'}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Panel title={`Quarter ${selectedQuarter}`} description={selectedTruck === 'all' ? 'All trucks' : `Truck #${trucks.find((t) => t.id === selectedTruck)?.unit_number ?? ''}`} className="mb-5">
+        <StatementLine
+          label={<>Total miles<IFTATooltip term="Total Miles" /></>}
+          note="All jurisdictions"
+          value={summary.totalMiles.toLocaleString()}
+        />
+        <StatementLine
+          label={<>Total gallons<IFTATooltip term="Gal Purchased" /></>}
+          note={<>Fleet MPG: {avgMpg > 0 ? avgMpg.toFixed(2) : '—'}<IFTATooltip term="Fleet MPG" /></>}
+          value={summary.totalGallons.toFixed(1)}
+          rule="single"
+        />
+        <StatementLine
+          label={<>Net fuel cost<IFTATooltip term="Net Fuel Cost" /></>}
+          note={discountCount > 0 ? `${formatCurrency(grossFuelCost)} gross, less ${formatCurrency(discountTotal)} in ${discountCount} ${discountCount === 1 ? 'discount' : 'discounts'}` : 'No discounts applied'}
+          value={formatCurrency(summary.totalFuelCost)}
+          rule="single"
+        />
+        <StatementLine
+          label={<>{summary.taxOwed >= 0 ? 'Tax owed' : 'Tax credit'}<IFTATooltip term="Tax Liability" /></>}
+          value={formatCurrency(Math.abs(summary.taxOwed))}
+          strong
+          rule="double"
+          tone={summary.taxOwed > 0 ? 'bad' : summary.taxOwed < 0 ? 'good' : undefined}
+        />
+      </Panel>
 
       {/* Workflow Stepper */}
       <IFTAWorkflowStepper
@@ -858,7 +828,7 @@ export default function IFTA() {
       )}
 
       <Tabs defaultValue="fuel" className="w-full">
-        <TabsList>
+        <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="fuel" className="gap-1.5">
             Fuel Purchases
             {filteredFuelPurchases.length > 0 && (
@@ -885,12 +855,12 @@ export default function IFTA() {
 
         <TabsContent value="fuel" className="mt-6">
           <Card className="card-elevated">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <CardTitle>Fuel Purchases</CardTitle>
                 <CardDescription>Track all fuel purchases with jurisdiction</CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={syncFuelFromExpenses}
                   disabled={isSyncing}

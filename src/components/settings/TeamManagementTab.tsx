@@ -6,7 +6,8 @@ import { invokeWithAuth } from '@/lib/invoke-with-auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-import { DataTable } from '@/components/shared/DataTable';
+import { Roster, type RosterEntry } from '@/components/fleet/Roster';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/LoadingButton';
@@ -17,7 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { UserPlus, Pencil, KeyRound, Trash2 } from 'lucide-react';
+import { Briefcase, UserPlus, Pencil, KeyRound, Trash2, MoreHorizontal } from 'lucide-react';
+import { usePositions } from '@/hooks/usePositions';
+import { usePayPackages } from '@/hooks/usePayPackages';
+import { createHirePlan } from '@/lib/positions/api';
+import { suggestFromPosition } from '@/lib/positions/defaults';
+import { DriverPositionSection } from '@/components/drivers/DriverPositionSection';
+import { DriverPayPackageSection } from '@/components/drivers/DriverPayPackageSection';
 import { useOnboardingDefaults, ONBOARDING_PREF_DEFAULTS } from '@/components/settings/OnboardingPreferencesCard';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -55,7 +62,7 @@ const roleBadgeVariant: Record<AppRole, 'default' | 'secondary' | 'outline'> = {
 
 export function TeamManagementTab() {
   const queryClient = useQueryClient();
-  const { user, orgId } = useAuth();
+  const { user, orgId, hasPayrollAccess } = useAuth();
 
   // Sheet / Dialog state
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -73,16 +80,26 @@ export function TeamManagementTab() {
   const [isInviting, setIsInviting] = useState(false);
 
   const { data: onboardingDefaults } = useOnboardingDefaults();
+  const { data: positions = [] } = usePositions();
+  const [invitePositionId, setInvitePositionId] = useState('');
+  const [invitePackageId, setInvitePackageId] = useState('');
+  const [inviteLimitAreas, setInviteLimitAreas] = useState(false);
+  const { data: payPackages = [] } = usePayPackages();
+  const [peopleUser, setPeopleUser] = useState<UserWithRole | null>(null);
+  const [peopleSuggestedPackage, setPeopleSuggestedPackage] = useState<string | null>(null);
+  const invitePosition = positions.find((p) => p.id === invitePositionId) ?? null;
 
   const onboardingApplies = inviteRole === 'driver' || inviteRole === 'dispatcher';
 
   // Auto-default the checkbox whenever role changes or sheet opens
   useEffect(() => {
     const defaults = onboardingDefaults ?? ONBOARDING_PREF_DEFAULTS;
-    if (inviteRole === 'driver') setInviteRequiresOnboarding(defaults.driver);
+    // A chosen position suggests onboarding; the checkbox below can still be changed.
+    if (invitePosition) setInviteRequiresOnboarding(invitePosition.requires_onboarding);
+    else if (inviteRole === 'driver') setInviteRequiresOnboarding(defaults.driver);
     else if (inviteRole === 'dispatcher') setInviteRequiresOnboarding(defaults.dispatcher);
     else setInviteRequiresOnboarding(false);
-  }, [inviteRole, onboardingDefaults, inviteOpen]);
+  }, [inviteRole, onboardingDefaults, inviteOpen, invitePosition]);
 
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRole, setSelectedRole] = useState<AppRole>('driver');
@@ -195,11 +212,29 @@ export function TeamManagementTab() {
       if (response.data?.error) throw new Error(response.data.error);
 
       toast.success(`Invitation sent to ${inviteEmail}`);
+      if (orgId && (invitePosition || invitePackageId)) {
+        try {
+          await createHirePlan({
+            orgId,
+            email: inviteEmail,
+            positionId: invitePosition?.id ?? null,
+            payPackageId: invitePackageId || null,
+            start: new Date().toISOString().slice(0, 10),
+            limitToAreas: inviteLimitAreas,
+            areas: invitePosition?.default_permissions ?? [],
+          });
+        } catch (planError: any) {
+          toast.error(`Invitation sent, but the position and pay package were not saved: ${planError.message}. Set them from their profile once they join.`);
+        }
+      }
       setInviteOpen(false);
       setInviteEmail('');
       setInviteFirstName('');
       setInviteLastName('');
       setInviteRole('driver');
+      setInvitePositionId('');
+      setInvitePackageId('');
+      setInviteLimitAreas(false);
       queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
     } catch (error: any) {
       toast.error(error.message || 'Failed to send invitation');
@@ -286,102 +321,65 @@ export function TeamManagementTab() {
     setEditDialogOpen(true);
   }, []);
 
-  // ── DataTable columns ──
-  const columns = useMemo(() => [
-    {
-      key: 'name' as const,
-      header: 'Name',
-      render: (row: UserWithRole) => {
-        const name = row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : null;
-        return <span className="font-medium text-foreground">{name || '—'}</span>;
-      },
-    },
-    {
-      key: 'email' as const,
-      header: 'Email',
-      render: (row: UserWithRole) => (
-        <span className="text-muted-foreground">{row.email}</span>
-      ),
-    },
-    {
-      key: 'role' as const,
-      header: 'Role',
-      width: '140px',
-      render: (row: UserWithRole) =>
-        row.role ? (
-          <Badge variant={roleBadgeVariant[row.role]}>{roleLabels[row.role]}</Badge>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedUserId(row.user_id);
-              setAssignDialogOpen(true);
-            }}
-          >
-            Assign Role
-          </Button>
-        ),
-    },
-    {
-      key: 'status' as const,
-      header: 'Status',
-      width: '100px',
-      render: (row: UserWithRole) => {
-        const isActive = !!row.first_name;
-        return (
+  const entries: RosterEntry[] = usersWithRoles.map((row) => {
+    const isActive = !!row.first_name;
+    const name = row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : row.email;
+    return {
+      id: row.user_id,
+      title: name,
+      subtitle: row.email,
+      facts: [],
+      chips: (
+        <>
+          {row.role ? (
+            <Badge variant={roleBadgeVariant[row.role]}>{roleLabels[row.role]}</Badge>
+          ) : (
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setSelectedUserId(row.user_id); setAssignDialogOpen(true); }}>
+              Assign role
+            </Button>
+          )}
           <Badge variant={isActive ? 'default' : 'outline'} className={isActive ? 'bg-emerald-600/15 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-800' : ''}>
             {isActive ? 'Active' : 'Invited'}
           </Badge>
-        );
-      },
-    },
-    {
-      key: 'actions' as const,
-      header: 'Actions',
-      width: '120px',
-      render: (row: UserWithRole) => {
-        if (row.user_id === user?.id) return null;
-        return (
-          <div className="flex items-center gap-1">
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); openEditDialog(row); }}>
-              <Pencil className="h-3.5 w-3.5" />
+        </>
+      ),
+      menu: row.user_id === user?.id ? undefined : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for ${name}`}>
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Force Password Reset" onClick={(e) => { e.stopPropagation(); setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}>
-              <KeyRound className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setUserToDelete(row); setDeleteDialogOpen(true); }}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        );
-      },
-    },
-  ], [user?.id, openEditDialog]);
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEditDialog(row)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+            {hasPayrollAccess && <DropdownMenuItem onClick={() => { setPeopleSuggestedPackage(null); setPeopleUser(row); }}><Briefcase className="mr-2 h-4 w-4" /> Position & pay</DropdownMenuItem>}
+            <DropdownMenuItem onClick={() => { setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}><KeyRound className="mr-2 h-4 w-4" /> Force password reset</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => { setUserToDelete(row); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> Remove</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    };
+  });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">Team Members</h3>
-          <p className="text-sm text-muted-foreground">Manage your organization's users and their roles</p>
+          <h3 className="font-condensed text-xl font-bold leading-tight text-foreground">Team members</h3>
+          <p className="text-[13px] text-muted-foreground">Manage your organization's users and their roles</p>
         </div>
-        <Button onClick={() => setInviteOpen(true)} className="gradient-gold text-primary-foreground">
+        <Button onClick={() => setInviteOpen(true)} className="h-11 gradient-gold text-primary-foreground">
           <UserPlus className="h-4 w-4 mr-2" />
           Invite Member
         </Button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={usersWithRoles}
-        loading={isLoading}
-        emptyMessage="No team members yet. Invite someone to get started."
-        tableId="team-members"
-        exportFilename="team-members"
-      />
+      {isLoading ? (
+        <div className="py-12 text-center text-muted-foreground">Loading...</div>
+      ) : (
+        <Roster entries={entries} empty="No team members yet. Invite someone to get started." />
+      )}
 
       {/* ── Invite Sheet ── */}
       <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -407,6 +405,45 @@ export function TeamManagementTab() {
               <Label htmlFor="invite-email">Email Address</Label>
               <Input id="invite-email" type="email" placeholder="user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
             </div>
+            {positions.some((p) => !p.archived_at) && (
+              <div className="space-y-2">
+                <Label>Position (optional)</Label>
+                <Select
+                  value={invitePositionId}
+                  onValueChange={(id) => {
+                    setInvitePositionId(id);
+                    const pos = positions.find((p) => p.id === id);
+                    if (pos?.default_role) setInviteRole(pos.default_role as AppRole);
+                    const usable = new Set(payPackages.filter((p) => !p.archived_at && p.is_active).map((p) => p.id));
+                    setInvitePackageId(pos ? suggestFromPosition(pos, usable).payPackageId ?? '' : '');
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choose a position to fill in the defaults" /></SelectTrigger>
+                  <SelectContent>
+                    {positions.filter((p) => !p.archived_at).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {invitePosition && (
+                  <>
+                    <Label className="pt-1">Pay package</Label>
+                    <Select value={invitePackageId || '__none__'} onValueChange={(v) => setInvitePackageId(v === '__none__' ? '' : v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No pay package yet</SelectItem>
+                        {payPackages.filter((p) => !p.archived_at && p.is_active).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <label className="flex min-h-[44px] items-center gap-2 text-sm">
+                      <Checkbox checked={inviteLimitAreas} onCheckedChange={(v) => setInviteLimitAreas(v === true)} />
+                      Limit them to this position's areas
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Role, onboarding and pay package are suggested from the position and can all be changed. The position, package and limit are applied automatically when they accept.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Role</Label>
               <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
@@ -571,6 +608,23 @@ export function TeamManagementTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!peopleUser} onOpenChange={(v) => !v && setPeopleUser(null)}>
+        <DialogContent className="flex max-h-[90vh] max-w-xl flex-col">
+          <DialogHeader>
+            <DialogTitle>Position & pay</DialogTitle>
+            <DialogDescription>{peopleUser ? `${peopleUser.first_name ?? ''} ${peopleUser.last_name ?? ''}`.trim() || peopleUser.email : ''}</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {peopleUser && (
+              <>
+                <DriverPositionSection userId={peopleUser.user_id} onSuggestPackage={setPeopleSuggestedPackage} />
+                <DriverPayPackageSection userId={peopleUser.user_id} suggestedPackageId={peopleSuggestedPackage} />
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

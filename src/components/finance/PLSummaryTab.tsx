@@ -1,17 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardTitle, CardHeader } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  PiggyBank,
-  Route,
-  Target,
-  Gauge,
-} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -21,7 +11,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   RadialBarChart,
   RadialBar,
   PolarAngleAxis,
@@ -29,6 +18,7 @@ import {
 import { formatCurrency } from '@/lib/formatters';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 import { usePLTrend, type PeriodRollup, type RunwayMetrics } from '@/hooks/usePLTrend';
+import { workbookMetrics, type DriverPayTotals, type FuelStats } from '@/lib/pl-metrics';
 
 interface PLSummaryTabProps {
   revenueTotals: any;
@@ -36,6 +26,7 @@ interface PLSummaryTabProps {
   standaloneExpenseTotals: any;
   loadLinkedExpenseTotals: any;
   payrollTotals: any;
+  driverPay: DriverPayTotals;
   commissionTotals: any;
   deadheadMiles: number;
   totalEmptyMiles: number;
@@ -44,6 +35,10 @@ interface PLSummaryTabProps {
   profitMargin: number;
   totalExpenses: number;
   totalRevenueWithCommissions: number;
+  fuel: FuelStats;
+  truckPaymentsTotal: number;
+  advancesTotal: number;
+  creditsTotal: number;
   getSetting: (key: string, defaultValue?: string) => string;
 }
 
@@ -56,15 +51,69 @@ const abbrevCurrency = (n: number) => {
   return `$${n.toFixed(0)}`;
 };
 
-const perMile = (numerator: number, miles: number) =>
-  miles > 0 ? formatCurrency(numerator / miles) : '—';
+const money = (v: number) => (v < 0 ? `−${formatCurrency(-v)}` : formatCurrency(v));
+const takeOff = (v: number) => (v > 0 ? `−${formatCurrency(v)}` : formatCurrency(0));
+const perMile = (numerator: number, miles: number) => (miles > 0 ? formatCurrency(numerator / miles) : 'No miles yet');
+const percent = (fraction: number, digits = 1) => `${(fraction * 100).toFixed(digits)}%`;
+
+function StatementLine({ label, note, value, strong, rule, muted, tone }: {
+  label: React.ReactNode;
+  note?: React.ReactNode;
+  value: React.ReactNode;
+  strong?: boolean;
+  rule?: 'single' | 'double';
+  muted?: boolean;
+  tone?: 'good' | 'bad';
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-baseline gap-3 py-2.5',
+        rule === 'single' && 'border-t',
+        rule === 'double' && 'border-t-[3px] border-double border-foreground/70',
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className={cn('text-[15px]', strong && 'font-semibold')}>{label}</div>
+        {note && <div className="text-[13px] text-muted-foreground">{note}</div>}
+      </div>
+      <div
+        className={cn(
+          'figure shrink-0 text-right',
+          strong ? 'text-2xl font-bold' : 'text-lg font-semibold',
+          muted && 'text-muted-foreground',
+          tone === 'good' && 'text-success',
+          tone === 'bad' && 'text-destructive',
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function Panel({ title, description, children, className, aside }: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+  aside?: React.ReactNode;
+}) {
+  return (
+    <section aria-label={title} className={cn('rounded-lg border bg-card px-4 pt-3 pb-2', className)}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="font-condensed text-xl font-bold leading-tight">{title}</h3>
+        {aside}
+      </div>
+      {description && <p className="pb-1 text-[13px] text-muted-foreground">{description}</p>}
+      {children}
+    </section>
+  );
+}
 
 export function PLSummaryTab({
   revenueTotals,
-  loadExpenseTotals,
-  standaloneExpenseTotals,
-  loadLinkedExpenseTotals,
-  payrollTotals,
+  driverPay,
   commissionTotals,
   deadheadMiles,
   totalEmptyMiles,
@@ -73,718 +122,417 @@ export function PLSummaryTab({
   profitMargin,
   totalExpenses,
   totalRevenueWithCommissions,
+  fuel,
+  truckPaymentsTotal,
+  advancesTotal,
+  creditsTotal,
   getSetting,
 }: PLSummaryTabProps) {
   const { costPerMile } = useOperationalCPM();
-  const overheadCost = costPerMile * totalActualMilesWithDeadhead;
-  const trueNetIncome = netProfit - overheadCost;
-  const breakEvenRPM = totalActualMilesWithDeadhead > 0 ? (totalExpenses + payrollTotals.netPay + overheadCost) / totalActualMilesWithDeadhead : 0;
-
-  // === Executive P&L ===
-  const grossRevenue = Number(revenueTotals.grossRevenue) || 0;
-  const combinedCosts =
-    (Number(totalExpenses) || 0) +
-    (Number(payrollTotals.netPay) || 0) +
-    (Number(commissionTotals.amount) || 0);
-  const noi = grossRevenue - combinedCosts;
-  const noiMargin = grossRevenue > 0 ? (noi / grossRevenue) * 100 : 0;
-
   const [timeframe, setTimeframe] = useState<Timeframe>('week');
   const { data: trend, isLoading: trendLoading } = usePLTrend();
+
+  const truckPct = getSetting('truck_percentage', '65');
+  const trailerPct = getSetting('trailer_percentage', '7');
+
+  // Revenue is what the truck earns. Gross is what the customer is billed; Landstar keeps the difference.
+  const grossRevenue = Number(revenueTotals.grossRevenue) || 0;
+  const yourRevenue = Number(revenueTotals.netRevenue) || 0;
+  const landstarShare = Math.max(0, grossRevenue - yourRevenue);
+  const payroll = driverPay.total;
+  const commissions = Number(commissionTotals.amount) || 0;
+  const hasLoads = revenueTotals.loadCount > 0;
+
+  const overheadCost = costPerMile * totalActualMilesWithDeadhead;
+  const trueNetIncome = netProfit - overheadCost;
+  const recordedCosts = totalExpenses + payroll;
+  const recordedCostPerMile = totalActualMilesWithDeadhead > 0 ? recordedCosts / totalActualMilesWithDeadhead : 0;
+  const breakEvenRPM = totalActualMilesWithDeadhead > 0 ? (recordedCosts + overheadCost) / totalActualMilesWithDeadhead : 0;
+  const revenuePerMile = totalActualMilesWithDeadhead > 0 ? yourRevenue / totalActualMilesWithDeadhead : 0;
+
+  const metrics = workbookMetrics({
+    loadCount: revenueTotals.loadCount,
+    revenue: yourRevenue,
+    fuelSurcharge: Number(revenueTotals.fuelSurcharge) || 0,
+    actualMiles: revenueTotals.actualMiles,
+    fuel,
+  });
 
   const selected: PeriodRollup = useMemo(() => {
     if (!trend) return { revenue: 0, costs: 0, miles: 0 };
     return trend[timeframe];
   }, [trend, timeframe]);
-
   const npmValue = selected.miles > 0 ? (selected.revenue - selected.costs) / selected.miles : 0;
-
   const tfLabel = timeframe === 'week' ? '7-day' : timeframe === 'month' ? '30-day' : '90-day';
 
   return (
-    <>
-      {/* ============ Fleet P&L Overview ============ */}
-      <div className="mb-6 space-y-4">
-        {/* ---------- Triple KPI row ---------- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Card 1 — Gross Revenue */}
-          <Card className="rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Fleet Gross Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold text-foreground tabular-nums">
-                {formatCurrency(grossRevenue)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {revenueTotals.loadCount} loads · {revenueTotals.bookedMiles.toLocaleString()} mi
-              </p>
-            </CardContent>
-          </Card>
+    <div className="space-y-6">
+      {/* ============ The statement, and the numbers that explain it ============ */}
+      <div className="grid gap-5 lg:grid-cols-5">
+        <Panel
+          title="Profit and loss"
+          description="Revenue is what your truck earns, the way Landstar's own workbook counts it."
+          className="lg:col-span-3"
+        >
+          <StatementLine
+            label="Billed to customers"
+            note={`${revenueTotals.loadCount} load${revenueTotals.loadCount === 1 ? '' : 's'} delivered, gross`}
+            value={money(grossRevenue)}
+            muted
+          />
+          <StatementLine
+            label="Landstar's share"
+            note={`${100 - Number(truckPct)}% of linehaul. Fuel surcharge comes to you at 100%.`}
+            value={takeOff(landstarShare)}
+            muted
+          />
+          <StatementLine label="Your revenue" note={`Truck ${truckPct}%, fuel surcharge, accessorials`} value={money(yourRevenue)} strong rule="single" />
+          {commissions > 0 && <StatementLine label="Agent commissions" value={`+${formatCurrency(commissions)}`} />}
+          <StatementLine
+            label="Operating expenses"
+            note={
+              totalExpenses > 0 ? (
+                <>
+                  {truckPaymentsTotal > 0 ? `Includes ${formatCurrency(truckPaymentsTotal)} in truck payments` : 'Recorded in this period'}
+                  {creditsTotal > 0 && `, after ${formatCurrency(creditsTotal)} in credits`}
+                </>
+              ) : (
+                'Nothing entered or imported for this period'
+              )
+            }
+            value={totalExpenses > 0 ? takeOff(totalExpenses) : 'None yet'}
+            muted
+          />
+          {payroll > 0 && (
+            <StatementLine
+              label="Driver pay"
+              note={[driverPay.settlementCount > 0 ? `${driverPay.settlementCount} settlement${driverPay.settlementCount === 1 ? '' : 's'}, gross pay plus reimbursements` : '', driverPay.batchCount > 0 ? `${driverPay.batchCount} payroll batch${driverPay.batchCount === 1 ? '' : 'es'}` : '', driverPay.bonusCount > 0 ? `${driverPay.bonusCount} safety bonus${driverPay.bonusCount === 1 ? '' : 'es'}` : ''].filter(Boolean).join(', ')}
+              value={takeOff(payroll)}
+              muted
+            />
+          )}
+          <StatementLine
+            label={netProfit >= 0 ? 'Net profit' : 'Net loss'}
+            note={totalExpenses > 0 || payroll > 0 ? `${profitMargin.toFixed(1)}% of ${commissions > 0 ? 'revenue with commissions' : 'your revenue'}` : 'Will drop as expenses are recorded'}
+            value={money(netProfit)}
+            strong
+            rule="double"
+            tone={netProfit < 0 ? 'bad' : undefined}
+          />
+          {advancesTotal > 0 && (
+            <p className="border-t pt-2 pb-1 text-[13px] text-muted-foreground tabular-nums">
+              Card advances of {formatCurrency(advancesTotal)} are not counted as expenses.
+            </p>
+          )}
+        </Panel>
 
-          {/* Card 2 — Dispatched Expenses */}
-          <Card className="rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Dispatched Expenses
-              </CardTitle>
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold text-foreground tabular-nums">
-                {formatCurrency(combinedCosts)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Payroll · Commissions · Opex
-              </p>
-            </CardContent>
-          </Card>
+        <Panel title="Per load and per mile" className="lg:col-span-2">
+          <dl className="divide-y">
+            <Ratio label="Revenue per load" note="With fuel surcharge" value={hasLoads ? formatCurrency(metrics.avgRevenuePerLoad) : 'None yet'} />
+            <Ratio label="Revenue per load" note="Without fuel surcharge" value={hasLoads ? formatCurrency(metrics.avgRevenuePerLoadWithoutFsc) : 'None yet'} />
+            <Ratio label="Profit per load" value={hasLoads ? money(netProfit / revenueTotals.loadCount) : 'None yet'} />
+            <Ratio label="All-in rate" note="Billed to customers over actual miles, before Landstar's cut" value={perMile(grossRevenue, totalActualMilesWithDeadhead)} />
+            <Ratio label="Revenue per mile" note="Your revenue over actual miles" value={perMile(yourRevenue, totalActualMilesWithDeadhead)} />
+            <Ratio label="Profit per mile" value={revenueTotals.actualMiles > 0 ? money(netProfit / revenueTotals.actualMiles) : 'No miles yet'} />
+            <Ratio label="Cost per mile" note="Recorded costs over actual miles" value={totalActualMilesWithDeadhead > 0 ? (recordedCosts > 0 ? formatCurrency(recordedCostPerMile) : 'None yet') : 'No miles yet'} />
+            <Ratio
+              label="Break-even revenue per mile"
+              note={
+                totalActualMilesWithDeadhead > 0
+                  ? `Now ${formatCurrency(revenuePerMile)}, ${revenuePerMile >= breakEvenRPM ? 'above' : 'below'} break-even. Includes overhead estimated at ${formatCurrency(costPerMile)} a mile.`
+                  : undefined
+              }
+              value={totalActualMilesWithDeadhead > 0 ? formatCurrency(breakEvenRPM) : 'No miles yet'}
+            />
+            <Ratio
+              label="True net income"
+              note={`Net profit less overhead estimated at ${formatCurrency(costPerMile)} a mile`}
+              value={money(trueNetIncome)}
+              tone={trueNetIncome < 0 ? 'bad' : undefined}
+            />
+          </dl>
+        </Panel>
+      </div>
 
-          {/* Card 3 — Net Operating Margin */}
-          <Card className="rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Net Operating Margin
-              </CardTitle>
-              <PiggyBank className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold text-foreground tabular-nums">
-                {formatCurrency(noi)}
-              </p>
-              <p className="text-xs mt-2 flex items-center gap-1">
-                <span className="text-muted-foreground">Margin</span>
-                <span
-                  className={`inline-flex items-center gap-0.5 font-medium ${
-                    noi >= 0 ? 'text-green-600' : 'text-destructive'
-                  }`}
-                >
-                  {noi >= 0 ? (
-                    <TrendingUp className="h-3 w-3" />
-                  ) : (
-                    <TrendingDown className="h-3 w-3" />
-                  )}
-                  {noiMargin.toFixed(2)}%
-                </span>
-              </p>
-            </CardContent>
-          </Card>
+      {/* ============ Revenue, and miles and fuel ============ */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel title="Revenue">
+          <StatementLine label="Linehaul" note="Booked, before the split" value={money(revenueTotals.bookedLinehaul)} />
+          <StatementLine
+            label="Fuel surcharge"
+            note={`${grossRevenue > 0 ? ((revenueTotals.fuelSurcharge / grossRevenue) * 100).toFixed(1) : '0.0'}% of gross, ${percent(metrics.fscShareOfRevenue)} of your revenue`}
+            value={money(revenueTotals.fuelSurcharge)}
+          />
+          <StatementLine label="Accessorials" value={money(revenueTotals.accessorials)} />
+          <StatementLine label="Gross revenue (100%)" value={money(grossRevenue)} strong rule="single" />
+          <StatementLine label={`Truck revenue (${truckPct}%)`} value={money(revenueTotals.truckRevenue)} muted />
+          <StatementLine label={`Trailer revenue (${trailerPct}%)`} value={money(revenueTotals.trailerRevenue)} muted />
+          <StatementLine label="Your revenue" note="Truck plus trailer" value={money(yourRevenue)} strong rule="double" />
+        </Panel>
+
+        <Panel title="Miles and fuel">
+          <StatementLine label="Paid miles" note="Booked" value={revenueTotals.bookedMiles.toLocaleString()} />
+          <StatementLine label="Actual miles" value={revenueTotals.actualMiles.toLocaleString()} />
+          <StatementLine label="Deadhead miles" note="Between loads" value={deadheadMiles.toLocaleString()} />
+          <StatementLine label="Empty miles" value={totalEmptyMiles.toLocaleString()} />
+          <StatementLine
+            label="Empty miles share"
+            value={totalActualMilesWithDeadhead > 0 ? percent(totalEmptyMiles / totalActualMilesWithDeadhead, 2) : 'No miles yet'}
+            strong
+            rule="single"
+          />
+          <StatementLine label="Average miles per load" value={hasLoads ? Math.round(metrics.avgMilesPerLoad).toLocaleString() : 'None yet'} />
+          <StatementLine
+            label="Fuel"
+            note={fuel.gallons > 0 ? `${fuel.gallons.toLocaleString('en-US', { maximumFractionDigits: 1 })} gallons, ${formatCurrency(fuel.discounts)} in discounts` : 'No fuel gallons recorded for this period'}
+            value={fuel.gallons > 0 ? money(fuel.netCost) : 'None yet'}
+            rule="single"
+          />
+          <StatementLine label="Cost per gallon" note="After discounts" value={fuel.gallons > 0 ? formatCurrency(fuel.costPerGallon) : 'None yet'} />
+          <StatementLine label="Miles per gallon" value={metrics.milesPerGallon > 0 ? metrics.milesPerGallon.toFixed(2) : 'None yet'} />
+          <StatementLine
+            label="Cost per gallon after fuel surcharge"
+            note="What a gallon costs once the surcharge you collect is counted"
+            value={metrics.costPerGallonAfterFsc !== 0 ? formatCurrency(metrics.costPerGallonAfterFsc) : 'None yet'}
+          />
+        </Panel>
+      </div>
+
+      {/* ============ Per-mile ratios by timeframe ============ */}
+      <Panel
+        title="Per mile"
+        description="Your revenue and recorded costs over actual miles."
+        aside={
+          <Tabs value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
+            <TabsList className="h-11">
+              <TabsTrigger value="week" className="h-9 px-4">Week</TabsTrigger>
+              <TabsTrigger value="month" className="h-9 px-4">Month</TabsTrigger>
+              <TabsTrigger value="quarter" className="h-9 px-4">Quarter</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        }
+      >
+        <dl className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <RatioCell
+            label="Revenue per mile"
+            value={trendLoading ? 'Loading' : perMile(selected.revenue, selected.miles)}
+            sub={`${abbrevCurrency(selected.revenue)} over ${selected.miles.toLocaleString()} mi`}
+          />
+          <RatioCell
+            label="Expense per mile"
+            value={trendLoading ? 'Loading' : perMile(selected.costs, selected.miles)}
+            sub={`${abbrevCurrency(selected.costs)} over ${selected.miles.toLocaleString()} mi`}
+          />
+          <RatioCell
+            label="Net per mile"
+            value={trendLoading ? 'Loading' : selected.miles > 0 ? money(npmValue) : 'No miles yet'}
+            sub={`${abbrevCurrency(selected.revenue - selected.costs)} net, ${tfLabel}`}
+          />
+        </dl>
+      </Panel>
+
+      {/* ============ 12-week trend ============ */}
+      <Panel
+        title="Revenue and costs by settlement week"
+        description="Twelve weeks, each ending on a Wednesday. Revenue is yours, not gross."
+        aside={
+          <div className="flex items-center gap-4 text-[13px] text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-primary" /> Revenue</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Costs</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-3 bg-muted-foreground" /> Net</span>
+          </div>
+        }
+      >
+        <div className="pb-2 pt-2">
+          {trendLoading || !trend ? (
+            <Skeleton className="h-[300px] w-full" />
+          ) : trend.weekly.length === 0 ? (
+            <div className="flex h-[300px] w-full items-center justify-center text-sm text-muted-foreground">No data available</div>
+          ) : (
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={trend.weekly} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    tickFormatter={abbrevCurrency}
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    width={56}
+                  />
+                  <Tooltip
+                    formatter={(v: any) => formatCurrency(Number(v))}
+                    labelFormatter={(l) => `Week ending ${l}`}
+                    contentStyle={{
+                      background: 'hsl(var(--popover))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: 6,
+                      fontSize: 13,
+                      color: 'hsl(var(--popover-foreground))',
+                    }}
+                    labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                    cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
+                  />
+                  <Area type="monotone" dataKey="costs" name="Costs" stroke="hsl(var(--destructive))" strokeWidth={1.5} fill="hsl(var(--destructive))" fillOpacity={0.1} />
+                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(var(--primary))" strokeWidth={1.5} fill="hsl(var(--primary))" fillOpacity={0.12} />
+                  <Line type="monotone" dataKey="net" name="Net" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
+      </Panel>
 
-        {/* ---------- Fleet Runway (Cost Per Day + Break-Even Gauge) ---------- */}
-        <FleetRunwaySection loading={trendLoading} runway={trend?.runway} />
-
-
-
-
-
-        {/* ---------- Operational Ratios ---------- */}
-        <Card className="rounded-xl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-4 flex-wrap">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-muted-foreground" />
-              Operational Ratios · Per Mile
-            </CardTitle>
-            <Tabs
-              value={timeframe}
-              onValueChange={(v) => setTimeframe(v as Timeframe)}
-            >
-              <TabsList>
-                <TabsTrigger value="week">Week</TabsTrigger>
-                <TabsTrigger value="month">Month</TabsTrigger>
-                <TabsTrigger value="quarter">Quarter</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-              <RatioCell
-                code="RPM"
-                label="Revenue / Mile"
-                value={trendLoading ? '—' : perMile(selected.revenue, selected.miles)}
-                tone="up"
-                sub={`${abbrevCurrency(selected.revenue)} over ${selected.miles.toLocaleString()} mi`}
-              />
-              <RatioCell
-                code="EPM"
-                label="Expense / Mile"
-                value={trendLoading ? '—' : perMile(selected.costs, selected.miles)}
-                tone="down"
-                sub={`${abbrevCurrency(selected.costs)} over ${selected.miles.toLocaleString()} mi`}
-              />
-              <RatioCell
-                code="NPM"
-                label="Net / Mile"
-                value={trendLoading ? '—' : selected.miles > 0 ? formatCurrency(npmValue) : '—'}
-                tone={npmValue >= 0 ? 'up' : 'down'}
-                sub={`${abbrevCurrency(selected.revenue - selected.costs)} net · ${tfLabel}`}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ---------- 12-Week Trend ---------- */}
-        <Card className="rounded-xl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-4 flex-wrap">
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              Gross vs Overhead · 12-Week Rolling
-            </CardTitle>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-sm bg-primary" /> Revenue
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Overhead
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-0.5 w-3 bg-muted-foreground" /> Net
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {trendLoading || !trend ? (
-              <Skeleton className="h-[320px] w-full" />
-            ) : trend.weekly.length === 0 ? (
-              <div className="h-[320px] w-full flex items-center justify-center text-sm text-muted-foreground">
-                No data available
-              </div>
-            ) : (
-              <div className="h-[320px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart
-                    data={trend.weekly}
-                    margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="plRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
-                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
-                      </linearGradient>
-                      <linearGradient id="plCost" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.25} />
-                        <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                      tickLine={false}
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
-                    />
-                    <YAxis
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                      tickFormatter={abbrevCurrency}
-                      tickLine={false}
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
-                      width={56}
-                    />
-                    <Tooltip
-                      formatter={(v: any) => formatCurrency(Number(v))}
-                      contentStyle={{
-                        background: 'hsl(var(--popover))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        color: 'hsl(var(--popover-foreground))',
-                      }}
-                      labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
-                      cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="costs"
-                      name="Overhead"
-                      stroke="hsl(var(--destructive))"
-                      strokeWidth={1.5}
-                      fill="url(#plCost)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      name="Revenue"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={1.5}
-                      fill="url(#plRev)"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="net"
-                      name="Net"
-                      stroke="hsl(var(--muted-foreground))"
-                      strokeWidth={1}
-                      strokeDasharray="4 4"
-                      dot={false}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-
-
-      {/* Revenue Flow */}
-      <Card className="card-elevated mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-center">
-            <div className="p-4 bg-muted rounded-lg overflow-hidden">
-              <p className="text-sm text-muted-foreground mb-1">100% GROSS</p>
-              <p className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(revenueTotals.grossRevenue)}</p>
-            </div>
-            <div className="p-4 bg-primary/10 rounded-lg overflow-hidden">
-              <p className="text-sm text-muted-foreground mb-1 truncate">TRUCK REVENUE ({getSetting('truck_percentage', '65')}%)</p>
-              <p className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(revenueTotals.truckRevenue)}</p>
-            </div>
-            <div className="p-4 bg-success/10 rounded-lg overflow-hidden">
-              <p className="text-sm text-muted-foreground mb-1">NET PROFIT</p>
-              <p className="text-xl sm:text-2xl font-bold text-success truncate">{formatCurrency(netProfit)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Revenue Summary */}
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-success" />
-              Revenue Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableBody>
-                <TableRow>
-                  <TableCell>GROSS L/H</TableCell>
-                  <TableCell className="text-right">{formatCurrency(revenueTotals.bookedLinehaul)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    FSC REV 
-                    <span className="text-muted-foreground text-xs ml-2">
-                      ({revenueTotals.grossRevenue > 0 ? ((revenueTotals.fuelSurcharge / revenueTotals.grossRevenue) * 100).toFixed(2) : 0}% of Gross)
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">{formatCurrency(revenueTotals.fuelSurcharge)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Accessorials</TableCell>
-                  <TableCell className="text-right">{formatCurrency(revenueTotals.accessorials)}</TableCell>
-                </TableRow>
-                <TableRow className="border-t-2">
-                  <TableCell className="font-medium">Gross Revenue (100%)</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(revenueTotals.grossRevenue)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Truck Revenue ({getSetting('truck_percentage', '65')}%)</TableCell>
-                  <TableCell className="text-right">{formatCurrency(revenueTotals.truckRevenue)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Trailer Revenue ({getSetting('trailer_percentage', '7')}%)</TableCell>
-                  <TableCell className="text-right">{formatCurrency(revenueTotals.trailerRevenue)}</TableCell>
-                </TableRow>
-                <TableRow className="bg-success/10">
-                  <TableCell className="font-bold">TOTAL REV (Net Revenue)</TableCell>
-                  <TableCell className="text-right font-bold text-success">{formatCurrency(revenueTotals.netRevenue)}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Miles Summary */}
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Route className="h-5 w-5 text-primary" />
-              Miles Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableBody>
-                <TableRow>
-                  <TableCell>Paid Miles (Booked)</TableCell>
-                  <TableCell className="text-right font-mono">{revenueTotals.bookedMiles.toLocaleString()}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Actual Miles</TableCell>
-                  <TableCell className="text-right font-mono">{revenueTotals.actualMiles.toLocaleString()}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Deadhead Miles (Between Loads)</TableCell>
-                  <TableCell className="text-right font-mono">{deadheadMiles.toLocaleString()}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Empty Miles</TableCell>
-                  <TableCell className="text-right font-mono">{totalEmptyMiles.toLocaleString()}</TableCell>
-                </TableRow>
-                <TableRow className="border-t">
-                  <TableCell className="font-medium">% of Empty Miles</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {totalActualMilesWithDeadhead > 0
-                      ? ((totalEmptyMiles / totalActualMilesWithDeadhead) * 100).toFixed(2)
-                      : 0}%
-                  </TableCell>
-                </TableRow>
-                <TableRow className="border-t-2">
-                  <TableCell className="font-medium">Revenue Per Paid Mile</TableCell>
-                  <TableCell className="text-right font-medium text-success">
-                    {revenueTotals.bookedMiles > 0 ? formatCurrency(revenueTotals.netRevenue / revenueTotals.bookedMiles) : '$0.00'}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Revenue Per Actual Mile</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {totalActualMilesWithDeadhead > 0 ? formatCurrency(revenueTotals.netRevenue / totalActualMilesWithDeadhead) : '$0.00'}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Net Profit Calculation */}
-      <Card className="card-elevated mt-6">
-        <CardContent className="pt-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span>Net Revenue</span>
-                <span className="font-mono text-success">{formatCurrency(revenueTotals.netRevenue)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Agency Commissions (Revenue)</span>
-                <span className="font-mono text-success">+{formatCurrency(commissionTotals.amount)}</span>
-              </div>
-              <div className="flex justify-between font-semibold border-t pt-2 mt-2">
-                <span>Total Revenue</span>
-                <span className="font-mono">{formatCurrency(totalRevenueWithCommissions)}</span>
-              </div>
-              <div className="flex justify-between mt-4">
-                <span>Operating Expenses</span>
-                <span className="font-mono text-destructive">-{formatCurrency(totalExpenses)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Driver Payroll</span>
-                <span className="font-mono text-destructive">-{formatCurrency(payrollTotals.netPay)}</span>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex justify-between items-center gap-2">
-                  <span className="font-bold text-lg">{netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS'}</span>
-                  <span className={`font-bold text-xl sm:text-2xl truncate ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(netProfit)}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
-                <p className="text-sm text-muted-foreground">Loads</p>
-                <p className="text-xl sm:text-2xl font-bold truncate">{revenueTotals.loadCount}</p>
-              </div>
-              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
-                <p className="text-sm text-muted-foreground">Profit Margin</p>
-                <p className={`text-xl sm:text-2xl font-bold truncate ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {profitMargin.toFixed(1)}%
-                </p>
-              </div>
-              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
-                <p className="text-sm text-muted-foreground">Avg Per Load</p>
-                <p className="text-lg sm:text-xl font-bold truncate">
-                  {revenueTotals.loadCount > 0 ? formatCurrency(netProfit / revenueTotals.loadCount) : '$0.00'}
-                </p>
-              </div>
-              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
-                <p className="text-sm text-muted-foreground">Profit Per Mile</p>
-                <p className="text-lg sm:text-xl font-bold truncate">
-                  {revenueTotals.actualMiles > 0 ? formatCurrency(netProfit / revenueTotals.actualMiles) : '$0.00'}
-                </p>
-              </div>
-              <div className="p-4 bg-primary/10 rounded-lg text-center overflow-hidden">
-                <p className="text-sm text-muted-foreground">True Net Income</p>
-                <p className={`text-lg sm:text-xl font-bold truncate ${trueNetIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(trueNetIncome)}
-                </p>
-              </div>
-              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
-                <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Target className="h-3 w-3 flex-shrink-0" /> Break-Even RPM</p>
-                <p className="text-lg sm:text-xl font-bold truncate">
-                  {formatCurrency(breakEvenRPM)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  );
-}
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  sub,
-  valueClass,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-4 overflow-hidden">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
-        {icon}
-      </div>
-      <p className={`text-2xl sm:text-3xl font-bold tabular-nums truncate ${valueClass ?? ''}`}>
-        {value}
-      </p>
-      <p className="text-xs text-muted-foreground mt-1 truncate">{sub}</p>
+      {/* ============ Runway ============ */}
+      <FleetRunwaySection loading={trendLoading} runway={trend?.runway} />
     </div>
   );
 }
 
-function CpmStat({
-  label,
-  hint,
-  value,
-  valueClass,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  valueClass?: string;
-}) {
+function Ratio({ label, note, value, tone }: { label: string; note?: React.ReactNode; value: string; tone?: 'bad' }) {
   return (
-    <div className="rounded-md bg-background border p-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-        <span className="text-[10px] font-mono text-muted-foreground/70">{hint}</span>
+    <div className="flex items-baseline gap-3 py-2.5">
+      <div className="min-w-0 flex-1">
+        <dt className="text-[15px]">{label}</dt>
+        {note && <dd className="text-[13px] text-muted-foreground">{note}</dd>}
       </div>
-      <p className={`text-xl sm:text-2xl font-bold tabular-nums mt-1 ${valueClass ?? ''}`}>
-        {value}
-      </p>
+      <dd className={cn('figure shrink-0 text-right text-lg font-semibold', tone === 'bad' && 'text-destructive')}>{value}</dd>
     </div>
   );
 }
 
-function RatioCell({
-  code,
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  code: string;
-  label: string;
-  value: string;
-  sub: string;
-  tone: 'up' | 'down';
-}) {
-  const toneClass = tone === 'up' ? 'text-green-600' : 'text-destructive';
-  const ToneIcon = tone === 'up' ? TrendingUp : TrendingDown;
+function RatioCell({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="px-5 py-4">
-      <div className="flex items-baseline justify-between mb-1">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${toneClass}`}>
-          <ToneIcon className="h-3 w-3" />
-          {code}
-        </span>
-      </div>
-      <p className="text-2xl font-semibold text-foreground tabular-nums">{value}</p>
-      <p className="text-xs text-muted-foreground mt-1 truncate">{sub}</p>
+    <div className="px-1 py-3 sm:px-5 sm:first:pl-1">
+      <dt className="text-[15px] text-muted-foreground">{label}</dt>
+      <dd className="figure mt-0.5 text-2xl font-bold">{value}</dd>
+      <dd className="mt-0.5 truncate text-[13px] text-muted-foreground">{sub}</dd>
     </div>
   );
 }
 
-function FleetRunwaySection({
-  loading,
-  runway,
-}: {
-  loading: boolean;
-  runway?: RunwayMetrics;
-}) {
+function FleetRunwaySection({ loading, runway }: { loading: boolean; runway?: RunwayMetrics }) {
   if (loading || !runway) {
     return (
-      <Card className="rounded-xl">
-        <CardContent className="pt-6">
-          <Skeleton className="h-[220px] w-full" />
-        </CardContent>
-      </Card>
+      <section className="rounded-lg border bg-card p-4">
+        <Skeleton className="h-[220px] w-full" />
+      </section>
     );
   }
 
   const hasExpenses = runway.trailing30Expenses !== 0 || runway.monthToDateExpenses !== 0;
+  // The month is only judged once it has costs; a month with none yet (the loan payment may not have posted) is not a loss.
+  const hasMonthCosts = runway.monthToDateExpenses > 0;
   const hasDispatch = runway.plannedDispatchDays > 0;
   const hasCostPerDay = runway.costPerDay > 0;
 
-  const coverageRatio = runway.monthToDateExpenses > 0 ? runway.monthToDateRevenue / runway.monthToDateExpenses : 0;
+  const coverageRatio = hasMonthCosts ? runway.monthToDateRevenue / runway.monthToDateExpenses : 0;
   const delta = runway.monthToDateNet;
 
   const gaugeColor =
     coverageRatio >= 1 ? 'hsl(var(--success))' : coverageRatio >= 0.9 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))';
   const statusLabel =
-    !hasExpenses ? 'Awaiting expenses'
-      : coverageRatio >= 1 ? 'Net profit MTD'
+    !hasMonthCosts ? 'No costs this month yet'
+      : coverageRatio >= 1 ? 'Net profit this month'
       : coverageRatio >= 0.9 ? 'Approaching break-even'
       : 'Below break-even';
+  const statusClass = !hasMonthCosts
+    ? 'text-muted-foreground'
+    : coverageRatio >= 1
+    ? 'text-success'
+    : coverageRatio >= 0.9
+    ? 'text-warning'
+    : 'text-destructive';
 
   const gaugeValue = Math.max(0, Math.min(coverageRatio * 100, 150));
   const gaugeData = [{ name: 'progress', value: gaugeValue, fill: gaugeColor }];
 
   return (
-    <Card className="rounded-xl">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Target className="h-4 w-4 text-muted-foreground" />
-          Fleet Runway · Cost-Per-Day vs Month-to-Date Revenue
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Cost Per Day breakdown */}
-          <div className="rounded-lg border bg-card p-5">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Recorded P&amp;L Cost Per Day
-            </p>
-            <p className="text-4xl font-bold tabular-nums mt-1">
-              {hasCostPerDay ? formatCurrency(runway.costPerDay) : '—'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {hasCostPerDay ? (
-                <>
-                  {formatCurrency(runway.trailing30Expenses)} recorded P&amp;L expenses ÷ 30 calendar days
-                </>
-              ) : (
-                <>Record P&amp;L expenses to calculate a cost-per-day run rate.</>
-              )}
-            </p>
+    <Panel
+      title="Runway"
+      description="What a day of running costs, and whether this month's revenue covers this month's costs."
+    >
+      <div className="grid grid-cols-1 gap-6 pb-3 pt-1 lg:grid-cols-2">
+        {/* Cost per day */}
+        <div>
+          <p className="text-[13px] text-muted-foreground">Recorded cost per day</p>
+          <p className="figure text-4xl font-bold">{hasCostPerDay ? formatCurrency(runway.costPerDay) : 'None yet'}</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            {hasCostPerDay
+              ? `${formatCurrency(runway.trailing30Expenses)} recorded in the last 30 days, over 30 calendar days`
+              : 'Record expenses to see a cost-per-day run rate.'}
+          </p>
 
-            <div className="mt-4 space-y-1.5">
-              {hasExpenses ? (
-                runway.expenseBreakdown.map((entry) => (
-                  <div
-                    key={entry.expenseType}
-                    className="flex items-center justify-between text-xs border-b border-border/40 last:border-0 py-1"
-                  >
-                    <span className="text-muted-foreground truncate pr-2">{entry.expenseType}</span>
-                    <span className="font-mono tabular-nums">{formatCurrency(entry.amount)}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground italic">
-                  No P&amp;L expenses recorded in the last 30 days.
-                </p>
-              )}
-              <div className="flex items-center justify-between text-xs pt-1.5">
-                <span className="text-muted-foreground">Trailing 90-day recorded P&amp;L expenses</span>
-                <span className="font-mono tabular-nums">{formatCurrency(runway.trailing90Expenses)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Revenue vs Expenses Gauge */}
-          <div className="rounded-lg border bg-card p-5 flex flex-col">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                MTD 1099 Revenue vs Recorded Expenses
-              </p>
-              <span
-                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                  !hasExpenses
-                    ? 'bg-muted text-muted-foreground'
-                    : coverageRatio >= 1
-                    ? 'bg-success/10 text-success'
-                    : coverageRatio >= 0.9
-                    ? 'bg-warning/10 text-warning'
-                    : 'bg-destructive/10 text-destructive'
-                }`}
-              >
-                {statusLabel}
-              </span>
-            </div>
-
-            <div className="relative h-[200px] mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart
-                  innerRadius="70%"
-                  outerRadius="100%"
-                  data={gaugeData}
-                  startAngle={180}
-                  endAngle={0}
-                  cy="90%"
-                >
-                  <PolarAngleAxis type="number" domain={[0, 150]} tick={false} />
-                  <RadialBar background dataKey="value" cornerRadius={8} />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-end pb-2 pointer-events-none">
-                <p
-                  className={`text-3xl font-bold tabular-nums ${
-                    !hasExpenses
-                      ? 'text-muted-foreground'
-                      : coverageRatio >= 1
-                      ? 'text-success'
-                      : coverageRatio >= 0.9
-                      ? 'text-warning'
-                      : 'text-destructive'
-                  }`}
-                >
-                  {hasExpenses ? `${coverageRatio.toFixed(1)}×` : '—'}
-                </p>
-                <p className="text-xs text-muted-foreground">revenue to expenses</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 mt-2 text-center">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">MTD 1099 Revenue</p>
-                <p className="text-sm font-semibold tabular-nums">{formatCurrency(runway.monthToDateRevenue)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">MTD Expenses</p>
-                <p className="text-sm font-semibold tabular-nums">
-                  {hasExpenses ? formatCurrency(runway.monthToDateExpenses) : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Net After Expenses</p>
-                <p
-                  className={`text-sm font-semibold tabular-nums ${
-                    !hasExpenses ? 'text-muted-foreground' : delta >= 0 ? 'text-success' : 'text-destructive'
-                  }`}
-                >
-                  {hasExpenses ? `${delta >= 0 ? '+' : ''}${formatCurrency(delta)}` : '—'}
-                </p>
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2 text-center">
-              {runway.monthToDateDays} dispatch days logged this month
-              {hasDispatch && <> · {runway.plannedDispatchDays}/30d cadence</>}
-              {runway.activeTrucksMTD > 0 && <> · {runway.activeTrucksMTD} active truck{runway.activeTrucksMTD === 1 ? '' : 's'}</>}
-            </p>
-          </div>
+          <ul className="mt-3 divide-y border-t">
+            {hasExpenses ? (
+              runway.expenseBreakdown.map((entry) => (
+                <li key={entry.expenseType} className="flex items-baseline justify-between gap-3 py-1.5 text-[14px]">
+                  <span className="truncate text-muted-foreground">{entry.expenseType}</span>
+                  <span className="figure">{formatCurrency(entry.amount)}</span>
+                </li>
+              ))
+            ) : (
+              <li className="py-2 text-[14px] text-muted-foreground">No expenses recorded in the last 30 days.</li>
+            )}
+            <li className="flex items-baseline justify-between gap-3 py-1.5 text-[14px]">
+              <span className="text-muted-foreground">Last 90 days recorded</span>
+              <span className="figure">{formatCurrency(runway.trailing90Expenses)}</span>
+            </li>
+          </ul>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* This month: revenue against costs */}
+        <div className="flex flex-col">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[13px] text-muted-foreground">This month, revenue against recorded costs</p>
+            <span className={cn('text-[13px] font-semibold', statusClass)}>{statusLabel}</span>
+          </div>
+
+          <div className="relative mt-1 h-[190px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadialBarChart innerRadius="70%" outerRadius="100%" data={gaugeData} startAngle={180} endAngle={0} cy="90%">
+                <PolarAngleAxis type="number" domain={[0, 150]} tick={false} />
+                <RadialBar background dataKey="value" cornerRadius={8} />
+              </RadialBarChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end pb-2">
+              <p className={cn('figure text-3xl font-bold', statusClass)}>{hasMonthCosts ? `${coverageRatio.toFixed(1)}×` : 'None yet'}</p>
+              <p className="text-[13px] text-muted-foreground">revenue to costs</p>
+            </div>
+          </div>
+
+          <dl className="mt-2 grid grid-cols-3 gap-3 text-center">
+            <div>
+              <dt className="text-[13px] text-muted-foreground">Revenue</dt>
+              <dd className="figure text-base font-semibold">{formatCurrency(runway.monthToDateRevenue)}</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] text-muted-foreground">Costs</dt>
+              <dd className="figure text-base font-semibold">{hasMonthCosts ? formatCurrency(runway.monthToDateExpenses) : 'None yet'}</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] text-muted-foreground">Left over</dt>
+              <dd className={cn('figure text-base font-semibold', !hasMonthCosts ? 'text-muted-foreground' : delta >= 0 ? 'text-success' : 'text-destructive')}>
+                {hasMonthCosts ? money(delta) : 'None yet'}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-center text-[13px] text-muted-foreground">
+            {runway.monthToDateDays} delivery day{runway.monthToDateDays === 1 ? '' : 's'} this month
+            {hasDispatch && <>, {runway.plannedDispatchDays} of the last 30</>}
+            {runway.activeTrucksMTD > 0 && <>, {runway.activeTrucksMTD} active truck{runway.activeTrucksMTD === 1 ? '' : 's'}</>}
+          </p>
+        </div>
+      </div>
+    </Panel>
   );
 }
-
-
-

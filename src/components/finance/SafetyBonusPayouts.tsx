@@ -3,13 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,20 +15,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Trophy, RefreshCw, MoreHorizontal } from 'lucide-react';
+import { RefreshCw, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
 const currency = (n: number) =>
@@ -91,15 +77,26 @@ export function SafetyBonusPayouts() {
     queryKey: ['safety-bonus-payouts', orgId, periodStart],
     enabled: !!orgId,
     queryFn: async () => {
+      // No foreign key links payouts to drivers in the database, so a joined select is rejected
+      // (400). Load the payouts, then attach each driver's name here.
       const { data, error } = await supabase
         .from('safety_bonus_payouts')
-        .select('*, drivers:driver_id ( first_name, last_name )')
+        .select('*')
         .eq('org_id', orgId!)
         .eq('period_start', periodStart)
         .is('deleted_at', null)
         .order('earned_amount', { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+      const driverIds = [...new Set(rows.map((r) => r.driver_id).filter(Boolean))] as string[];
+      if (driverIds.length === 0) return rows.map((r) => ({ ...r, drivers: null as { first_name: string; last_name: string } | null }));
+      const { data: driverRows, error: driversError } = await supabase
+        .from('drivers')
+        .select('id, first_name, last_name')
+        .in('id', driverIds);
+      if (driversError) throw driversError;
+      const byId = new Map((driverRows ?? []).map((d) => [d.id, { first_name: d.first_name, last_name: d.last_name }]));
+      return rows.map((r) => ({ ...r, drivers: byId.get(r.driver_id) ?? null }));
     },
   });
 
@@ -147,185 +144,125 @@ export function SafetyBonusPayouts() {
     .filter((p: any) => p.status === 'paid')
     .reduce((sum: number, p: any) => sum + Number(p.earned_amount ?? 0), 0);
 
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-500" />
-              Safety Bonus Payouts
-            </CardTitle>
-            <CardDescription>
-              Record and pay out monthly safety bonuses. Generate a month to snapshot each driver's
-              earned amount, then mark payouts approved or paid.
-            </CardDescription>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Select value={periodStart} onValueChange={setPeriodStart}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={() => generateMutation.mutate()}
-                disabled={generateMutation.isPending}
-                variant="outline"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 mr-1 ${generateMutation.isPending ? 'animate-spin' : ''}`}
-                />
-                {generateMutation.isPending ? 'Generating…' : `Generate for ${periodLabel}`}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Period: {periodRange}
-              {isCurrentMonth && ' · Month in progress — totals will change'}
-            </p>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent>
-        {payoutsQuery.isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : payouts.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border p-8 text-center">
-            <p className="text-sm text-muted-foreground mb-3">
-              No payouts recorded for {periodLabel} yet.
-            </p>
-            <Button
-              onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending}
-              size="sm"
-            >
-              Generate payouts
-            </Button>
-          </div>
-
-        ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-              <div className="rounded-md border p-3">
-                <p className="text-xs text-muted-foreground">Drivers</p>
-                <p className="text-lg font-semibold">{payouts.length}</p>
-              </div>
-              <div className="rounded-md border p-3">
-                <p className="text-xs text-muted-foreground">Owed (pending + approved)</p>
-                <p className="text-lg font-semibold">{currency(totalPending)}</p>
-              </div>
-              <div className="rounded-md border p-3">
-                <p className="text-xs text-muted-foreground">Paid</p>
-                <p className="text-lg font-semibold">{currency(totalPaid)}</p>
-              </div>
-            </div>
-
-            <div className="border rounded-md overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Driver</TableHead>
-                    <TableHead className="text-right">Safe Miles</TableHead>
-                    <TableHead className="text-right">Earned</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[60px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payouts.map((p: any) => {
-                    const name = p.drivers
-                      ? `${p.drivers.first_name} ${p.drivers.last_name}`
-                      : 'Unknown';
-                    const disabled = updateStatusMutation.isPending;
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell>
-                          <div className="font-medium">{name}</div>
-                          {p.notes && (
-                            <div className="text-xs text-muted-foreground">{p.notes}</div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {Number(p.safe_miles ?? 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">
-                          {currency(Number(p.earned_amount ?? 0))}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusVariant(p.status)} className="capitalize">
-                            {p.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" disabled={disabled}>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {p.status !== 'approved' && p.status !== 'paid' && (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateStatusMutation.mutate({ id: p.id, status: 'approved' })
-                                  }
-                                >
-                                  Approve
-                                </DropdownMenuItem>
-                              )}
-                              {p.status !== 'paid' && (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateStatusMutation.mutate({ id: p.id, status: 'paid' })
-                                  }
-                                >
-                                  Mark Paid
-                                </DropdownMenuItem>
-                              )}
-                              {p.status !== 'pending' && (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateStatusMutation.mutate({ id: p.id, status: 'pending' })
-                                  }
-                                >
-                                  Reset to Pending
-                                </DropdownMenuItem>
-                              )}
-                              {p.status !== 'void' && (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateStatusMutation.mutate({ id: p.id, status: 'void' })
-                                  }
-                                  className="text-destructive"
-                                >
-                                  Void
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </>
+  const rowMenu = (p: any) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-11 w-11" disabled={updateStatusMutation.isPending} aria-label="Payout actions">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {p.status !== 'approved' && p.status !== 'paid' && (
+          <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: p.id, status: 'approved' })}>Approve</DropdownMenuItem>
         )}
-      </CardContent>
-    </Card>
+        {p.status !== 'paid' && (
+          <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: p.id, status: 'paid' })}>Mark paid</DropdownMenuItem>
+        )}
+        {p.status !== 'pending' && (
+          <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: p.id, status: 'pending' })}>Reset to pending</DropdownMenuItem>
+        )}
+        {p.status !== 'void' && (
+          <DropdownMenuItem className="text-destructive" onClick={() => updateStatusMutation.mutate({ id: p.id, status: 'void' })}>Void</DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+  const nameOf = (p: any) => (p.drivers ? `${p.drivers.first_name} ${p.drivers.last_name}` : 'Unknown driver');
+
+  return (
+    <Panel
+      title="Safety bonuses"
+      description={
+        <>
+          Pay safe drivers a bonus each month. Generate a month to record what each driver earned, then mark it approved or paid.
+          <span className="block tabular-nums">
+            Period: {periodRange}
+            {isCurrentMonth && ', month in progress, so totals will change'}
+          </span>
+        </>
+      }
+      flush
+      aside={
+        <>
+          <Select value={periodStart} onValueChange={setPeriodStart}>
+            <SelectTrigger className="h-11 w-44" aria-label="Month"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((m) => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button className="h-11 gap-2" variant="outline" onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending}>
+            <RefreshCw className={`h-4 w-4 ${generateMutation.isPending ? 'animate-spin' : ''}`} />
+            {generateMutation.isPending ? 'Generating' : `Generate for ${periodLabel}`}
+          </Button>
+        </>
+      }
+    >
+      {payoutsQuery.isLoading ? (
+        <div className="space-y-2 border-t px-4 py-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : payouts.length === 0 ? (
+        <p className="border-t px-4 py-4 text-sm text-muted-foreground">No bonuses recorded for {periodLabel} yet. Use Generate to record them.</p>
+      ) : (
+        <>
+          <div className="px-4">
+            <StatementLine label="Owed" note="Pending and approved" value={currency(totalPending)} />
+            <StatementLine label="Paid" value={currency(totalPaid)} muted rule="single" />
+          </div>
+
+          <ul className="divide-y border-t md:hidden">
+            {payouts.map((p: any) => (
+              <li key={p.id} className="flex items-start gap-1 py-1 pl-4 pr-1">
+                <div className="min-w-0 flex-1 py-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{nameOf(p)}</span>
+                    <span className="figure text-base font-semibold">{currency(Number(p.earned_amount ?? 0))}</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 text-[13px] text-muted-foreground tabular-nums">
+                    <Badge variant={statusVariant(p.status)} className="capitalize">{p.status}</Badge>
+                    <span>{Number(p.safe_miles ?? 0).toLocaleString()} safe miles</span>
+                  </div>
+                  {p.notes && <div className="text-[13px] text-muted-foreground">{p.notes}</div>}
+                </div>
+                {rowMenu(p)}
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto border-t md:block">
+            <table className="w-full text-[15px]">
+              <caption className="sr-only">Safety bonus payouts for {periodLabel}</caption>
+              <thead>
+                <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th scope="col" className="px-4 py-2">Driver</th>
+                  <th scope="col" className="py-2 text-right">Safe miles</th>
+                  <th scope="col" className="py-2 text-right">Earned</th>
+                  <th scope="col" className="py-2 pl-6">Status</th>
+                  <th scope="col" className="w-12 py-2 pr-2"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {payouts.map((p: any) => (
+                  <tr key={p.id}>
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{nameOf(p)}</div>
+                      {p.notes && <div className="text-[13px] text-muted-foreground">{p.notes}</div>}
+                    </td>
+                    <td className="figure py-2 text-right">{Number(p.safe_miles ?? 0).toLocaleString()}</td>
+                    <td className="figure py-2 text-right font-semibold">{currency(Number(p.earned_amount ?? 0))}</td>
+                    <td className="py-2 pl-6"><Badge variant={statusVariant(p.status)} className="capitalize">{p.status}</Badge></td>
+                    <td className="py-1 pr-2">{rowMenu(p)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Panel>
   );
 }
 

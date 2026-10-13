@@ -1,18 +1,17 @@
 import { useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
 /**
- * Bridges AuthContext (org branding data) → ThemeContext (CSS injection).
- * Must be rendered inside both AuthProvider and ThemeProvider.
+ * Fleet Flow is JeanWay's own system and its palette lives in the design
+ * tokens (src/index.css). The org's stored brand color is no longer injected
+ * over them; this clears any override a previous session left on <html>.
  */
 export function BrandColorInjector() {
-  const { primaryColor } = useAuth();
   const { applyBrandColor, theme } = useTheme();
 
   useEffect(() => {
-    applyBrandColor(primaryColor || null);
-  }, [primaryColor, applyBrandColor, theme]);
+    applyBrandColor(null);
+  }, [applyBrandColor, theme]);
 
   return null;
 }

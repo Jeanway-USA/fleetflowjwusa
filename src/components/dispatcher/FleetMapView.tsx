@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel } from '@/components/finance/statement-ui';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -115,6 +115,46 @@ function readOverlays(): OverlayState {
     return { ...DEFAULT_OVERLAYS, ...parsed };
   } catch {
     return DEFAULT_OVERLAYS;
+  }
+}
+
+/** Douglas-Peucker line simplification. Tolerance is in degrees (0.0003 is roughly 30 m). */
+function simplifyLine(points: [number, number][], tolerance: number): [number, number][] {
+  if (points.length <= 2) return points;
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack: [number, number][] = [[0, points.length - 1]];
+  while (stack.length) {
+    const [first, last] = stack.pop()!;
+    const [ax, ay] = points[first];
+    const [bx, by] = points[last];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    let maxDist = 0;
+    let index = -1;
+    for (let i = first + 1; i < last; i++) {
+      const [px, py] = points[i];
+      const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+      const dist = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+      if (dist > maxDist) { maxDist = dist; index = i; }
+    }
+    if (index !== -1 && maxDist > tolerance) {
+      keep[index] = 1;
+      stack.push([first, index], [index, last]);
+    }
+  }
+  return points.filter((_, i) => keep[i] === 1);
+}
+
+/** Resizing a map that was removed (its tab closed) throws; skip it. */
+function safeResize(map: mapboxgl.Map) {
+  try {
+    if ((map as any)._removed) return;
+    map.resize();
+  } catch {
+    /* the map is gone */
   }
 }
 
@@ -617,81 +657,52 @@ export function FleetMapView() {
 
   if (isLoading) {
     return (
-      <Card className="card-elevated h-full">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Navigation className="h-4 w-4 text-primary" />
-            In Transit
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <Skeleton className="aspect-square w-full rounded-lg" />
-        </CardContent>
-      </Card>
+      <Panel title="Trucks on the road" description="Loading the map…" flush className="h-full">
+        <div className="px-3 pb-3"><Skeleton className="aspect-square w-full rounded-lg" /></div>
+      </Panel>
     );
   }
 
   if (!MAPBOX_TOKEN) {
     return (
-      <Card className="card-elevated h-full">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Navigation className="h-4 w-4 text-primary" />
-            In Transit
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div className="aspect-square w-full rounded-lg border border-dashed border-border flex items-center justify-center text-center p-6">
+      <Panel title="Trucks on the road" flush className="h-full">
+        <div className="px-3 pb-3">
+          <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-border p-6 text-center">
             <div>
-              <MapPin className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm font-medium">Mapbox not configured</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Link the Mapbox connector to enable the fleet map.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="card-elevated h-full">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Navigation className="h-4 w-4 text-primary" />
-              In Transit
-            </CardTitle>
-            <CardDescription className="text-xs">
-              {loads.length} loads on the road
-              {liveCount > 0 && (
-                <span className="ml-1 text-green-500">• {liveCount} live</span>
-              )}
-            </CardDescription>
-          </div>
-          <div className="hidden md:flex items-center gap-2 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-muted-foreground">Origin</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-muted-foreground">Dest</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Radio className="h-3 w-3 text-green-500" />
-              <span className="text-muted-foreground">Live</span>
+              <MapPin className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+              <p className="text-sm font-medium">The map is not set up yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">Link the Mapbox connector to show where your trucks are.</p>
             </div>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="p-3 pt-0">
-        <div className={selectedLoad ? 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-3' : ''}>
-          <ExpandableMap renderMap={renderMapContent} title="Fleet Map — In Transit Loads" />
+      </Panel>
+    );
+  }
+
+  const description =
+    loads.length === 0
+      ? 'No trucks are moving right now.'
+      : `${loads.length} ${loads.length === 1 ? 'load' : 'loads'} on the road${liveCount > 0 ? `, ${liveCount} sharing live GPS` : ''}`;
+
+  return (
+    <Panel
+      title="Trucks on the road"
+      description={description}
+      flush
+      className="h-full"
+      aside={
+        <div className="hidden items-center gap-3 text-xs text-muted-foreground md:flex">
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-500" /> Pickup</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Delivery</span>
+          <span className="flex items-center gap-1"><Radio className="h-3 w-3 text-green-500" /> Live GPS</span>
+        </div>
+      }
+    >
+      <div className="px-3 pb-3">
+        <div className={selectedLoad ? 'grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]' : ''}>
+          <ExpandableMap renderMap={renderMapContent} title="Fleet map: trucks on the road" />
           {selectedLoad && (
-            <div className="hidden xl:block h-full min-h-[360px]">
+            <div className="hidden h-full min-h-[360px] xl:block">
               <WeatherForecastPanel
                 loadLabel={selectedLoad.landstar_load_id || selectedLoad.id.slice(0, 8)}
                 origin={selectedLoad.origin}
@@ -704,8 +715,8 @@ export function FleetMapView() {
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -796,7 +807,7 @@ function MapboxCanvas({
     clearStyleReadyTimer();
     setMapError(null);
     setStyleReady(true);
-    requestAnimationFrame(() => map.resize());
+    requestAnimationFrame(() => safeResize(map));
   }, [clearStyleReadyTimer]);
 
   const armStyleReadyFallback = useCallback(
@@ -863,8 +874,8 @@ function MapboxCanvas({
       mapRef.current = map;
       armStyleReadyFallback(map, initialStyle);
       requestAnimationFrame(() => {
-        map.resize();
-        window.setTimeout(() => map.resize(), 250);
+        safeResize(map);
+        window.setTimeout(() => safeResize(map), 250);
       });
     } catch (err: any) {
       console.error(err);
@@ -887,7 +898,7 @@ function MapboxCanvas({
     const container = containerRef.current;
     if (!map || !container) return;
 
-    const resizeMap = () => requestAnimationFrame(() => map.resize());
+    const resizeMap = () => requestAnimationFrame(() => safeResize(map));
     resizeMap();
 
     if (typeof ResizeObserver === 'undefined') {
@@ -1070,7 +1081,8 @@ function MapboxCanvas({
 
       // Traffic off (or no congestion data): one continuous line per load
       if (!overlays.traffic || !congestion || congestion.length === 0) {
-        push(coords, 'unknown');
+        // Dense road geometry overflows Mapbox's per-bucket vertex limit; simplify while no congestion colors are needed.
+        push(simplifyLine(coords, 0.0003), 'unknown');
         return;
       }
 

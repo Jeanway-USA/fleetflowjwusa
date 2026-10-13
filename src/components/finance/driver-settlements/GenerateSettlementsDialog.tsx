@@ -28,6 +28,8 @@ import { toast } from 'sonner';
 import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
 import { applyW2WithholdingToSettlements } from '@/lib/payroll/applySettlementWithholding';
 import { formatCurrency } from '@/lib/formatters';
+import { useAuth } from '@/contexts/AuthContext';
+import { driversOnPackages, generatePackageSettlements, loadPackageContext, type PackageContext } from '@/lib/pay-packages/generate';
 import { cn } from '@/lib/utils';
 import { addDays, format } from 'date-fns';
 import { CalendarIcon, Check, ChevronsUpDown, X, Users } from 'lucide-react';
@@ -101,6 +103,7 @@ export function GenerateSettlementsDialog({
   };
 
   const { data: taxConfig } = useTaxYearConfig();
+  const { user } = useAuth();
 
   const generate = useMutation({
     mutationFn: async () => {
@@ -113,15 +116,50 @@ export function GenerateSettlementsDialog({
       if (periodStart > periodEnd) {
         throw new Error('Pay period start must be on or before the end date.');
       }
-      const targetIds = allSelected ? null : Array.from(selected);
-      const { data, error } = await supabase.rpc('generate_driver_settlements', {
-        _driver_ids: targetIds,
-        _period_start: format(periodStart, 'yyyy-MM-dd'),
-        _period_end: format(periodEnd, 'yyyy-MM-dd'),
-        _payment_date: format(paymentDate, 'yyyy-MM-dd'),
-      });
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+      const start = format(periodStart, 'yyyy-MM-dd');
+      const end = format(periodEnd, 'yyyy-MM-dd');
+      const pay = format(paymentDate, 'yyyy-MM-dd');
+
+      // Drivers with a pay package are paid from it; everyone else goes through the original generator.
+      // If the pay package tables are not set up yet, every driver is simply paid the original way.
+      let context: PackageContext | null = null;
+      try {
+        context = await loadPackageContext();
+      } catch {
+        context = null;
+      }
+      const chosen = Array.from(selected);
+      const onPackage = context ? driversOnPackages(chosen, context, end) : new Set<string>();
+      const legacyIds = chosen.filter((id) => !onPackage.has(id));
+
+      const rows: any[] = [];
+      let packageSkipped: Array<{ driverId: string; reason: string }> = [];
+      if (legacyIds.length > 0) {
+        const targetIds = onPackage.size === 0 && allSelected ? null : legacyIds;
+        const { data, error } = await supabase.rpc('generate_driver_settlements', {
+          _driver_ids: targetIds,
+          _period_start: start,
+          _period_end: end,
+          _payment_date: pay,
+        });
+        if (error) throw error;
+        rows.push(...((data ?? []) as any[]));
+      }
+      if (onPackage.size > 0 && context) {
+        if (!taxConfig?.orgId) throw new Error('Your organization has not finished loading. Try again in a moment.');
+        const made = await generatePackageSettlements({
+          orgId: taxConfig.orgId,
+          userId: user?.id ?? null,
+          driverIds: Array.from(onPackage),
+          periodStart: start,
+          periodEnd: end,
+          paymentDate: pay,
+          context,
+          replaceDrafts: true,
+        });
+        rows.push(...made.rows);
+        packageSkipped = made.skipped;
+      }
 
       // Auto-apply W-2 withholding (contractors are left untouched).
       let withheld = { w2Count: 0, totalWithheld: 0 };
@@ -134,9 +172,9 @@ export function GenerateSettlementsDialog({
           defaultTaxState: taxConfig.defaultTaxState,
         });
       }
-      return { rows, withheld };
+      return { rows, withheld, packageSkipped };
     },
-    onSuccess: ({ rows, withheld }) => {
+    onSuccess: ({ rows, withheld, packageSkipped }) => {
       const total = rows.reduce((s, r: any) => s + Number(r.net_pay ?? 0), 0);
       const requested = allSelected ? drivers.length : selected.size;
       const skipped = Math.max(0, requested - rows.length);

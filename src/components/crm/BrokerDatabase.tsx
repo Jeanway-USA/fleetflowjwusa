@@ -63,6 +63,7 @@ export function BrokerDatabase() {
       const { data, error } = await supabase
         .from('crm_contacts')
         .select('*')
+        .is('deleted_at', null)
         .eq('contact_type', 'broker')
         .order('company_name');
       if (error) throw error;
@@ -111,12 +112,10 @@ export function BrokerDatabase() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('crm_contacts').delete().eq('id', id);
-      if (error) throw error;
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({ table: 'crm_contacts', id, queryClient, invalidateKeys: [['crm-brokers']] });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-brokers'] });
-      toast.success('Broker deleted');
       setDeleteTarget(null);
     },
     onError: (e: any) => toast.error(e.message),
@@ -332,7 +331,7 @@ export function BrokerDatabase() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(b)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      <Trash2 className="mr-2 h-4 w-4" /> Archive
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -419,8 +418,9 @@ export function BrokerDatabase() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        title="Delete Broker"
-        description={`Are you sure you want to delete "${deleteTarget?.company_name}"? This action cannot be undone.`}
+        title="Archive Broker"
+        confirmLabel="Archive"
+        description={`Archive "${deleteTarget?.company_name}"? You can restore it from the Archive page.`}
         isDeleting={deleteMutation.isPending}
       />
     </>

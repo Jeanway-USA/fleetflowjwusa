@@ -3,7 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
+import { Roster, RosterToolbar, RosterBulkBar, downloadCsv, type RosterEntry } from '@/components/fleet/Roster';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +17,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, AlertTriangle, Eye, Pencil, Trash2, FileWarning, Car, Users, Camera, MoreHorizontal, Archive } from 'lucide-react';
+import { Plus, AlertTriangle, Eye, Pencil, Trash2, FileWarning, Car, Users, Camera, MoreHorizontal, Archive, Download } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -84,6 +86,8 @@ export default function Incidents() {
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: incidents = [], isLoading } = useQuery({
     queryKey: ['incidents'],
@@ -235,120 +239,117 @@ export default function Incidents() {
     withInjuries: incidents.filter(i => i.injuries_reported).length,
   };
 
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const typeLabel = (i: Incident) => incidentTypes.find((t) => t.value === i.incident_type)?.label ?? i.incident_type.replace('_', ' ');
+  const filteredIncidents = incidents.filter((i) => {
+    if (statusFilter !== 'all' && i.status !== statusFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [typeLabel(i), getDriverName(i.driver_id), getTruckName(i.truck_id), i.location_description, i.description].filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+
+  const entries: RosterEntry[] = filteredIncidents.map((incident) => ({
+    id: incident.id,
+    title: typeLabel(incident),
+    onOpen: () => setViewingIncident(incident),
+    chips: (
+      <>
+        {getSeverityBadge(incident.severity)}
+        <StatusBadge status={incident.status} />
+      </>
+    ),
+    subtitle: [format(parseISO(incident.incident_date), 'MMM d, yyyy'), incident.location_description].filter(Boolean).join(', '),
+    facts: [
+      { label: 'Driver', value: getDriverName(incident.driver_id) },
+      { label: 'Truck', value: getTruckName(incident.truck_id) },
+      { label: 'Damage estimate', value: formatCurrencyValue(incident.estimated_damage) },
+      ...(incident.injuries_reported ? [{ label: 'Injuries', value: 'Reported', tone: 'bad' as const }] : []),
+    ],
+    menu: (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for ${typeLabel(incident)} on ${format(parseISO(incident.incident_date), 'MMM d')}`}>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setViewingIncident(incident)}><Eye className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => openDialog(incident)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(incident.id)}><Archive className="mr-2 h-4 w-4" /> Archive</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+  }));
+
+  const exportCsv = () =>
+    downloadCsv(
+      'incidents',
+      ['Date', 'Type', 'Severity', 'Driver', 'Truck', 'Location', 'Damage estimate', 'Status'],
+      filteredIncidents.map((i) => [i.incident_date, typeLabel(i), i.severity, getDriverName(i.driver_id), getTruckName(i.truck_id), i.location_description, i.estimated_damage, i.status]),
+    );
+
   return (
     <>
-      <PageHeader 
-        title="Incident Reports" 
-        description="Track and manage accidents, incidents, and near-misses"
+      <PageHeader
+        title="Incidents"
+        description="Accidents, incidents and near-misses"
+        action={{ label: 'Report Incident', onClick: () => openDialog() }}
       />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Incidents</CardTitle>
-            <FileWarning className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Open Cases</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{stats.open}</div>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Critical/Major</CardTitle>
-            <Car className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{stats.critical}</div>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">With Injuries</CardTitle>
-            <Users className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{stats.withInjuries}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <Panel title="Summary" className="mb-5">
+        <StatementLine label="On record" note={`${stats.total === 1 ? '1 incident' : `${stats.total} incidents`} in all`} value={stats.total} />
+        <StatementLine label="Open cases" note="Reported or under review" value={stats.open} rule="single" tone={stats.open > 0 ? 'bad' : undefined} />
+        <StatementLine label="Critical or major" value={stats.critical} rule="single" tone={stats.critical > 0 ? 'bad' : undefined} />
+        <StatementLine label="With injuries" value={stats.withInjuries} rule="single" tone={stats.withInjuries > 0 ? 'bad' : undefined} />
+      </Panel>
 
-      {/* Main Content */}
-      <Card className="card-elevated">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>All Incidents</CardTitle>
-            <CardDescription>View and manage all reported incidents</CardDescription>
-          </div>
-          <Button onClick={() => openDialog()} className="gradient-gold text-primary-foreground">
-            <Plus className="h-4 w-4 mr-2" />
-            Report Incident
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={[
-              { key: 'incident_date', header: 'Date', render: (i: Incident) => format(parseISO(i.incident_date), 'MM/dd/yyyy') },
-              { key: 'incident_type', header: 'Type', render: (i: Incident) => <span className="capitalize">{i.incident_type.replace('_', ' ')}</span> },
-              { key: 'severity', header: 'Severity', render: (i: Incident) => getSeverityBadge(i.severity) },
-              { key: 'driver_id', header: 'Driver', hiddenOnMobile: true, render: (i: Incident) => getDriverName(i.driver_id) },
-              { key: 'truck_id', header: 'Truck', hiddenOnMobile: true, render: (i: Incident) => getTruckName(i.truck_id) },
-              { key: 'location_description', header: 'Location', hiddenOnMobile: true, render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
-              { key: 'estimated_damage', header: 'Damage Est.', hiddenOnMobile: true, render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
-              { key: 'status', header: 'Status', render: (i: Incident) => <StatusBadge status={i.status} /> },
-              { key: 'actions', header: '', render: (incident: Incident) => (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setViewingIncident(incident)}>
-                      <Eye className="mr-2 h-4 w-4" /> View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openDialog(incident)}>
-                      <Pencil className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(incident.id)}>
-                      <Archive className="mr-2 h-4 w-4" /> Archive
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )},
-            ]}
-            data={incidents}
-            loading={isLoading}
-            emptyMessage="No incidents reported"
-            emptyDescription="No incidents on record — that's a good thing!"
-            emptyIcon={FileWarning}
-            tableId="incidents"
-            exportFilename="incidents"
-            onRowDoubleClick={(incident) => openDialog(incident)}
-            selectable
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            bulkActions={(ids) => (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
-                  <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-                  <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
-                </Button>
-              </>
-            )}
-          />
+      {isLoading ? (
+        <div className="py-12 text-center text-muted-foreground">Loading...</div>
+      ) : incidents.length === 0 ? (
+        <EmptyState
+          icon={FileWarning}
+          title="No incidents reported"
+          description="No incidents on record. That's a good thing."
+          action={{ label: 'Report Incident', onClick: () => openDialog() }}
+        />
+      ) : (
+        <>
+          <RosterToolbar search={search} onSearch={setSearch} placeholder="Search by type, driver, truck, location">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 w-full sm:w-[170px]" aria-label="Filter by status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {statusOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="h-11" onClick={exportCsv}>
+              <Download className="h-4 w-4 mr-2" /> Export CSV
+            </Button>
+          </RosterToolbar>
+
+          <RosterBulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+            <Button variant="outline" className="h-11" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" /> Change status
+            </Button>
+            <Button variant="outline" className="h-11 text-destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Archive className="mr-2 h-4 w-4" /> Archive
+            </Button>
+          </RosterBulkBar>
+
+          <Roster entries={entries} selectedIds={selectedIds} onToggle={toggleSelect} empty="No incidents match your filters." />
+        </>
+      )}
+
           <ConfirmDeleteDialog
             open={massDeleteOpen}
             onOpenChange={setMassDeleteOpen}
@@ -396,9 +397,6 @@ export default function Incidents() {
               { value: 'closed', label: 'Closed' },
             ]}
           />
-        </CardContent>
-      </Card>
-
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -600,72 +598,39 @@ export default function Incidents() {
                 <StatusBadge status={viewingIncident.status} />
               </div>
 
+              <div className="divide-y">
+                <StatementLine label="Date and time" value={<span className="text-base font-medium text-right">{format(parseISO(viewingIncident.incident_date), 'PPpp')}</span>} />
+                <StatementLine label="Type" value={<span className="text-base font-medium text-right">{typeLabel(viewingIncident)}</span>} />
+                <StatementLine label="Driver" value={<span className="text-base font-medium text-right">{getDriverName(viewingIncident.driver_id)}</span>} />
+                <StatementLine label="Truck" value={<span className="text-base font-medium text-right">{getTruckName(viewingIncident.truck_id)}</span>} />
+                <StatementLine label="Location" value={<span className="text-base font-medium text-right">{viewingIncident.location_description || 'Not set'}</span>} />
+                <StatementLine label="Estimated damage" value={<span className="text-base font-medium text-right">{formatCurrencyValue(viewingIncident.estimated_damage)}</span>} />
+                <StatementLine label="Citation issued" value={<span className="text-base font-medium text-right">{viewingIncident.citation_issued ? 'Yes' : 'No'}</span>} />
+                <StatementLine label="Injuries reported" value={<span className="text-base font-medium text-right">{viewingIncident.injuries_reported ? 'Yes' : 'No'}</span>} />
+                {viewingIncident.police_report_number && <StatementLine label="Police report" value={<span className="text-base font-medium">{viewingIncident.police_report_number}</span>} />}
+                {viewingIncident.insurance_claim_number && <StatementLine label="Insurance claim" value={<span className="text-base font-medium">{viewingIncident.insurance_claim_number}</span>} />}
+              </div>
+
               <div className="space-y-4">
                 <div>
-                  <Label className="text-muted-foreground">Date/Time</Label>
-                  <p className="font-medium">{format(parseISO(viewingIncident.incident_date), 'PPpp')}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Type</Label>
-                  <p className="font-medium capitalize">{viewingIncident.incident_type.replace('_', ' ')}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Driver</Label>
-                  <p className="font-medium">{getDriverName(viewingIncident.driver_id)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Truck</Label>
-                  <p className="font-medium">{getTruckName(viewingIncident.truck_id)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Location</Label>
-                  <p className="font-medium">{viewingIncident.location_description || '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Description</Label>
+                  <Label className="text-muted-foreground">What happened</Label>
                   <p className="font-medium">{viewingIncident.description}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Estimated Damage</Label>
-                  <p className="font-medium">{formatCurrencyValue(viewingIncident.estimated_damage)}</p>
-                </div>
-                {viewingIncident.police_report_number && (
-                  <div>
-                    <Label className="text-muted-foreground">Police Report</Label>
-                    <p className="font-medium">{viewingIncident.police_report_number}</p>
-                  </div>
-                )}
-                {viewingIncident.insurance_claim_number && (
-                  <div>
-                    <Label className="text-muted-foreground">Insurance Claim</Label>
-                    <p className="font-medium">{viewingIncident.insurance_claim_number}</p>
-                  </div>
-                )}
-                <div className="flex gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">Citation Issued</Label>
-                    <p className="font-medium">{viewingIncident.citation_issued ? 'Yes' : 'No'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Injuries</Label>
-                    <p className="font-medium">{viewingIncident.injuries_reported ? 'Yes' : 'No'}</p>
-                  </div>
                 </div>
                 {viewingIncident.injury_details && (
                   <div>
-                    <Label className="text-muted-foreground">Injury Details</Label>
+                    <Label className="text-muted-foreground">Injury details</Label>
                     <p className="font-medium">{viewingIncident.injury_details}</p>
                   </div>
                 )}
                 {viewingIncident.resolution_notes && (
                   <div>
-                    <Label className="text-muted-foreground">Resolution Notes</Label>
+                    <Label className="text-muted-foreground">Resolution notes</Label>
                     <p className="font-medium">{viewingIncident.resolution_notes}</p>
                   </div>
                 )}
               </div>
 
-              <Button onClick={() => { setViewingIncident(null); openDialog(viewingIncident); }} className="w-full">
+              <Button onClick={() => { setViewingIncident(null); openDialog(viewingIncident); }} className="h-11 w-full">
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit Incident
               </Button>

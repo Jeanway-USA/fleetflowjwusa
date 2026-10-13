@@ -7,7 +7,7 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, FileSpreadsheet
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { parseLandstarXlsx } from '@/lib/parse-landstar-xlsx';
-import { detectFileType, reconcileDocuments, getFileTypeLabel } from '@/lib/settlement-reconciliation';
+import { detectFileType, reconcileDocuments, getFileTypeLabel, mergeStagedFiles, typeFromParsedPdf } from '@/lib/settlement-reconciliation';
 import type { StagedFile, ReconciliationResult } from '@/lib/settlement-reconciliation';
 import { ReconciliationPreview } from './ReconciliationPreview';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +22,7 @@ interface FleetLoad {
   origin: string;
   destination: string;
   rate?: number | null;
+  net_revenue?: number | null;
   delivery_date?: string | null;
 }
 
@@ -36,6 +37,7 @@ interface ExistingExpense {
   expense_type: string;
   amount: number;
   load_id: string | null;
+  description?: string | null;
 }
 
 interface StatementUploadProps {
@@ -129,19 +131,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       status: 'pending',
     }));
 
-    setStagedFiles(prev => {
-      // Replace files of same detected type, keep others
-      const updated = [...prev];
-      for (const ns of newStaged) {
-        const existingIdx = updated.findIndex(s => s.type === ns.type);
-        if (existingIdx >= 0) {
-          updated[existingIdx] = ns;
-        } else {
-          updated.push(ns);
-        }
-      }
-      return updated;
-    });
+    setStagedFiles(prev => mergeStagedFiles(prev, newStaged));
 
     setReconciliationResult(null);
     setError(null);
@@ -204,7 +194,9 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           data = fnData;
         }
 
-        updatedFiles[i] = { ...sf, status: 'parsed', data };
+        // A PDF's real type is what the parser found, not what its filename suggested.
+        const type = isExcel ? sf.type : typeFromParsedPdf(data?.statement_type, sf.type);
+        updatedFiles[i] = { ...sf, type, status: 'parsed', data };
       } catch (err) {
         updatedFiles[i] = { ...sf, status: 'error', error: err instanceof Error ? err.message : 'Parse failed' };
       }

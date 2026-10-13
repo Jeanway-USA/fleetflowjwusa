@@ -32,6 +32,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { DriverPayPackageSection } from '@/components/drivers/DriverPayPackageSection';
+import { DriverPositionSection } from '@/components/drivers/DriverPositionSection';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { formatCurrency } from '@/lib/formatters';
 
@@ -90,6 +92,7 @@ export function DriverDetailSheet({
   const canForceReonboard = isOwner || hasRole('payroll_admin');
   const canEditTaxState = !readOnly && (isOwner || hasRole('payroll_admin'));
   const [chatOpen, setChatOpen] = useState(false);
+  const [suggestedPackageId, setSuggestedPackageId] = useState<string | null>(null);
   const [confirmReonboardOpen, setConfirmReonboardOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -285,6 +288,10 @@ export function DriverDetailSheet({
         )}
 
 
+
+        {/* Pay package: managers can assign; others only see their own */}
+        <DriverPositionSection driver={driver} onSuggestPackage={setSuggestedPackageId} />
+        <DriverPayPackageSection driver={driver} suggestedPackageId={suggestedPackageId} />
 
         {/* Emergency Contact */}
         <Separator />

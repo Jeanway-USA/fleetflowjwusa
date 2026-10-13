@@ -249,7 +249,18 @@ IMPORTANT:
 - Advances (Cash Advance, Card Pre-Trip, Card Load, SPEC ADV, Direct-Deposit Bank) must have is_advance: true
 - Direct-Deposit Fee / DD Fee is a REAL expense (is_advance: false) — do not confuse with Direct-Deposit Bank transfers
 - For contractor PDF revenue, 1099 REVENUE is the final truck-share amount after the Landstar cut. Do not treat it as gross linehaul and do not add it together with gross linehaul for the same trip.
-- Always populate the "revenue" array for contractor PDFs; use an empty array [] for card_activity PDFs`;
+- Always populate the "revenue" array for contractor PDFs; use an empty array [] for card_activity PDFs
+
+CONTRACTOR STATEMENT SPECIFICS:
+- Landstar contractor statements are WEEKLY. period_end is the "Period Ending" date (a Wednesday) and period_start is 6 days earlier. Do not report the whole month.
+- Deductions & Charges are printed as positive numbers; return them as positive amounts.
+- List every scheduled deduction separately, even when two lines share a description (e.g. two "NTP TRUCK WARRANTY PROG." lines with different amounts, or two "EOBR - AIRTIME" lines). Never sum them.
+- Use the line's own Transaction Date for scheduled deductions and other adjustments; use the P/U Date for trip lines.
+- Include the "Direct Deposit Fee" shown under the totals (date = period end, expense_type "Direct Deposit Fee").
+- "CARD PARTIAL FINAL SETT" is an advance (is_advance: true), like CARD PRE-TRIP.
+- Do NOT put revenue lines in "expenses": Tractor Line Haul, TRACTOR L/H, Fuel Surcharge, and accessorial pay such as Just In Time, Detention, Stop Off, Layover — including their reversals (amounts printed with a trailing minus in the 1099 Revenue column).
+- Do NOT include "TRIP% ESCROW PAYMENT (VOLUNTARY)" lines; escrow is the contractor's savings, not an expense.
+- Ignore the "Pending Adjustments" and "Outstanding Trips" sections; they are not part of this week's settlement.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

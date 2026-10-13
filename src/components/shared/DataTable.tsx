@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LucideIcon } from 'lucide-react';
 
@@ -96,6 +97,8 @@ function getStorageKey(tableId: string) {
 
 type FilterValue = string | { from?: string; to?: string };
 
+const MOBILE_PAGE_SIZE = 25;
+
 export function DataTable<T extends { id: string }>({ 
   columns, 
   data, 
@@ -168,6 +171,7 @@ export function DataTable<T extends { id: string }>({
   const showSelection = selectable && onSelectionChange;
   const hasAnyFilter = useMemo(() => columns.some(c => c.filter), [columns]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileLimit, setMobileLimit] = useState(MOBILE_PAGE_SIZE);
   const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({});
 
   const activeFilterCount = useMemo(() => {
@@ -240,10 +244,27 @@ export function DataTable<T extends { id: string }>({
     });
   }, []);
 
+  // Columns marked hiddenOnMobile are display:none on phones, so they must not claim width there.
+  const isMobile = useIsMobile();
+  const displayedColumns = useMemo(
+    () => (isMobile ? visibleColumns.filter(col => !col.hiddenOnMobile) : visibleColumns),
+    [visibleColumns, isMobile],
+  );
+
   const computedWidths = useMemo(() => {
-    const defaultWidth = `${100 / visibleColumns.length}%`;
+    const defaultWidth = `${100 / displayedColumns.length}%`;
     return visibleColumns.map(col => col.width || defaultWidth);
-  }, [visibleColumns]);
+  }, [visibleColumns, displayedColumns]);
+
+  // Fixed layout splits leftover width equally, which crushes wide tables. Give every column
+  // a floor so the container scrolls sideways instead of overlapping headers and breaking words.
+  const tableMinWidth = useMemo(() => {
+    const columnsWidth = displayedColumns.reduce((sum, col) => {
+      const px = col.width && /px$/.test(col.width) ? parseInt(col.width, 10) : NaN;
+      return sum + (Number.isNaN(px) ? 130 : px);
+    }, 0);
+    return Math.max(640, columnsWidth + 80);
+  }, [displayedColumns]);
 
   const rowVirtualizer = useVirtualizer({
     count: sortedData.length,
@@ -333,7 +354,7 @@ export function DataTable<T extends { id: string }>({
           </TooltipProvider>
         </div>
         <div className="rounded-lg border border-border">
-          <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
             <thead className="[&_tr]:border-b">
               <tr className="border-b transition-colors bg-muted/50">
                 {showSelection && <th className={cn(thClass, "w-10")} />}
@@ -375,7 +396,7 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         {hasAnyFilter && (
           <Button
             variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'outline'}
@@ -389,7 +410,7 @@ export function DataTable<T extends { id: string }>({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant={density === 'compact' ? 'secondary' : 'outline'} size="sm" onClick={toggleDensity}>
+              <Button variant={density === 'compact' ? 'secondary' : 'outline'} size="sm" onClick={toggleDensity} className={cn(renderMobileCard && "hidden md:inline-flex")}>
                 {density === 'compact' ? <Rows3 className="h-4 w-4" /> : <AlignJustify className="h-4 w-4" />}
               </Button>
             </TooltipTrigger>
@@ -399,7 +420,7 @@ export function DataTable<T extends { id: string }>({
         {tableId && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className={cn(renderMobileCard && "hidden md:inline-flex")}>
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
                 View
               </Button>
@@ -489,13 +510,15 @@ export function DataTable<T extends { id: string }>({
 
       <div className="relative">
         {renderMobileCard && (
-          <div className="md:hidden space-y-2 max-h-[600px] overflow-y-auto pr-1">
+          // Cards flow with the page on phones — no nested scroll box. Rendered in
+          // pages of MOBILE_PAGE_SIZE so long lists stay fast on older phones.
+          <div className="md:hidden space-y-2">
             {sortedData.length === 0 ? (
               <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
                 No rows match the current filters.
               </div>
             ) : (
-              sortedData.map((item) => {
+              sortedData.slice(0, mobileLimit).map((item) => {
                 const isSelected = showSelection && safeSelectedIds.has(item.id);
                 const isExpanded = expandable && renderExpanded && expandedIds.has(item.id);
                 const canRowToggle = expandable && renderExpanded && !onRowClick;
@@ -510,34 +533,13 @@ export function DataTable<T extends { id: string }>({
                     onDoubleClick={() => onRowDoubleClick?.(item)}
                     onTouchEnd={() => handleTouchEnd(item)}
                     className={cn(
-                      "rounded-lg border border-border bg-card p-3 space-y-2 transition-colors",
+                      "rounded-lg border border-border bg-card p-3 space-y-2 transition-colors overflow-hidden",
                       (onRowClick || onRowDoubleClick || canRowToggle) && "cursor-pointer active:bg-muted/50",
                       isSelected && "bg-primary/5 border-primary/40",
                       isExpanded && "bg-muted/30"
                     )}
                   >
-                    {(showSelection || (expandable && renderExpanded)) && (
-                      <div className="flex items-center justify-between gap-2 -mt-1" onClick={(e) => e.stopPropagation()}>
-                        {showSelection ? (
-                          <Checkbox
-                            checked={safeSelectedIds.has(item.id)}
-                            onCheckedChange={() => toggleRow(item.id)}
-                            aria-label="Select row"
-                          />
-                        ) : <span />}
-                        {expandable && renderExpanded && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground"
-                            onClick={() => toggleExpand(item.id)}
-                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                            aria-expanded={isExpanded ? true : false}
-                          >
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    {/* Bulk selection is desk work; phone cards stay clean. */}
                     <div className="min-w-0 break-words">
                       {renderMobileCard(item)}
                     </div>
@@ -546,9 +548,30 @@ export function DataTable<T extends { id: string }>({
                         {renderExpanded!(item)}
                       </div>
                     )}
+                    {expandable && renderExpanded && (
+                      <button
+                        type="button"
+                        className="-mx-3 -mb-3 mt-1 flex h-11 w-[calc(100%+1.5rem)] items-center justify-center gap-1.5 border-t border-border text-sm font-semibold text-primary"
+                        onClick={(e) => { e.stopPropagation(); toggleExpand(item.id); }}
+                        aria-expanded={isExpanded ? true : false}
+                      >
+                        {isExpanded ? 'Hide details' : 'Show details'}
+                        {isExpanded ? <ChevronDown className="h-4 w-4 rotate-180" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
+                    )}
                   </div>
                 );
               })
+            )}
+            {sortedData.length > mobileLimit && (
+              <Button
+                variant="outline"
+                className="w-full h-11"
+                onClick={() => setMobileLimit((n) => n + MOBILE_PAGE_SIZE)}
+              >
+                Show {Math.min(MOBILE_PAGE_SIZE, sortedData.length - mobileLimit)} more
+                <span className="ml-1 text-muted-foreground">({mobileLimit} of {sortedData.length})</span>
+              </Button>
             )}
           </div>
         )}
@@ -562,7 +585,7 @@ export function DataTable<T extends { id: string }>({
           style={{ maxHeight: 600 }}
         >
           {useStaticLayout ? (
-            <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full caption-bottom" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
               <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background">
                 <tr className="border-b border-border bg-transparent">
                   {showSelection && (
@@ -701,7 +724,7 @@ export function DataTable<T extends { id: string }>({
               </tbody>
             </table>
           ) : (
-          <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
             <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
               <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
                 {showSelection && (

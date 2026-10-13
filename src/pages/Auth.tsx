@@ -104,7 +104,7 @@ export default function Auth() {
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center gap-2 mb-8">
             <img src={logoIcon} alt="" className="h-10 w-auto" />
-            <img src={textLogo} alt="JeanWay USA" className="h-10 w-auto" />
+            <img src={textLogo} alt="JeanWay USA" className="h-10 w-auto brightness-0 dark:brightness-100" />
           </div>
           <Card className="border-border bg-card">
             <CardHeader className="text-center">
@@ -154,7 +154,7 @@ export default function Auth() {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
           <img src={logoIcon} alt="" className="h-12 w-auto" />
-          <img src={textLogo} alt="JeanWay USA" className="h-12 w-auto" />
+          <img src={textLogo} alt="JeanWay USA" className="h-12 w-auto brightness-0 dark:brightness-100" />
         </div>
         <Card className="border-border bg-card shadow-lg">
           <CardHeader className="text-center">

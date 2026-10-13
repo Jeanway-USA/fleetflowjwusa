@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { forwardRef, useState, type ComponentPropsWithoutRef } from 'react';
 import { usePMNotifications, useMarkPMNotificationRead, useDismissPMNotification, useMarkAllPMNotificationsRead, PMNotification } from '@/hooks/usePMNotifications';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -31,11 +31,11 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'overdue':
-        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+        return <AlertTriangle className="h-4 w-4 text-destructive" />;
       case 'due_soon':
-        return <Clock className="h-4 w-4 text-amber-500" />;
+        return <Clock className="h-4 w-4 text-warning" />;
       case 'upcoming':
-        return <CheckCircle className="h-4 w-4 text-blue-500" />;
+        return <CheckCircle className="h-4 w-4 text-primary" />;
       default:
         return <Bell className="h-4 w-4" />;
     }
@@ -45,11 +45,11 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
     const baseStyle = isRead ? 'opacity-60' : '';
     switch (type) {
       case 'overdue':
-        return cn(baseStyle, 'border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20');
+        return cn(baseStyle, 'bg-destructive/5 dark:bg-destructive/10');
       case 'due_soon':
-        return cn(baseStyle, 'border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20');
+        return cn(baseStyle, 'bg-warning/10 dark:bg-warning/15');
       case 'upcoming':
-        return cn(baseStyle, 'border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20');
+        return cn(baseStyle, 'bg-primary/10 dark:bg-primary/10');
       default:
         return baseStyle;
     }
@@ -99,7 +99,7 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
           <Bell className="h-4 w-4" />
           <span className="font-medium text-sm">PM Alerts</span>
           {unreadCount > 0 && (
-            <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+            <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full text-xs font-medium bg-destructive/10 dark:bg-destructive/10 text-destructive dark:text-destructive">
               {unreadCount}
             </span>
           )}
@@ -167,8 +167,8 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
                   </p>
                   <p className={cn(
                     'text-xs mt-0.5',
-                    notification.notification_type === 'overdue' ? 'text-red-600 dark:text-red-400' :
-                    notification.notification_type === 'due_soon' ? 'text-amber-600 dark:text-amber-400' :
+                    notification.notification_type === 'overdue' ? 'text-destructive dark:text-destructive' :
+                    notification.notification_type === 'due_soon' ? 'text-warning dark:text-warning' :
                     'text-muted-foreground'
                   )}>
                     {formatRemaining(notification)}
@@ -201,7 +201,7 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
 }
 
 // Compact bell icon with badge for use in headers
-export function PMNotificationsBell({ onClick }: { onClick?: () => void }) {
+export const PMNotificationsBell = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<typeof Button>>(function PMNotificationsBell(props, ref) {
   const { data: notifications } = usePMNotifications();
   
   const overdueCount = notifications?.filter(n => n.notification_type === 'overdue' && !n.is_read).length || 0;
@@ -210,26 +210,27 @@ export function PMNotificationsBell({ onClick }: { onClick?: () => void }) {
 
   return (
     <Button
+      ref={ref}
       variant="ghost"
       size="icon"
-      className="relative"
-      onClick={onClick}
+      {...props}
+      className={cn('relative', props.className)}
     >
       <Bell className={cn(
         'h-5 w-5',
-        overdueCount > 0 && 'text-red-500',
-        overdueCount === 0 && dueSoonCount > 0 && 'text-amber-500'
+        overdueCount > 0 && 'text-destructive',
+        overdueCount === 0 && dueSoonCount > 0 && 'text-warning'
       )} />
       {totalUnread > 0 && (
         <span className={cn(
           'absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center',
           overdueCount > 0 
-            ? 'bg-red-500 text-white' 
-            : 'bg-amber-500 text-white'
+            ? 'bg-destructive text-white' 
+            : 'bg-warning text-white'
         )}>
           {totalUnread > 99 ? '99+' : totalUnread}
         </span>
       )}
     </Button>
   );
-}
+});

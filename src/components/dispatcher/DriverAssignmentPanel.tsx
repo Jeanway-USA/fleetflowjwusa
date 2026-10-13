@@ -42,6 +42,7 @@ export function DriverAssignmentPanel() {
       const { data: activeLoads } = await supabase
         .from('fleet_loads')
         .select('driver_id')
+        .is('deleted_at', null)
         .in('status', ['assigned', 'loading', 'in_transit', 'unloading']);
 
       const assignedDriverIds = new Set(activeLoads?.map(l => l.driver_id).filter(Boolean));
@@ -58,6 +59,7 @@ export function DriverAssignmentPanel() {
       const { data, error } = await supabase
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, status, pickup_date')
+        .is('deleted_at', null)
         .in('status', ['pending', 'booked', 'assigned'])
         .is('driver_id', null)
         .order('pickup_date', { ascending: true });

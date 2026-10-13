@@ -1,8 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { ClipboardList, FileText, Wrench, AlertCircle, Calendar, ChevronRight, Receipt } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 export interface PendingAction {
   id: string;
@@ -18,114 +17,57 @@ interface PendingActionsCardProps {
   isLoading?: boolean;
 }
 
-const typeConfig: Record<PendingAction['type'], { icon: typeof FileText; label: string }> = {
-  document: { icon: FileText, label: 'Documents' },
-  maintenance: { icon: Wrench, label: 'Maintenance' },
-  defect: { icon: AlertCircle, label: 'Defects' },
-  credential: { icon: Calendar, label: 'Credentials' },
-  settlement: { icon: Receipt, label: 'Finance' },
-};
-
-const priorityColors: Record<PendingAction['priority'], string> = {
-  high: 'bg-destructive text-destructive-foreground',
-  medium: 'bg-yellow-500 text-yellow-950',
-  low: 'bg-muted text-muted-foreground',
+const typeLabel: Record<PendingAction['type'], string> = {
+  document: 'Documents',
+  maintenance: 'Maintenance',
+  defect: 'Defects',
+  credential: 'Credentials',
+  settlement: 'Money',
 };
 
 export function PendingActionsCard({ actions, isLoading }: PendingActionsCardProps) {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-primary" />
-            Pending Actions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const totalCount = actions.reduce((sum, a) => sum + a.count, 0);
-  const highPriorityCount = actions.filter(a => a.priority === 'high').reduce((sum, a) => sum + a.count, 0);
-
-  if (actions.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-primary" />
-            Pending Actions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6 text-muted-foreground">
-            <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">All caught up!</p>
-            <p className="text-xs">No pending actions at this time.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const high = actions.filter(a => a.priority === 'high').length;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-primary" />
-            Pending Actions
+    <section aria-labelledby="todo-title" className="h-full rounded-lg border bg-card px-4 pt-3 pb-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 id="todo-title" className="font-condensed text-xl font-bold">To do</h2>
+        {!isLoading && actions.length > 0 && (
+          <span className={cn('text-sm', high > 0 ? 'font-semibold text-destructive' : 'text-muted-foreground')}>
+            {high > 0 ? `${high} urgent` : `${actions.length} open`}
           </span>
-          <Badge variant={highPriorityCount > 0 ? 'destructive' : 'secondary'} className="text-xs">
-            {totalCount} items
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {actions.map(action => {
-          const config = typeConfig[action.type];
-          const Icon = config.icon;
-          
-          const content = (
-            <div
-              key={action.id}
-              className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-1.5 rounded bg-background">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3 py-3">
+          {[0, 1, 2].map(i => <Skeleton key={i} className="h-5 w-full" />)}
+        </div>
+      ) : actions.length === 0 ? (
+        <p className="py-6 text-[15px] text-muted-foreground">Nothing waiting on you.</p>
+      ) : (
+        <ul className="mt-1 divide-y">
+          {actions.map(action => {
+            const row = (
+              <div className="flex min-h-[48px] items-center gap-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className={cn('text-[15px] font-medium', action.priority === 'high' && 'text-destructive')}>{action.title}</p>
+                  <p className="text-[13px] text-muted-foreground">{typeLabel[action.type]}</p>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">{action.title}</p>
-                  <p className="text-xs text-muted-foreground">{config.label}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className={`${priorityColors[action.priority]} text-xs`}>
+                <span className={cn('figure text-lg font-semibold', action.priority === 'high' && 'text-destructive')}>
                   {action.count}
-                </Badge>
-                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </span>
+                {action.link && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
               </div>
-            </div>
-          );
-
-          if (action.link) {
-            return (
-              <Link key={action.id} to={action.link}>
-                {content}
-              </Link>
             );
-          }
-
-          return content;
-        })}
-      </CardContent>
-    </Card>
+            return (
+              <li key={action.id}>
+                {action.link ? <Link to={action.link} className="block hover:bg-secondary/60 -mx-4 px-4">{row}</Link> : row}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

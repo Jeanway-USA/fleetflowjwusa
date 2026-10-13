@@ -6,11 +6,13 @@ import {
   startOfWeek,
   addWeeks,
   subDays,
+  addDays,
   isAfter,
   startOfMonth,
   endOfMonth,
 } from 'date-fns';
-import { ADVANCE_EXPENSE_TYPES } from '@/lib/expense-types';
+import { SETTLEMENT_WEEK_START } from '@/lib/settlement-week';
+import { driverPayEvents, expenseCost, truckRevenueOf, MIRRORED_LOAN_EXPENSE_TYPE } from '@/lib/pl-metrics';
 
 export interface PeriodRollup {
   revenue: number;
@@ -67,25 +69,6 @@ const safeDate = (d: string | null | undefined): Date | null => {
 
 const isOnOrAfter = (date: Date, cutoff: Date) => date.getTime() >= cutoff.getTime();
 
-const isPnlExpense = (expense: { expense_type?: string | null; notes?: string | null }) => {
-  const type = String(expense.expense_type || '').trim();
-  return !ADVANCE_EXPENSE_TYPES.includes(type) && !(expense.notes?.includes('Advance (Non-P&L)') ?? false);
-};
-
-const getTruckRevenue = (load: {
-  net_revenue?: number | string | null;
-  truck_revenue?: number | string | null;
-  gross_revenue?: number | string | null;
-}) => {
-  const netRevenue = Number(load.net_revenue);
-  if (Number.isFinite(netRevenue) && netRevenue > 0) return netRevenue;
-
-  const truckRevenue = Number(load.truck_revenue);
-  if (Number.isFinite(truckRevenue) && truckRevenue > 0) return truckRevenue;
-
-  return Number(load.gross_revenue) || 0;
-};
-
 export function usePLTrend() {
   return useQuery<PLTrendData>({
     queryKey: ['pl-trend', WEEKS],
@@ -93,12 +76,13 @@ export function usePLTrend() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const today = new Date();
-      const horizonStart = startOfWeek(subDays(today, 7 * (WEEKS - 1)), { weekStartsOn: 1 });
+      const horizonStart = startOfWeek(subDays(today, 7 * (WEEKS - 1)), { weekStartsOn: SETTLEMENT_WEEK_START });
       const horizonIso = format(horizonStart, 'yyyy-MM-dd');
       const trailing90Cutoff = subDays(today, 90);
       const trailing90Iso = format(trailing90Cutoff, 'yyyy-MM-dd');
 
-      const [loadsRes, expensesRes, payrollRes, commissionsRes] = await Promise.all([
+      const earliestIso = horizonIso < trailing90Iso ? horizonIso : trailing90Iso;
+      const [loadsRes, expensesRes, payrollRes, commissionsRes, loanRes, settlementsRes, bonusesRes] = await Promise.all([
         supabase
           .from('fleet_loads')
           .select('delivery_date, gross_revenue, truck_revenue, net_revenue, actual_miles, booked_miles, status, truck_id')
@@ -109,25 +93,44 @@ export function usePLTrend() {
           .gte('expense_date', trailing90Iso),
         supabase
           .from('driver_payroll')
-          .select('period_end, net_pay')
+          .select('driver_id, period_end, net_pay')
           .gte('period_end', horizonIso),
         supabase
           .from('agent_commissions')
           .select('created_at, commission_amount')
           .gte('created_at', horizonIso),
+        (supabase as any)
+          .from('truck_loan_payments')
+          .select('payment_date, amount')
+          .gte('payment_date', earliestIso),
+        supabase
+          .from('driver_settlements')
+          .select('driver_id, period_end, status, gross_pay, reimbursements')
+          .is('deleted_at', null)
+          .gte('period_end', earliestIso),
+        supabase
+          .from('safety_bonus_payouts')
+          .select('period_end, status, earned_amount, paid_in_settlement_id')
+          .is('deleted_at', null)
+          .gte('period_end', earliestIso),
       ]);
 
       const loads = loadsRes.data ?? [];
       const expenses = expensesRes.data ?? [];
       const payroll = payrollRes.data ?? [];
+      // Driver pay: approved or paid settlements (gross plus reimbursements) and payroll batches, never the same week twice.
+      const driverPay = driverPayEvents((settlementsRes.data ?? []) as any[], payroll as any[], (bonusesRes.data ?? []) as any[]);
       const commissions = commissionsRes.data ?? [];
+      const loanPayments = (loanRes.data ?? []) as Array<{ payment_date: string; amount: number | string }>;
+      // Loan payments come from the ledger; skip any mirrored expense rows so a payment never counts twice.
+      const costRows = (expenses as any[]).filter((e) => e.expense_type !== MIRRORED_LOAN_EXPENSE_TYPE);
 
       // Weekly buckets
       const buckets: WeekPoint[] = Array.from({ length: WEEKS }, (_, i) => {
         const start = addWeeks(horizonStart, i);
         return {
           weekStart: format(start, 'yyyy-MM-dd'),
-          label: format(start, 'MMM d'),
+          label: format(addDays(start, 6), 'MMM d'),
           revenue: 0,
           costs: 0,
           net: 0,
@@ -135,7 +138,7 @@ export function usePLTrend() {
       });
 
       const bucketIndex = (d: Date): number => {
-        const weekStart = startOfWeek(d, { weekStartsOn: 1 });
+        const weekStart = startOfWeek(d, { weekStartsOn: SETTLEMENT_WEEK_START });
         const diffDays = Math.floor((weekStart.getTime() - horizonStart.getTime()) / 86_400_000);
         const idx = Math.floor(diffDays / 7);
         return idx >= 0 && idx < WEEKS ? idx : -1;
@@ -156,14 +159,14 @@ export function usePLTrend() {
         const d = safeDate(l.delivery_date);
         if (!d) continue;
         const idx = bucketIndex(d);
-        const rev = Number(l.gross_revenue) || 0;
+        const rev = truckRevenueOf(l);
         const miles = Number(l.actual_miles ?? l.booked_miles) || 0;
         if (idx >= 0) buckets[idx].revenue += rev;
         if (isOnOrAfter(d, trailing30Cutoff)) {
           dispatchDaySet30.add(l.delivery_date.slice(0, 10));
         }
         if (d >= monthStart && d <= monthEnd) {
-          monthToDateRevenue += getTruckRevenue(l);
+          monthToDateRevenue += truckRevenueOf(l);
           dispatchDaysMonth.add(l.delivery_date.slice(0, 10));
           if (l.truck_id) activeTrucksMonth.add(l.truck_id);
         }
@@ -174,18 +177,23 @@ export function usePLTrend() {
         const idx = bucketIndex(d);
         if (idx >= 0) buckets[idx].revenue += Number(c.commission_amount) || 0;
       }
-      for (const e of expenses as any[]) {
+      for (const e of costRows) {
         const d = safeDate(e.expense_date);
         if (!d) continue;
-        if (!isPnlExpense(e)) continue;
         const idx = bucketIndex(d);
-        if (idx >= 0) buckets[idx].costs += Number(e.amount) || 0;
+        if (idx >= 0) buckets[idx].costs += expenseCost(e);
       }
-      for (const p of payroll as any[]) {
-        const d = safeDate(p.period_end);
+      for (const lp of loanPayments) {
+        const d = safeDate(lp.payment_date);
         if (!d) continue;
         const idx = bucketIndex(d);
-        if (idx >= 0) buckets[idx].costs += Number(p.net_pay) || 0;
+        if (idx >= 0) buckets[idx].costs += Number(lp.amount) || 0;
+      }
+      for (const pay of driverPay) {
+        const d = safeDate(pay.date);
+        if (!d) continue;
+        const idx = bucketIndex(d);
+        if (idx >= 0) buckets[idx].costs += pay.amount;
       }
 
       for (const b of buckets) b.net = b.revenue - b.costs;
@@ -196,7 +204,7 @@ export function usePLTrend() {
         for (const l of loads as any[]) {
           const d = safeDate(l.delivery_date);
           if (d && isAfter(d, cutoff)) {
-            revenue += Number(l.gross_revenue) || 0;
+            revenue += truckRevenueOf(l);
             miles += Number(l.actual_miles ?? l.booked_miles) || 0;
           }
         }
@@ -204,13 +212,17 @@ export function usePLTrend() {
           const d = safeDate(c.created_at);
           if (d && isAfter(d, cutoff)) revenue += Number(c.commission_amount) || 0;
         }
-        for (const e of expenses as any[]) {
+        for (const e of costRows) {
           const d = safeDate(e.expense_date);
-          if (d && isAfter(d, cutoff) && isPnlExpense(e)) costs += Number(e.amount) || 0;
+          if (d && isAfter(d, cutoff)) costs += expenseCost(e);
         }
-        for (const p of payroll as any[]) {
-          const d = safeDate(p.period_end);
-          if (d && isAfter(d, cutoff)) costs += Number(p.net_pay) || 0;
+        for (const lp of loanPayments) {
+          const d = safeDate(lp.payment_date);
+          if (d && isAfter(d, cutoff)) costs += Number(lp.amount) || 0;
+        }
+        for (const pay of driverPay) {
+          const d = safeDate(pay.date);
+          if (d && isAfter(d, cutoff)) costs += pay.amount;
         }
         return { revenue, costs, miles };
       };
@@ -222,19 +234,28 @@ export function usePLTrend() {
       let trailing90Expenses = 0;
       let monthToDateExpenses = 0;
 
-      for (const e of expenses as any[]) {
-        const d = safeDate(e.expense_date);
-        if (!d || !isPnlExpense(e)) continue;
-
-        const type = String(e.expense_type || '').trim();
-        const amount = Number(e.amount) || 0;
-
+      const addRunwayCost = (d: Date, type: string, amount: number) => {
         if (isOnOrAfter(d, trailing30Cutoff)) {
           trailing30Expenses += amount;
           expensesByType.set(type, (expensesByType.get(type) || 0) + amount);
         }
         if (isOnOrAfter(d, trailing90Cutoff)) trailing90Expenses += amount;
         if (d >= monthStart && d <= monthEnd) monthToDateExpenses += amount;
+      };
+      for (const lp of loanPayments) {
+        const d = safeDate(lp.payment_date);
+        if (d) addRunwayCost(d, 'Truck loan', Number(lp.amount) || 0);
+      }
+      for (const pay of driverPay) {
+        const d = safeDate(pay.date);
+        if (d) addRunwayCost(d, 'Driver pay', pay.amount);
+      }
+      for (const e of costRows) {
+        const d = safeDate(e.expense_date);
+        if (!d) continue;
+        const amount = expenseCost(e);
+        if (amount === 0) continue;
+        addRunwayCost(d, String(e.expense_type || '').trim(), amount);
       }
 
       // Dispatch cadence: distinct delivery days & miles in trailing 30d

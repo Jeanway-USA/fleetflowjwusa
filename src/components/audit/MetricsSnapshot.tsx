@@ -19,10 +19,10 @@ export function MetricsSnapshot() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">Critical Overrides (24h)</CardTitle>
-          <AlertOctagon className="h-4 w-4 text-destructive" />
+          <AlertOctagon className={`h-4 w-4 ${(data?.critical24h ?? 0) > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-semibold tabular-nums text-destructive">
+          <div className={`text-3xl font-semibold tabular-nums ${(data?.critical24h ?? 0) > 0 ? 'text-destructive' : ''}`}>
             {isLoading ? '—' : data?.critical24h ?? 0}
           </div>
           <p className="text-xs text-muted-foreground mt-1">Deletions and settlement/driver updates.</p>

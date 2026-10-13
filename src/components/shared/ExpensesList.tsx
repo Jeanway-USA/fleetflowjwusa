@@ -51,6 +51,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
       const query = supabase
         .from('expenses')
         .select('*')
+        .is('deleted_at', null)
         .order('expense_date', { ascending: false });
 
       if (relatedType === 'load') {
@@ -80,15 +81,11 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
     onError: (error: any) => toast.error(error.message),
   });
 
+  // Archived, not erased: the toast offers Undo and the Archive page keeps it.
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expenses').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast.success('Expense deleted');
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({ table: 'expenses', id, queryClient, invalidateKeys: [queryKey, ['expenses']] });
     },
     onError: (error: any) => toast.error(error.message),
   });
@@ -382,7 +379,8 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 text-destructive"
+                className="h-11 w-11 text-destructive"
+                aria-label="Archive this expense"
                 onClick={(ev) => { ev.stopPropagation(); deleteMutation.mutate(e.id); }}
               >
                 <Trash2 className="h-4 w-4" />
