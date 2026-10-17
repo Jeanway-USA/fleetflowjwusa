@@ -1,3 +1,4 @@
+import { localDateOf } from '@/lib/datetime';
 import type {
   PackageSnapshot,
   PayComponent,
@@ -32,7 +33,7 @@ export function packageCovers(pkg: Pick<PayPackage, 'effective_start' | 'effecti
  * Returns null when the package had not been saved yet.
  */
 export function versionAsOf(versions: PayPackageVersion[], date: string): PayPackageVersion | null {
-  const upTo = versions.filter((v) => v.created_at.slice(0, 10) <= date);
+  const upTo = versions.filter((v) => localDateOf(v.created_at) <= date);
   if (upTo.length === 0) return null;
   return upTo.sort((a, b) => b.version_number - a.version_number)[0];
 }

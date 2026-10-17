@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import {
   assignPackage,
   createOverride,
@@ -40,6 +41,22 @@ export function usePackageVersions(packageId: string | null) {
     queryKey: [...KEY, 'versions', packageId],
     queryFn: () => fetchVersions(packageId as string),
     enabled: !!packageId,
+  });
+}
+
+/** Which pay package each listed settlement was paid under (empty before the pay package upgrade is applied). */
+export function useSettlementPackages(settlementIds: string[]) {
+  const key = settlementIds.slice().sort().join(',');
+  return useQuery({
+    queryKey: [...KEY, 'settlement-packages', key],
+    enabled: settlementIds.length > 0,
+    retry: false,
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      const { data, error } = await (supabase as any).from('settlement_pay_snapshots').select('settlement_id, package_name').in('settlement_id', settlementIds);
+      if (!error) for (const r of data ?? []) map.set(r.settlement_id, r.package_name ?? 'Pay package');
+      return map;
+    },
   });
 }
 

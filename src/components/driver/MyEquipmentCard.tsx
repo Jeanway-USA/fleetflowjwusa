@@ -74,6 +74,7 @@ export function MyEquipmentCard({ driverId, assignedTruck }: MyEquipmentCardProp
         .from('work_orders')
         .select('id, status, service_type')
         .eq('truck_id', assignedTruck!.id)
+        .is('deleted_at', null)
         .neq('status', 'completed');
       if (error) throw error;
       return data ?? [];

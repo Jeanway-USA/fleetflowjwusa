@@ -188,10 +188,16 @@ export function GenerateSettlementsDialog({
           defaultTaxState: taxConfig.defaultTaxState,
         });
       }
-      return { rows, withheld, packageSkipped };
+      // The rows above were read before withholding was applied, so read the pay back for the message.
+      let finalNet = rows.reduce((s, r: any) => s + Number(r.net_pay ?? 0), 0);
+      if (rows.length > 0) {
+        const { data: fresh } = await supabase.from('driver_settlements').select('net_pay').in('id', rows.map((r: any) => r.id));
+        if (fresh) finalNet = fresh.reduce((s, r) => s + Number(r.net_pay ?? 0), 0);
+      }
+      return { rows, withheld, packageSkipped, finalNet };
     },
-    onSuccess: ({ rows, withheld, packageSkipped }) => {
-      const total = rows.reduce((s, r: any) => s + Number(r.net_pay ?? 0), 0);
+    onSuccess: ({ rows, withheld, packageSkipped, finalNet }) => {
+      const total = finalNet;
       const requested = allSelected ? drivers.length : selected.size;
       const skipped = Math.max(0, requested - rows.length);
       const skipNote =
