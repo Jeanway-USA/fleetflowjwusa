@@ -19,6 +19,7 @@ const money = (v: number) => (v < 0 ? `−${formatCurrency(-v)}` : formatCurrenc
 
 function issueText(t: TripProof): string[] {
   const out: string[] = [];
+  if (t.partial) out.push('The file shows only part of this trip (its reversed lines), so its charges and advances are checked in the weeks that hold them.');
   if (t.issues.includes('missing_load')) out.push('Landstar settled it but it is not in your loads.');
   if (t.advanceOnly && t.issues.length > 0) out.push('Landstar settled this trip with charges and advances only, no revenue, so it is recorded as expenses, not as a load.');
   if (t.issues.includes('revenue')) out.push(`Revenue: Landstar ${money(t.landstar.revenue)}, your load ${money(t.app.revenue)}. Run the match above.`);

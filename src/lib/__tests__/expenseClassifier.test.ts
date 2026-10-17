@@ -53,3 +53,11 @@ describe('escrow interest', () => {
     expect(classifyStatementLine('3RD QTR ADV INT DED')).toMatchObject({ toType: 'Interest' });
   });
 });
+
+describe('statement labels', () => {
+  it('skips the GROSS COST and NO SUBSIDY notes printed under a charge', () => {
+    for (const d of ['GROSS COST $33.98', 'GROSS COST', 'NO SUBSIDY']) {
+      expect(classifyStatementLine(d), d).toMatchObject({ action: 'skip', group: 'label' });
+    }
+  });
+});

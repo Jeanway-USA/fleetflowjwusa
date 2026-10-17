@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import type { ReconciliationResult, ReconciledExpense, RevenueTripMismatch } from '@/lib/settlement-reconciliation';
 import { matchOneToOne, matchTripTotals } from '@/lib/expense-matching';
+import { advanceOnlyNote } from '@/lib/weekly-proof';
 
 interface FleetLoad {
   id: string;
@@ -166,7 +167,7 @@ export function ReconciliationPreview({
 
   const expensesTotal = selectedExpenses.reduce((sum, e) => sum + Math.abs(e.amount), 0);
   const creditsTotal = selectedCredits.reduce((sum, e) => sum + Math.abs(e.amount), 0);
-  const advancesTotal = selectedAdvances.reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  const advancesTotal = selectedAdvances.reduce((sum, e) => sum + (e.advance_return ? -Math.abs(e.amount) : Math.abs(e.amount)), 0);
   const netExpense = expensesTotal - creditsTotal;
 
   const mergedCount = [...expenseRows, ...advanceRows, ...creditRows].filter(e => e.merged).length;
@@ -208,6 +209,14 @@ export function ReconciliationPreview({
   const truckFor = (exp: ExpenseRow): string | null =>
     exp.matchedTruck?.id || exp.matchedLoad?.truck_id || (truckChoice !== 'none' ? truckChoice : null);
 
+  /** An advance Landstar paid back (UA or VOID pre-trip) is saved negative so it reduces advances. */
+  const savedAmount = (exp: ExpenseRow & { importType: 'expense' | 'advance' | 'credit' }) =>
+    exp.importType === 'credit' || (exp.importType === 'advance' && exp.advance_return) ? -Math.abs(exp.amount) : Math.abs(exp.amount);
+
+  /** An advance on a trip with no load is tagged with its trip number, so the weekly proof can find it. */
+  const advanceNotes = (exp: ExpenseRow) =>
+    exp.trip_number && !exp.matchedLoad ? advanceOnlyNote(exp.trip_number) : 'Advance (Non-P&L)';
+
   const handleImport = async () => {
     const allSelected = [
       ...selectedExpenses.map(e => ({ ...e, importType: 'expense' as const })),
@@ -244,13 +253,13 @@ export function ReconciliationPreview({
           expense_type: exp.importType === 'advance' ? 'Advance'
             : exp.is_reimbursement ? 'Reimbursement'
             : exp.expense_type,
-          amount: exp.importType === 'credit' ? -Math.abs(exp.amount) : Math.abs(exp.amount),
+          amount: savedAmount(exp),
           description: exp.description,
           vendor: exp.vendor,
           gallons: exp.gallons,
           load_id: exp.matchedLoad?.id || null,
           truck_id: truckFor(exp),
-          notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
+          notes: exp.importType === 'advance' ? advanceNotes(exp)
             : exp.is_reimbursement ? 'Reimbursement/Refund'
             : exp.is_discount ? 'Discount/Credit'
             : null,
@@ -270,13 +279,13 @@ export function ReconciliationPreview({
             expense_type: exp.importType === 'advance' ? 'Advance'
               : exp.is_reimbursement ? 'Reimbursement'
               : exp.expense_type,
-            amount: exp.importType === 'credit' ? -Math.abs(exp.amount) : Math.abs(exp.amount),
+            amount: savedAmount(exp),
             description: exp.description,
             vendor: exp.vendor,
             gallons: exp.gallons,
             load_id: exp.matchedLoad?.id || null,
             truck_id: truckFor(exp),
-            notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
+            notes: exp.importType === 'advance' ? advanceNotes(exp)
               : exp.is_reimbursement ? 'Reimbursement/Refund'
               : exp.is_discount ? 'Discount/Credit'
               : null,
@@ -429,7 +438,7 @@ export function ReconciliationPreview({
                 )}
               </TableCell>
               <TableCell className={cn('text-right font-mono text-sm font-medium', colorClass)}>
-                {colorClass.includes('success') ? '+' : '-'}{formatCurrency(Math.abs(row.amount))}
+                {colorClass.includes('success') || row.advance_return ? '+' : '-'}{formatCurrency(Math.abs(row.amount))}
               </TableCell>
               <TableCell>
                 {row.merged ? (

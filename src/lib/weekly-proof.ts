@@ -48,6 +48,8 @@ export interface TripProof {
   loadFound: boolean;
   /** Settled with charges and advances only, no revenue: recorded as expenses, not as a load. */
   advanceOnly: boolean;
+  /** The file shows only part of this trip (reversal lines), so its charges and advances are not compared. */
+  partial: boolean;
   loadId: string | null;
   /** The trip's pickup date from the file; statement lines are dated by it. */
   pickup: string | null;
@@ -80,6 +82,9 @@ export interface ProofResult {
 }
 
 const cents = (v: number) => Math.round(v * 100);
+
+/** Code V lines are advances taken; a code 8 pre-trip line (UA, VOID) is Landstar paying one back. */
+const isAdvanceLine = (l: SettlementLine) => l.code === 'V' || (l.code === '8' && /pre-trip|advance|partial\s*final/i.test(l.description));
 
 /** The note that ties an expense to an advance-only Landstar trip. */
 export const advanceOnlyNote = (trip: string) => `Landstar trip ${trip} (advance only, no load)`;
@@ -130,7 +135,8 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
     // Card fees of a trip with no load sit among the card's other unlinked fees, so the year-to-date ledger checks them.
     const hasRevenue = settled.has(trip);
     const chargeLines = group.filter((l) => l.code === 'B' && (hasRevenue || loadByTrip.has(trip) || !/^card\s*fee$/i.test(l.description.trim()))).map((l) => ({ description: l.description, amount: roundCents(Math.abs(l.amount)) }));
-    const advanceLines = group.filter((l) => l.code === 'V').map((l) => ({ description: l.description, amount: roundCents(Math.abs(l.amount)) }));
+    // Landstar prints an advance taken as negative and one paid back as positive; the app counts taken as positive.
+    const advanceLines = group.filter(isAdvanceLine).map((l) => ({ description: l.description, amount: roundCents(-l.amount) }));
     const charges = roundCents(chargeLines.reduce((s, l) => s + l.amount, 0));
     const advances = roundCents(advanceLines.reduce((s, l) => s + l.amount, 0));
     const revenueLines = settled.get(trip);
@@ -144,18 +150,23 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
 
     const linked = load ? expensesByLoad.get(load.id) ?? [] : advanceOnly ? expenses.filter((e) => !e.load_id && advanceOnlyTrip(e.notes) === trip) : [];
     const toLine = (e: ProofExpense) => ({ id: e.id, date: e.expense_date ?? null, description: e.description || e.expense_type, amount: roundCents(Math.abs(Number(e.amount) || 0)) });
-    const appAdvanceLines = linked.filter((e) => isAdvanceExpense(e as never)).map(toLine);
+    // An advance paid back is saved as a negative amount, so its sign is kept.
+    const appAdvanceLines = linked.filter((e) => isAdvanceExpense(e as never)).map((e) => ({ ...toLine(e), amount: roundCents(Number(e.amount) || 0) }));
     const appChargeLines = linked.filter((e) => !isAdvanceExpense(e as never) && !NOT_TRIP_CHARGE_TYPES.has(e.expense_type) && (Number(e.amount) || 0) > 0).map(toLine);
     const appAdvances = roundCents(appAdvanceLines.reduce((s, l) => s + l.amount, 0));
     const appCharges = roundCents(appChargeLines.reduce((s, l) => s + l.amount, 0));
     const appRevenue = roundCents(Number(load?.net_revenue) || 0);
 
+    // The weekly file can show only the tail of a trip Landstar reversed and reissued (reversal lines, and nothing
+    // else to compare). Its charges and advances are then spread over other weeks, so they cannot be proven here.
+    const partial = !advanceOnly && group.some((l) => l.code === 'X') && !group.some((l) => l.code === 'B' || isAdvanceLine(l));
+
     const issues: ProofIssue[] = [];
     if (!load && !advanceOnly) issues.push('missing_load');
     else {
       if (!advanceOnly && revenueComparable && cents(appRevenue) !== cents(revenue)) issues.push('revenue');
-      if (cents(appCharges) !== cents(charges)) issues.push('charges');
-      if (cents(appAdvances) !== cents(advances)) issues.push('advances');
+      if (!partial && cents(appCharges) !== cents(charges)) issues.push('charges');
+      if (!partial && cents(appAdvances) !== cents(advances)) issues.push('advances');
     }
 
     trips.push({
@@ -163,6 +174,7 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
       week: dates[0] ?? null,
       loadFound: !!load,
       advanceOnly,
+      partial,
       loadId: load?.id ?? null,
       pickup: group.map((l) => l.pickup).find((d): d is string => !!d) ?? null,
       meta: {

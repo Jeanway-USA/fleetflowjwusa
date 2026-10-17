@@ -132,3 +132,31 @@ describe('advance-only trips and card fees', () => {
     expect(r.trips[0].issues).toEqual(['advances']);
   });
 });
+
+describe('returned advances and partial trips', () => {
+  const trip = [line('1797799', 'CARD PRE-TRIP', 'V', -1401.43), line('1797799', 'UA CARD PRE-TRIP', '8', 483.56)];
+
+  it('counts a UA pre-trip line as an advance paid back, not another advance', () => {
+    const t = proveTrips(trip, [], []).trips[0];
+    expect(t.landstar.advances).toBe(917.87);
+  });
+
+  it('proves a trip whose returned advance is saved negative', () => {
+    const adv = (amount: number): ProofExpense => ({ load_id: null, expense_type: 'Advance', amount, notes: 'Landstar trip 1797799 (advance only, no load)' });
+    const t = proveTrips(trip, [], [adv(1401.43), adv(-483.56)]).trips[0];
+    expect(t.issues).toEqual([]);
+  });
+
+  it('does not count a toll credit on code 8 as an advance', () => {
+    const t = proveTrips([line('7163725', 'CARD PRE-TRIP', 'V', -618), line('7163725', 'TOLL CHARGES', '8', 274.99)], [], []).trips[0];
+    expect(t.landstar.advances).toBe(618);
+  });
+
+  it('does not compare charges for a trip the file shows only as reversal lines', () => {
+    const lines = [line('1456639', 'TRACTOR L/H', '1', 1625), line('1456639', 'Tractor Line Haul', 'X', -1625), line('1456639', 'FUEL SURCHARGE', '3', 700), line('1456639', 'FUEL SURCHARGE', 'X', -700)];
+    const l: ProofLoad = { id: 'P', landstar_load_id: '1456639', net_revenue: 0 };
+    const t = proveTrips(lines, [l], [{ load_id: 'P', expense_type: 'Trip Scanning', amount: 2 }]).trips[0];
+    expect(t.partial).toBe(true);
+    expect(t.issues).not.toContain('charges');
+  });
+});

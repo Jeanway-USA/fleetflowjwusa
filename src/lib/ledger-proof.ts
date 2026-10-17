@@ -183,7 +183,9 @@ export function buildLedger(lines: LedgerLine[], appExpenses: AppExpenseRow[]): 
     const category = categorizeApp(e);
     if (!category) continue;
     const sign = e.expense_type === 'Reimbursement' ? -1 : 1;
-    appByKey.set(category.key, (appByKey.get(category.key) ?? 0) + sign * Math.abs(Number(e.amount) || 0));
+    // An advance Landstar paid back is saved negative and must reduce the advances; everything else is a plain amount.
+    const raw = Number(e.amount) || 0;
+    appByKey.set(category.key, (appByKey.get(category.key) ?? 0) + sign * (category.kind === 'advance' ? raw : Math.abs(raw)));
   }
 
   const keys = new Set<string>([...byKey.keys(), ...[...appByKey.keys()]]);

@@ -107,3 +107,15 @@ describe('buildLedger', () => {
     expect(by('escrowOut')).toMatchObject({ landstar: -500, app: null });
   });
 });
+
+describe('returned advances in the ledger', () => {
+  it('subtracts an advance saved negative from the advances total', () => {
+    const rows = buildLedger([{ description: 'CARD PRE-TRIP', amount: -1000 }, { description: 'UA CARD PRE-TRIP', amount: 300 }] as never, [
+      { expense_type: 'Advance', amount: 1000, description: 'CARD PRE-TRIP' },
+      { expense_type: 'Advance', amount: -300, description: 'UA CARD PRE-TRIP' },
+    ] as never).rows;
+    const adv = rows.find((x) => x.category.key === 'advances')!;
+    expect(adv.landstar).toBe(700);
+    expect(adv.app).toBe(700);
+  });
+});
