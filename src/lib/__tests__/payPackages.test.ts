@@ -280,3 +280,15 @@ describe('lines that work out below zero', () => {
     expect(r.net).toBe(1750);
   });
 });
+
+describe('when a version counts from', () => {
+  const evening: PayPackageVersion = {
+    id: 'v-eve', package_id: 'p1', version_number: 2, change_note: null,
+    created_at: new Date(2026, 9, 7, 20, 30).toISOString(), // saved at 8:30 pm local on Oct 7
+    snapshot: { package: { id: 'p1', name: 'Standard', description: null, position_type: 'driver', is_active: true, effective_start: null, effective_end: null }, components: [] },
+  };
+  it('counts a version saved in the evening on the day it was saved, not the next day', () => {
+    expect(versionAsOf([evening], '2026-10-07')?.version_number).toBe(2);
+    expect(versionAsOf([evening], '2026-10-06')).toBeNull();
+  });
+});

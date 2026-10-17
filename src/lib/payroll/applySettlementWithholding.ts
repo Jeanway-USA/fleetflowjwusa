@@ -28,6 +28,31 @@ export interface ApplyWithholdingSummary {
 }
 
 /**
+ * Re-adds the year-to-date figures on a statement once its real withholding is in. They were first worked out
+ * with a placeholder withholding rate, so YTD net would otherwise stay a little off. Archived statements are
+ * left out, the same as everywhere else.
+ */
+async function refreshYtd(orgId: string, driverId: string, settlementId: string, periodEnd: string) {
+  const year = periodEnd.slice(0, 4);
+  const { data, error } = await supabase
+    .from('driver_settlements')
+    .select('gross_pay, reimbursements, deductions, net_pay')
+    .eq('org_id', orgId)
+    .eq('driver_id', driverId)
+    .is('deleted_at', null)
+    .gte('period_end', `${year}-01-01`)
+    .lte('period_end', periodEnd);
+  if (error) throw error;
+  const sum = (pick: (r: { gross_pay: number | null; reimbursements: number | null; deductions: number | null; net_pay: number | null }) => number | null) =>
+    Math.round((data ?? []).reduce((s, r) => s + (Number(pick(r)) || 0), 0) * 100) / 100;
+  const { error: updateError } = await supabase
+    .from('driver_settlements')
+    .update({ ytd_gross: sum((r) => r.gross_pay), ytd_reimbursements: sum((r) => r.reimbursements), ytd_deductions: sum((r) => r.deductions), ytd_net: sum((r) => r.net_pay) })
+    .eq('id', settlementId);
+  if (updateError) throw updateError;
+}
+
+/**
  * Applies automatic W-2 withholding to freshly generated settlements.
  *
  * Contractor / lease-purchase drivers are left untouched (no withholding).
@@ -74,6 +99,8 @@ export async function applyW2WithholdingToSettlements(
       })
       .eq('id', row.id);
     if (error) throw error;
+
+    await refreshYtd(ctx.orgId, row.driver_id, row.id, row.period_end);
 
     w2Count += 1;
     totalWithheld += result.totalEmployeeWithholding;

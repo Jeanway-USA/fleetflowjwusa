@@ -112,10 +112,10 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
         <Link to={partsPath} className="mt-2 inline-block text-xs font-medium text-primary hover:underline">Open the parts room</Link>
       </Block>
 
-      <Block icon={Wallet} title="This month">
+      <Block icon={Wallet} title="Costs">
         <dl className="grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-xl bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Spent on the fleet</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cost.data == null ? '—' : money(cost.data)}</dd></div>
-          <div className="rounded-xl bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Cost per mile</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cpm.data == null ? '—' : `$${cpm.data.toFixed(3)}`}</dd></div>
+          <div className="rounded-xl bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Spent this month</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cost.data == null ? '—' : money(cost.data)}</dd></div>
+          <div className="rounded-xl bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Per mile, all time</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cpm.data == null ? '—' : `$${cpm.data.toFixed(3)}`}</dd></div>
         </dl>
       </Block>
 

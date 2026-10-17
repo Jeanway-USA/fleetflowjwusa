@@ -30,6 +30,7 @@ import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
 import { useSettlementDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
 import { SettlementPackageNote } from '@/components/settings/pay-packages/SettlementPackageNote';
+import { fetchSettlementSnapshot } from '@/lib/pay-packages/api';
 import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
 import { PayBreakdown as PayBreakdownPanel } from '@/components/finance/payroll/PayBreakdown';
 import type { TaxAuditSnapshot } from '@/lib/payroll/types';
@@ -102,6 +103,15 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
     queryKey: ['settlement_breakdown', settlementId, driverProfile?.pay_type],
     queryFn: () => fetchPayBreakdown(settlement, driverProfile ?? null),
     enabled: !!settlement && !!driverProfile,
+  });
+
+  // Paid under a pay package: the package's own lines are the explanation, so the older per-load pay-type
+  // calculation below must not be shown beside it (it would contradict the amount actually paid).
+  const { data: packageSnapshot } = useQuery({
+    queryKey: ['pay-packages', 'snapshot', settlementId],
+    queryFn: () => fetchSettlementSnapshot(settlementId!),
+    enabled: open,
+    retry: false,
   });
 
   const driver = settlement ? driverMap.get(settlement.driver_id) : null;
@@ -280,7 +290,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               </CardContent>
             </Card>
 
-            <EarningsBreakdown breakdown={breakdown} />
+            {!packageSnapshot && <EarningsBreakdown breakdown={breakdown} />}
 
             <LineItemsSplit
               items={items as any[]}
