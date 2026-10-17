@@ -8,7 +8,7 @@ export type LineGroup = 'advance' | 'cost' | 'credit';
 
 export type LineVerdict =
   /** Not a cost: leave it out, or archive it if it was already imported. */
-  | { action: 'skip'; group: 'total' | 'reversal'; reason: string }
+  | { action: 'skip'; group: 'total' | 'reversal' | 'label'; reason: string }
   /** A real line, filed under the wrong type. */
   | { action: 'retype'; toType: string; group: LineGroup; reason: string };
 
@@ -56,6 +56,11 @@ export function classifyStatementLine(description: string | null | undefined): L
   const text = String(description ?? '').trim();
   if (!text) return null;
   if (/^total$/i.test(text)) return { action: 'skip', group: 'total', reason: 'A statement total, not a charge.' };
+  // The contractor statement prints "GROSS COST $33.98" and "NO SUBSIDY" under a charge to explain it. They carry
+  // the neighbouring line's amount, so read as charges they would count that money twice.
+  if (/^(gross\s*cost\b|no\s*subsidy\b)/i.test(text)) {
+    return { action: 'skip', group: 'label', reason: 'A note printed under a charge on the statement, not a charge of its own.' };
+  }
   if (REVENUE_LINE_PATTERNS.some((p) => p.test(text))) {
     return { action: 'skip', group: 'reversal', reason: 'A revenue line reversed when the freight bill was revised. Your loads already carry the settled amounts.' };
   }

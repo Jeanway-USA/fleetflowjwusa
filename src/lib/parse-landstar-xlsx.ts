@@ -18,6 +18,7 @@ interface ExtractedExpense {
   is_discount: boolean;
   is_reimbursement: boolean;
   is_advance: boolean;
+  advance_return?: boolean;
 }
 
 interface ParsedStatement {
@@ -164,7 +165,9 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
       const amt = parseAmount(row['Transaction Amt'] ?? 0);
       if (trip && trip !== '0') revenueLines.push({ trip, description, code, amount: amt, delivery: null, lane: null });
     }
-    if (hasCodeColumn && code !== 'B' && code !== 'V') continue;
+    // Code 8 is mostly toll credits, but a UA or VOID card pre-trip line is Landstar paying an advance back.
+    const advanceReturn8 = code === '8' && ADVANCE_PATTERNS.some(p => p.test(description));
+    if (hasCodeColumn && code !== 'B' && code !== 'V' && !advanceReturn8) continue;
 
     // Skip general revenue/income lines entirely
     if (REVENUE_IGNORE_PATTERNS.some(p => p.test(description))) continue;
@@ -216,6 +219,9 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
       is_discount: isDiscount,
       is_reimbursement: isReimb,
       is_advance: isAdvance,
+      // Landstar shows an advance as money taken (negative). A positive line (a UA or VOID card pre-trip) is money
+      // coming back against an advance, so it must reduce advances rather than add to them.
+      advance_return: isAdvance && amount > 0,
     });
   }
 

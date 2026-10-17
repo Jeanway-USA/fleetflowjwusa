@@ -32,6 +32,8 @@ export interface ExtractedExpense {
   is_discount: boolean;
   is_reimbursement: boolean;
   is_advance: boolean;
+  /** Landstar paid money BACK against an advance (a positive UA or VOID card pre-trip line), so it reduces advances. */
+  advance_return?: boolean;
 }
 
 export interface ExtractedRevenue {
@@ -322,6 +324,7 @@ export function reconcileDocuments(
       if (!best.gallons && item.gallons) best.gallons = item.gallons;
       if (!best.trip_number && item.trip_number) best.trip_number = item.trip_number;
       if (!best.description && item.description) best.description = item.description;
+      if (item.advance_return) best.advance_return = true;
     } else {
       deduped.push({
         ...item,
@@ -486,7 +489,7 @@ function crossCheckStatement<T extends ExtractedExpense>(pdfLines: T[], xlsxLine
       xlsxAmount: cents(x.amount) / 100,
       pdfAmount: sum / 100,
     });
-    replaced.push({ remove: group.map(({ p }) => p), add: { ...group[0].p, description: x.description, amount: Math.abs(x.amount) } });
+    replaced.push({ remove: group.map(({ p }) => p), add: { ...group[0].p, description: x.description, amount: Math.abs(x.amount), advance_return: x.advance_return } });
   }
 
   return { missingFromPdf, mismatches, replaced };
