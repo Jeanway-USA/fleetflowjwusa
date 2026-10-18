@@ -4,6 +4,7 @@ import { calculatePackagePay } from '@/lib/pay-packages/engine';
 import { assignmentOn, packageCovers, resolvePay, snapshotFor } from '@/lib/pay-packages/resolve';
 import { buildWeekInput, type PackageContext } from '@/lib/pay-packages/generate';
 import type { PayLine, PayResult } from '@/lib/pay-packages/types';
+import { isWholePayWeeks, periodPaidHours, type ShiftEntry } from '@/lib/shop/hours';
 
 const db = supabase as any;
 
@@ -83,6 +84,8 @@ export async function generateStaffStatements(args: {
     .lte('incident_date', periodEnd);
   const week = { ...buildWeekInput(loads ?? [], incidents ?? 0, periodStart, periodEnd), daysWorked: weekdaysIn(periodStart, periodEnd) };
 
+  const shifts = await fetchShifts(periodStart, periodEnd);
+
   for (const staffId of staffIds) {
     const resolved = resolvePay({
       assignments: context.assignments.filter((a) => !a.driver_id && a.user_id === staffId),
@@ -110,7 +113,17 @@ export async function generateStaffStatements(args: {
       continue;
     }
 
-    const result: PayResult = calculatePackagePay(resolved.components, week);
+    // Hourly pay comes from the shift clock. It needs whole pay weeks, and every clock entry checked.
+    const hourly = resolved.components.some((c) => c.is_active && (c.calculation_method === 'per_hour' || c.calculation_method === 'overtime_hour' || /\bhours\b|regular_hours|overtime_hours/.test(c.formula ?? '')));
+    let staffWeek = week;
+    if (hourly) {
+      if (!isWholePayWeeks(periodStart, periodEnd)) { skipped.push({ userId: staffId, reason: 'Hourly pay needs a period of whole Monday to Sunday weeks' }); continue; }
+      const paid = periodPaidHours(shifts, staffId, periodStart, periodEnd, Date.now());
+      if (paid.reviewCount > 0) { skipped.push({ userId: staffId, reason: `${paid.reviewCount} clock ${paid.reviewCount === 1 ? 'entry needs' : 'entries need'} review in the hours report first` }); continue; }
+      staffWeek = { ...week, regularHours: paid.regularHours, overtimeHours: paid.overtimeHours };
+    }
+
+    const result: PayResult = calculatePackagePay(resolved.components, staffWeek);
     if (result.lines.length === 0 || (result.taxableGross === 0 && result.nonTaxable === 0 && result.deductions === 0)) {
       skipped.push({ userId: staffId, reason: 'The package paid nothing for this period' });
       continue;
@@ -138,13 +151,27 @@ export async function generateStaffStatements(args: {
       net_pay: result.net,
       lines: result.lines,
       snapshot: snap.snapshot,
-      week,
+      week: staffWeek,
       created_by: userId,
     });
     if (insertError) throw insertError;
     created++;
   }
   return { created, skipped };
+}
+
+/** Finished shifts in a period, for hourly pay. An entry still running is left out: it is not finished yet. */
+async function fetchShifts(periodStart: string, periodEnd: string): Promise<ShiftEntry[]> {
+  const { data, error } = await db
+    .from('shift_entries')
+    .select('id, user_id, user_name, started_at, ended_at, meal_minutes, needs_review')
+    .is('archived_at', null)
+    .not('ended_at', 'is', null)
+    .gte('started_at', new Date(`${periodStart}T00:00:00`).toISOString())
+    .lt('started_at', new Date(`${periodEnd}T23:59:59`).toISOString());
+  // Hourly pay can be used before the shift clock is set up: no table means no hours, not a failed run.
+  if (error) return [];
+  return ((data ?? []) as any[]).map((r) => ({ id: r.id, userId: r.user_id, userName: r.user_name, startedAt: r.started_at, endedAt: r.ended_at, mealMinutes: Number(r.meal_minutes) || 0, needsReview: !!r.needs_review }));
 }
 
 export async function fetchStaffStatements(): Promise<StaffStatement[]> {

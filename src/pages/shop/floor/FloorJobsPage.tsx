@@ -11,6 +11,7 @@ import { useMyName, useShopActions, useShopBoard } from '@/hooks/useShop';
 import { jobTitle, laneOf, sortJobs, type ShopJob } from '@/lib/shop/board';
 import { DownChip, LANE_STYLE, PriorityTag, RunningClock, ShopEmpty, TaskBar } from '@/components/shop/shared';
 import { NewJobSheet } from '@/components/shop/NewJobSheet';
+import { ShiftClock } from '@/components/shop/ShiftClock';
 
 type View = 'mine' | 'next' | 'all';
 
@@ -78,6 +79,7 @@ export default function FloorJobsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
+      <ShiftClock touch />
       <div className="flex flex-wrap items-center gap-3">
         <div role="tablist" aria-label="Which jobs" className="flex rounded-2xl bg-muted p-1.5">
           {SEGMENTS.map((s) => (

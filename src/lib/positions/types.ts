@@ -3,7 +3,7 @@
  * Picking one only suggests these defaults; every one stays editable for the person.
  */
 
-export type AppRoleKey = 'owner' | 'payroll_admin' | 'dispatcher' | 'safety' | 'driver';
+export type AppRoleKey = 'owner' | 'payroll_admin' | 'dispatcher' | 'safety' | 'driver' | 'maintenance';
 
 export const APP_ROLE_LABELS: Record<AppRoleKey, string> = {
   owner: 'Owner',
@@ -11,6 +11,7 @@ export const APP_ROLE_LABELS: Record<AppRoleKey, string> = {
   dispatcher: 'Dispatcher',
   safety: 'Safety',
   driver: 'Driver',
+  maintenance: 'Maintenance staff',
 };
 
 /** The areas of the app a position opens. The app role decides what is actually enforced. */

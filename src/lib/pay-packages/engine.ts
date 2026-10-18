@@ -25,6 +25,9 @@ export function formulaVariables(week: PayWeekInput, base: number, earnings: num
     detention_hours: week.detentionHours,
     detention_pay: week.detentionPay,
     incidents: week.incidents,
+    hours: (week.regularHours ?? 0) + (week.overtimeHours ?? 0),
+    regular_hours: week.regularHours ?? 0,
+    overtime_hours: week.overtimeHours ?? 0,
     base,
     earnings,
   };
@@ -53,6 +56,14 @@ export function calculateComponent(
       return { amount: round2((value / 100) * week.grossRevenue), detail: `${plain(value)}% of ${money(week.grossRevenue)} billed` };
     case 'fixed_amount':
       return { amount: round2(value), detail: 'Fixed amount' };
+    case 'per_hour': {
+      const h = week.regularHours ?? 0;
+      return { amount: round2(value * h), detail: `${plain(h)} hours at ${money(value)} an hour` };
+    }
+    case 'overtime_hour': {
+      const h = week.overtimeHours ?? 0;
+      return { amount: round2(value * 1.5 * h), detail: `${plain(h)} overtime hours at 1.5 times ${money(value)} an hour (${money(round2(value * 1.5))})` };
+    }
     case 'formula': {
       try {
         const amount = round2(evaluateFormula(c.formula ?? '', formulaVariables(week, base, earnings)));

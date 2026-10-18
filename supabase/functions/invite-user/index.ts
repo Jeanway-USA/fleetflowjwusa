@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     }
 
     // Validate role
-    const validRoles = ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'];
+    const validRoles = ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver', 'maintenance'];
     if (!validRoles.includes(role)) {
       return new Response(JSON.stringify({ error: 'Invalid role' }), {
         status: 400,
@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
       dispatcher: 'Dispatcher',
       safety: 'Safety',
       driver: 'Driver',
+      maintenance: 'Maintenance',
     };
 
     // Get the requesting user's org_id

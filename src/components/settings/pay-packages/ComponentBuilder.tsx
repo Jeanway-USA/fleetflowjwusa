@@ -29,6 +29,7 @@ const unitHint: Record<string, string> = {
   usd_per_week: 'Dollars each week',
   usd_per_day: 'Dollars for each day worked',
   usd_per_mile: 'Dollars for each mile',
+  usd_per_hour: 'Dollars for each hour (the normal hourly rate; overtime is paid at 1.5 times it)',
   percent: 'Percent (for example 2 means 2%)',
 };
 
