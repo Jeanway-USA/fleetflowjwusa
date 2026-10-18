@@ -6007,6 +6007,57 @@ export type Database = {
           },
         ]
       }
+      shift_entries: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
+          created_at: string
+          ended_at: string | null
+          id: string
+          meal_minutes: number
+          meal_started_at: string | null
+          needs_review: boolean
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          auto_stopped?: boolean
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          meal_minutes?: number
+          meal_started_at?: string | null
+          needs_review?: boolean
+          org_id: string
+          started_at?: string
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          auto_stopped?: boolean
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          meal_minutes?: number
+          meal_started_at?: string | null
+          needs_review?: boolean
+          org_id?: string
+          started_at?: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       staff_pay_statements: {
         Row: {
           approved_at: string | null
@@ -6444,6 +6495,51 @@ export type Database = {
           standard_deduction?: Json
           tax_year?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      time_edit_log: {
+        Row: {
+          action: string
+          created_at: string
+          edited_by: string | null
+          entry_id: string
+          id: string
+          kind: string
+          new_ended: string | null
+          new_started: string | null
+          old_ended: string | null
+          old_started: string | null
+          org_id: string
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          edited_by?: string | null
+          entry_id: string
+          id?: string
+          kind: string
+          new_ended?: string | null
+          new_started?: string | null
+          old_ended?: string | null
+          old_started?: string | null
+          org_id: string
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          edited_by?: string | null
+          entry_id?: string
+          id?: string
+          kind?: string
+          new_ended?: string | null
+          new_started?: string | null
+          old_ended?: string | null
+          old_started?: string | null
+          org_id?: string
+          reason?: string | null
         }
         Relationships: []
       }
@@ -7165,8 +7261,13 @@ export type Database = {
       }
       work_order_time_entries: {
         Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
           ended_at: string | null
           id: string
+          needs_review: boolean
           note: string | null
           org_id: string
           started_at: string
@@ -7175,8 +7276,13 @@ export type Database = {
           work_order_id: string
         }
         Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          auto_stopped?: boolean
           ended_at?: string | null
           id?: string
+          needs_review?: boolean
           note?: string | null
           org_id: string
           started_at?: string
@@ -7185,8 +7291,13 @@ export type Database = {
           work_order_id: string
         }
         Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          auto_stopped?: boolean
           ended_at?: string | null
           id?: string
+          needs_review?: boolean
           note?: string | null
           org_id?: string
           started_at?: string
@@ -8118,6 +8229,118 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      shift_clock_in: {
+        Args: { _user_name?: string }
+        Returns: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
+          created_at: string
+          ended_at: string | null
+          id: string
+          meal_minutes: number
+          meal_started_at: string | null
+          needs_review: boolean
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shift_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shift_clock_out: {
+        Args: never
+        Returns: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
+          created_at: string
+          ended_at: string | null
+          id: string
+          meal_minutes: number
+          meal_started_at: string | null
+          needs_review: boolean
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shift_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shift_meal_end: {
+        Args: never
+        Returns: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
+          created_at: string
+          ended_at: string | null
+          id: string
+          meal_minutes: number
+          meal_started_at: string | null
+          needs_review: boolean
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shift_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shift_meal_start: {
+        Args: never
+        Returns: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
+          created_at: string
+          ended_at: string | null
+          id: string
+          meal_minutes: number
+          meal_started_at: string | null
+          needs_review: boolean
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shift_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shop_close_stale_clocks: { Args: never; Returns: number }
+      shop_edit_time: {
+        Args: {
+          _ended: string
+          _id: string
+          _kind: string
+          _meal_minutes: number
+          _reason: string
+          _started: string
+        }
+        Returns: undefined
+      }
       shop_log_part: {
         Args: {
           _part_id: string
@@ -8147,11 +8370,20 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      shop_review_time: {
+        Args: { _action: string; _id: string; _kind: string; _reason: string }
+        Returns: undefined
+      }
       shop_start_timer: {
         Args: { _user_name?: string; _work_order_id: string }
         Returns: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
           ended_at: string | null
           id: string
+          needs_review: boolean
           note: string | null
           org_id: string
           started_at: string
@@ -8169,8 +8401,13 @@ export type Database = {
       shop_stop_timer: {
         Args: { _user_name?: string }
         Returns: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          auto_stopped: boolean
           ended_at: string | null
           id: string
+          needs_review: boolean
           note: string | null
           org_id: string
           started_at: string

@@ -43,6 +43,13 @@
       "when": 1792211634081,
       "tag": "0005_allow_mechanic_position_maintenance_role",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792354871409,
+      "tag": "0006_mechanic_shift_clock_hourly_pay_uploaded",
+      "breakpoints": true
     }
   ]
 }
