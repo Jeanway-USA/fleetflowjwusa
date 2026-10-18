@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Wallet } from 'lucide-react';
 import { fetchSettlementSnapshot } from '@/lib/pay-packages/api';
 import { formatCurrency, formatDate } from '@/lib/formatters';
+import { localDateOf } from '@/lib/datetime';
 
 /**
  * Shows the pay package a settlement was paid under, exactly as it stood that week. Settlements made before pay
@@ -23,7 +24,7 @@ export function SettlementPackageNote({ settlementId }: { settlementId: string }
           Paid under {data.package_name ?? 'a pay package'}
           {data.version_number != null && `, version ${data.version_number}`}
         </span>
-        <span className="text-xs text-muted-foreground">frozen {formatDate(data.created_at.slice(0, 10))}</span>
+        <span className="text-xs text-muted-foreground">frozen {formatDate(localDateOf(data.created_at))}</span>
       </div>
       <ul className="mt-2 divide-y">
         {(data.lines ?? []).map((l, i) => (

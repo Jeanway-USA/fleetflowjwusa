@@ -7,6 +7,7 @@ import { usePackageVersions } from '@/hooks/usePayPackages';
 import { versionAsOf } from '@/lib/pay-packages/resolve';
 import { COMPONENT_LABELS, METHOD_LABELS, type PayComponent } from '@/lib/pay-packages/types';
 import { formatDate } from '@/lib/formatters';
+import { localDateOf } from '@/lib/datetime';
 
 function amountText(c: PayComponent) {
   if (c.calculation_method === 'formula') return c.formula || 'formula';
@@ -54,7 +55,7 @@ export function PackageHistoryDialog({ packageId, name, open, onOpenChange }: { 
               onThatDay ? (
                 <div className="space-y-2 pt-1">
                   <p className="text-sm">
-                    On {formatDate(asOf)} this was <strong>version {onThatDay.version_number}</strong>, saved {formatDate(onThatDay.created_at.slice(0, 10))}.
+                    On {formatDate(asOf)} this was <strong>version {onThatDay.version_number}</strong>, saved {formatDate(localDateOf(onThatDay.created_at))}.
                   </p>
                   <ComponentList components={onThatDay.snapshot.components} />
                 </div>
@@ -72,7 +73,7 @@ export function PackageHistoryDialog({ packageId, name, open, onOpenChange }: { 
                 <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm">
                   <span className="font-medium">Version {v.version_number}</span>
                   {i === 0 && <Badge>Current</Badge>}
-                  <span className="text-muted-foreground">{formatDate(v.created_at.slice(0, 10))}</span>
+                  <span className="text-muted-foreground">{formatDate(localDateOf(v.created_at))}</span>
                   {v.change_note && <span className="truncate text-muted-foreground">· {v.change_note}</span>}
                 </summary>
                 <div className="pt-2">

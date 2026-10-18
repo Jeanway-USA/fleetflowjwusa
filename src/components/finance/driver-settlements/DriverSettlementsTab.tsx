@@ -13,6 +13,7 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { archiveWithUndo } from '@/lib/soft-delete';
+import { useSettlementPackages } from '@/hooks/usePayPackages';
 import {
   MoreHorizontal,
   CheckCircle2,
@@ -164,6 +165,7 @@ export function DriverSettlementsTab() {
     }
   };
 
+  const { data: packageBySettlement = new Map<string, string>() } = useSettlementPackages(settlements.map((s) => s.id));
   const payMethod = (drv?: Driver | null) => {
     const pt = (drv?.pay_type ?? '').toLowerCase();
     const rate = Number(drv?.pay_rate ?? 0);
@@ -214,12 +216,12 @@ export function DriverSettlementsTab() {
             <DropdownMenuItem
               className="text-destructive"
               onClick={() => {
-                if (confirm('Delete this settlement statement? This cannot be undone.')) {
+                if (confirm('Archive this settlement statement? You can undo it right after.')) {
                   deleteSettlement.mutate(st.id);
                 }
               }}
             >
-              Delete
+              Archive
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -266,7 +268,7 @@ export function DriverSettlementsTab() {
             <ul className="divide-y border-t md:hidden">
               {filtered.map((st: any) => {
                 const drv = driverMap.get(st.driver_id);
-                const method = payMethod(drv);
+                const method = packageBySettlement.get(st.id) ?? payMethod(drv);
                 return (
                   <li key={st.id} className="flex items-start gap-1 py-1 pl-4 pr-1">
                     <div className="min-w-0 flex-1 py-2">
@@ -305,7 +307,7 @@ export function DriverSettlementsTab() {
                 <tbody className="divide-y">
                   {filtered.map((st: any) => {
                     const drv = driverMap.get(st.driver_id);
-                    const method = payMethod(drv);
+                    const method = packageBySettlement.get(st.id) ?? payMethod(drv);
                     return (
                       <tr key={st.id}>
                         <td className="px-4 py-2 font-medium">{driverName(drv)}</td>

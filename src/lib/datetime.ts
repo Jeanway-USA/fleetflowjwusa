@@ -190,3 +190,8 @@ export function toLocalIso(d: Date): string {
 export function todayLocal(): string {
   return toLocalIso(new Date());
 }
+
+/** The calendar day a saved timestamp falls on in the viewer's time zone (a version saved at 8pm is that day, not the next). */
+export function localDateOf(timestamp: string): string {
+  return toLocalIso(new Date(timestamp));
+}
