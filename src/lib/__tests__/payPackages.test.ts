@@ -281,6 +281,29 @@ describe('lines that work out below zero', () => {
   });
 });
 
+describe('hourly pay methods', () => {
+  const comp = (over: Record<string, unknown>) => ({ id: 'c', component_type: 'base_pay', label: 'Hourly', calculation_method: 'per_hour', value: 30, unit: 'usd_per_hour', formula: null, is_taxable: true, is_deduction: false, sort_order: 1, is_active: true, ...over }) as any;
+  const week = { ...EMPTY_WEEK, periodStart: '2026-10-12', periodEnd: '2026-10-18', regularHours: 40, overtimeHours: 10 };
+
+  it('pays the hourly rate on regular hours and 1.5 times on overtime hours', () => {
+    const r = calculatePackagePay([comp({}), comp({ id: 'o', label: 'Overtime', calculation_method: 'overtime_hour', sort_order: 2 })], week);
+    expect(r.lines.map((l) => [l.label, l.amount])).toEqual([['Hourly', 1200], ['Overtime', 450]]);
+    expect(r.taxableGross).toBe(1650);
+    expect(r.lines[1].detail).toContain('1.5 times');
+  });
+
+  it('pays nothing for hours when none were worked', () => {
+    const r = calculatePackagePay([comp({}), comp({ id: 'o', calculation_method: 'overtime_hour', sort_order: 2 })], { ...EMPTY_WEEK });
+    expect(r.taxableGross).toBe(0);
+  });
+
+  it('lets a formula use hours, regular_hours and overtime_hours', () => {
+    const r = calculatePackagePay([comp({ calculation_method: 'formula', formula: 'regular_hours * 30 + overtime_hours * 45 + (hours > 45 ? 100 : 0)' })], week);
+    expect(r.lines[0].amount).toBe(1750);
+    expect(r.lines[0].error).toBeUndefined();
+  });
+});
+
 describe('when a version counts from', () => {
   const evening: PayPackageVersion = {
     id: 'v-eve', package_id: 'p1', version_number: 2, change_note: null,

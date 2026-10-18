@@ -26,6 +26,8 @@ export const CALCULATION_METHODS = [
   'percentage_of_gross',
   'fixed_amount',
   'formula',
+  'per_hour',
+  'overtime_hour',
 ] as const;
 export type CalculationMethod = (typeof CALCULATION_METHODS)[number];
 
@@ -146,6 +148,9 @@ export interface PayWeekInput {
   detentionPay: number;
   /** Safety incidents in the period, for bonus formulas. */
   incidents: number;
+  /** Paid shift hours in the period, straight time (up to 40 a week) and overtime (over 40 a week). Staff on the shift clock only. */
+  regularHours?: number;
+  overtimeHours?: number;
 }
 
 export interface PayLine {
@@ -210,6 +215,8 @@ export const METHOD_LABELS: Record<CalculationMethod, string> = {
   percentage_of_gross: 'Percent of everything billed',
   fixed_amount: 'One fixed amount',
   formula: 'Formula',
+  per_hour: 'Hourly rate (hours up to 40 a week)',
+  overtime_hour: 'Overtime (1.5 times the hourly rate)',
 };
 
 /** The unit a value is read in, for each method. */
@@ -221,6 +228,8 @@ export const METHOD_UNITS: Record<CalculationMethod, string> = {
   percentage_of_gross: 'percent',
   fixed_amount: 'usd',
   formula: 'usd',
+  per_hour: 'usd_per_hour',
+  overtime_hour: 'usd_per_hour',
 };
 
 export const FORMULA_VARIABLES: Array<{ name: string; meaning: string }> = [
@@ -233,6 +242,9 @@ export const FORMULA_VARIABLES: Array<{ name: string; meaning: string }> = [
   { name: 'detention_hours', meaning: 'Detention hours' },
   { name: 'detention_pay', meaning: 'Detention billed' },
   { name: 'incidents', meaning: 'Safety incidents in the period' },
+  { name: 'hours', meaning: 'Paid shift hours (straight time plus overtime)' },
+  { name: 'regular_hours', meaning: 'Paid shift hours up to 40 a week' },
+  { name: 'overtime_hours', meaning: 'Paid shift hours over 40 a week' },
   { name: 'base', meaning: 'Total of the base pay lines above this one' },
   { name: 'earnings', meaning: 'Total of every earning line above this one' },
 ];

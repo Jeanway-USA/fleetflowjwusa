@@ -21,14 +21,14 @@ async function tolerant<T>(run: () => PromiseLike<{ data: T[] | null; error: unk
 
 export interface ShopTask { id: string; work_order_id: string; label: string; is_done: boolean; done_at: string | null; done_by_name: string | null; sort_order: number; hidden_at: string | null }
 export interface ShopPart { id: string; work_order_id: string; part_id: string | null; part_name: string; part_number: string | null; quantity: number; unit_cost: number; logged_by_name: string | null; logged_at: string; voided_at: string | null }
-export interface ShopTime { id: string; work_order_id: string; user_id: string; user_name: string | null; started_at: string; ended_at: string | null }
+export interface ShopTime { id: string; work_order_id: string; user_id: string; user_name: string | null; started_at: string; ended_at: string | null; archived_at?: string | null }
 export interface ShopEvent { id: string; work_order_id: string; kind: string; body: string | null; photo_path: string | null; user_name: string | null; created_at: string }
 
 function buildJobs(workOrders: any[], tasks: ShopTask[], parts: ShopPart[], times: ShopTime[]): ShopJob[] {
   return workOrders.map((wo) => {
     const myTasks = tasks.filter((t) => t.work_order_id === wo.id && !t.hidden_at);
     const myParts = parts.filter((p) => p.work_order_id === wo.id && !p.voided_at);
-    const myTime = times.filter((t) => t.work_order_id === wo.id);
+    const myTime = times.filter((t) => t.work_order_id === wo.id && !t.archived_at);
     const running = myTime.find((t) => !t.ended_at) ?? null;
     const serviceTypes: string[] = wo.service_types && wo.service_types.length > 0 ? wo.service_types : wo.service_type ? [wo.service_type] : [];
     const truck = wo.trucks ?? {};
@@ -136,7 +136,7 @@ export function useShopJob(id: string | undefined) {
         tolerant<ShopTime>(() => db.from('work_order_time_entries').select('*').eq('work_order_id', id).order('started_at', { ascending: false })),
         tolerant<ShopEvent>(() => db.from('work_order_events').select('*').eq('work_order_id', id).order('created_at', { ascending: false }).limit(100)),
       ]);
-      return { job: buildJobs([wo], tasks.rows, parts.rows, time.rows)[0], raw: wo, tasks: tasks.rows, parts: parts.rows, time: time.rows, events: events.rows };
+      return { job: buildJobs([wo], tasks.rows, parts.rows, time.rows)[0], raw: wo, tasks: tasks.rows, parts: parts.rows, time: time.rows.filter((t) => !t.archived_at), events: events.rows };
     },
   });
 }

@@ -50,3 +50,9 @@ describe('suggesting from a position', () => {
     expect(suggestFromPosition(DEFAULT_POSITIONS[0], new Set()).payPackageId).toBeNull();
   });
 });
+
+describe('mechanic position', () => {
+  it('opens the account role that can use the shop floor', () => {
+    expect(DEFAULT_POSITIONS.find((p) => p.key === 'mechanic')!.default_role).toBe('maintenance');
+  });
+});

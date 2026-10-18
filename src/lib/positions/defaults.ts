@@ -55,7 +55,7 @@ export const DEFAULT_POSITIONS: PositionDraft[] = [
   {
     key: 'mechanic', name: 'Mechanic', is_builtin: true, sort_order: 6,
     description: 'Maintains and repairs the fleet.',
-    default_pay_package_id: null, default_role: null, requires_onboarding: false,
+    default_pay_package_id: null, default_role: 'maintenance', requires_onboarding: false,
     default_permissions: ['maintenance', 'fleet'],
     required_documents: W2_DOCS,
     onboarding_checklist: list('Tools and shop access arranged', 'Added to the pay package'),

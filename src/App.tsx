@@ -31,6 +31,7 @@ const MaintenanceRedirect = lazy(() => import("./pages/shop/MaintenanceRedirect"
 const ShopPartsPage = lazy(() => import("./pages/shop/ShopPartsPage"));
 const ShopPlannerPage = lazy(() => import("./pages/shop/ShopPlannerPage"));
 const ShopHistoryPage = lazy(() => import("./pages/shop/ShopHistoryPage"));
+const ShopHoursPage = lazy(() => import("./pages/shop/ShopHoursPage"));
 const ShopBoardPage = lazy(() => import("./pages/shop/ShopBoardPage"));
 const ShopJobPage = lazy(() => import("./pages/shop/ShopJobPage"));
 const FloorLayout = lazy(() => import("./components/shop/floor/FloorLayout").then((m) => ({ default: m.FloorLayout })));
@@ -252,6 +253,11 @@ const App = () => {
                     <Route path="/shop/history" element={
                       <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
                         <ShopHistoryPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/shop/hours" element={
+                      <ProtectedRoute allowedRoles={['owner']} requiredFeature="maintenance_full">
+                        <ShopHoursPage />
                       </ProtectedRoute>
                     } />
                     {/* The old maintenance addresses still work: they land on the matching shop screen */}
