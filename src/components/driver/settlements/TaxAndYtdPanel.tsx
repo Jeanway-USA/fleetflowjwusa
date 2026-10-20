@@ -1,23 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Download, FileSpreadsheet, TrendingUp, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/formatters';
 import type { SettlementRow } from '@/hooks/useDriverSettlementsPage';
-import {
-  downloadTaxDocument,
-  useMyTaxDocuments,
-} from '@/hooks/useDriverTaxDocuments';
+import { downloadTaxDocument, useMyTaxDocuments } from '@/hooks/useDriverTaxDocuments';
+import { DBtn, Panel, PanelHead, Stat, StatCell, StatRow } from '@/components/driver/ui/driver-ui';
 
 interface Props {
   settlements: SettlementRow[];
@@ -25,7 +15,7 @@ interface Props {
   ytdLoading: boolean;
 }
 
-export function TaxAndYtdPanel({ settlements, ytd, ytdLoading }: Props) {
+export function TaxAndYtdPanel({ ytd, ytdLoading }: Props) {
   const { data: taxDocs = [], isLoading: taxLoading } = useMyTaxDocuments();
 
   const years = useMemo(() => {
@@ -40,9 +30,7 @@ export function TaxAndYtdPanel({ settlements, ytd, ytdLoading }: Props) {
   // Default to newest available year once data loads
   useEffect(() => {
     if (!year && years.length > 0) setYear(String(years[0]));
-    if (year && !years.includes(Number(year))) {
-      setYear(years[0] ? String(years[0]) : '');
-    }
+    if (year && !years.includes(Number(year))) setYear(years[0] ? String(years[0]) : '');
   }, [years, year]);
 
   const hasDocs = years.length > 0;
@@ -63,147 +51,52 @@ export function TaxAndYtdPanel({ settlements, ytd, ytdLoading }: Props) {
     }
   };
 
-
   return (
-    <div className="space-y-4">
-      {/* 1099 Tax Statements */}
-      <Card className="card-elevated">
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-              <FileSpreadsheet className="h-4 w-4 text-primary" />
+    <div className="space-y-3">
+      <Panel>
+        <PanelHead title={`${new Date().getFullYear()} so far`} aside={`As of ${format(new Date(), 'MMM d, h:mm a')}`} />
+        {ytdLoading || !ytd ? (
+          <div className="space-y-2 px-4 pb-4"><Skeleton className="h-12 w-full" /></div>
+        ) : (
+          <>
+            <div className="px-4 pb-4">
+              <p className="text-xs text-muted-foreground">Net pay</p>
+              <p className="font-condensed text-4xl font-bold tabular-nums leading-tight text-success">{formatCurrency(ytd.netYtd)}</p>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">1099 Tax Statements</p>
-              <p className="text-[11px] text-muted-foreground">
-                For 1099 owner-operators
-              </p>
-            </div>
-          </div>
+            <StatRow>
+              <StatCell><Stat label="Gross revenue">{formatCurrency(ytd.grossYtd)}</Stat></StatCell>
+              <StatCell><Stat label="Loaded miles">{ytd.milesYtd.toLocaleString()}</Stat></StatCell>
+            </StatRow>
+          </>
+        )}
+      </Panel>
 
-          <div className="space-y-2">
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">
-              Tax Year
-            </label>
-            {taxLoading ? (
-              <Skeleton className="h-10 w-full" />
-            ) : (
-              <Select
-                value={year}
-                onValueChange={setYear}
-                disabled={!hasDocs}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={hasDocs ? 'Select year' : 'No forms available'}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={handle1099Download}
-            disabled={!hasDocs || !year || downloading || taxLoading}
-          >
-            {downloading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            {hasDocs && year
-              ? `Download 1099-NEC (${year})`
-              : 'Download 1099-NEC'}
-          </Button>
-
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+      <Panel>
+        <PanelHead title="1099 tax statements" aside="Owner-operators" />
+        <div className="space-y-3 px-4 pb-4">
+          {taxLoading ? (
+            <Skeleton className="h-11 w-full" />
+          ) : (
+            <Select value={year} onValueChange={setYear} disabled={!hasDocs}>
+              <SelectTrigger className="h-11" aria-label="Tax year">
+                <SelectValue placeholder={hasDocs ? 'Select year' : 'No forms available'} />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          <DBtn tone="secondary" size="lg" className="w-full" onClick={handle1099Download} disabled={!hasDocs || !year || downloading || taxLoading}>
+            {downloading ? <Loader2 className="animate-spin" /> : <Download />}
+            {hasDocs && year ? `Download 1099-NEC (${year})` : 'Download 1099-NEC'}
+          </DBtn>
+          <p className="text-xs leading-relaxed text-muted-foreground">
             {hasDocs
               ? '1099-NEC forms are issued each January for the prior tax year. Contact dispatch if you need a correction.'
               : "Your administrator hasn't uploaded a 1099 yet. You'll be notified when one is available."}
           </p>
-
-        </CardContent>
-      </Card>
-
-      {/* YTD Snapshot */}
-      <Card className="card-elevated">
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-9 w-9 rounded-lg bg-success/10 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-success" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  Year-to-Date Snapshot
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {new Date().getFullYear()} totals
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {ytdLoading || !ytd ? (
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <YtdRow label="YTD Gross Revenue" value={formatCurrency(ytd.grossYtd)} />
-              <YtdRow
-                label="YTD Loaded Miles"
-                value={`${ytd.milesYtd.toLocaleString()} mi`}
-              />
-              <YtdRow
-                label="YTD Net Pay"
-                value={formatCurrency(ytd.netYtd)}
-                emphasis
-              />
-            </div>
-          )}
-
-          <p className="text-[10px] text-muted-foreground tabular-nums">
-            As of {format(new Date(), 'MMM d, yyyy h:mm a')}
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function YtdRow({
-  label,
-  value,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
-      <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p
-        className={
-          emphasis
-            ? 'text-lg font-bold text-success tabular-nums'
-            : 'text-base font-semibold text-foreground tabular-nums'
-        }
-      >
-        {value}
-      </p>
+        </div>
+      </Panel>
     </div>
   );
 }

@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type OfflineActionType = 'load_status_update' | 'fuel_receipt' | 'driver_hos_update';
+export type OfflineActionType = 'load_status_update' | 'fuel_receipt' | 'driver_hos_update' | 'stop_confirm';
 
 export interface OfflineAction {
   id: string;
@@ -12,6 +12,12 @@ export interface OfflineAction {
 }
 
 const QUEUE_KEY = 'offline_action_queue';
+
+/**
+ * One sync at a time for the whole app. Several screens each hold their own copy of this hook, and every copy hears
+ * the phone come back online; without a shared guard they would all send the same saved actions at once.
+ */
+let syncInFlight = false;
 
 function getQueue(): OfflineAction[] {
   try {
@@ -119,6 +125,21 @@ async function processAction(action: OfflineAction): Promise<void> {
       if (error) throw error;
       break;
     }
+    case 'stop_confirm': {
+      if (!isPlainObject(action.payload)) throw new Error('Invalid payload');
+      const id = action.payload.id;
+      const hos = action.payload.remaining_hos;
+      const at = action.payload.completed_at;
+      if (typeof id !== 'string' || !UUID_RE.test(id)) throw new Error('Invalid stop id');
+      if (typeof hos !== 'number' || !Number.isFinite(hos) || hos < 0 || hos > 11) throw new Error('Invalid hours');
+      if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) throw new Error('Invalid timestamp');
+      const { error } = await supabase
+        .from('load_intermediate_stops')
+        .update({ status: 'completed', remaining_hos: hos, completed_at: at })
+        .eq('id', id);
+      if (error) throw error;
+      break;
+    }
     case 'driver_hos_update': {
       if (!isPlainObject(action.payload)) throw new Error('Invalid payload');
       const id = action.payload.id;
@@ -151,7 +172,6 @@ export function useOfflineQueue() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(() => getQueue().length);
   const [isSyncing, setIsSyncing] = useState(false);
-  const syncingRef = useRef(false);
 
   const enqueue = useCallback((type: OfflineActionType, payload: Record<string, unknown>) => {
     const queue = getQueue();
@@ -169,11 +189,11 @@ export function useOfflineQueue() {
   }, []);
 
   const syncAll = useCallback(async () => {
-    if (!navigator.onLine || syncingRef.current) return;
+    if (!navigator.onLine || syncInFlight) return;
     const queue = getQueue();
     if (queue.length === 0) return;
 
-    syncingRef.current = true;
+    syncInFlight = true;
     setIsSyncing(true);
 
     let successCount = 0;
@@ -193,7 +213,7 @@ export function useOfflineQueue() {
 
     saveQueue(remaining);
     setPendingCount(remaining.length);
-    syncingRef.current = false;
+    syncInFlight = false;
     setIsSyncing(false);
 
     if (successCount > 0) {

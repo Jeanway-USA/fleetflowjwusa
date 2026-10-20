@@ -1,134 +1,31 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRight, CheckCircle2, Loader2, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
-import { 
-  MapPin, 
-  Calendar, 
-  Route, 
-  DollarSign, 
-  FileText,
-  CheckCircle,
-  Truck,
-  Clock,
-  Package
-} from 'lucide-react';
-import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
+import { StopTime } from '@/components/shared/StopTime';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 import { calculateLoadPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
-import { StartingOdometerDialog } from './StartingOdometerDialog';
-import { EndingOdometerDialog } from './EndingOdometerDialog';
+import { useLoadProgress } from '@/hooks/useLoadProgress';
+import { appointmentText, condensedAddress, statusLabel } from '@/lib/driver/load';
+import { Chip, DBtn, Note, Panel, Segmented, Stat, StatCell, StatRow } from '@/components/driver/ui/driver-ui';
+import { LoadDetailsSheet, type DetailsLoad } from './LoadDetailsSheet';
+import { LoadProgressDialogs } from './LoadProgressDialogs';
 
-
-
-// Status progression for drivers
-const STATUS_PROGRESSION: Record<string, string> = {
-  'pending': 'assigned',
-  'assigned': 'loading',
-  'loading': 'in_transit',
-  'in_transit': 'delivered',
-};
-
-// Get next status button label
-const getProgressButtonLabel = (status: string): string => {
-  switch (status) {
-    case 'pending': return 'Accept Load';
-    case 'assigned': return 'Arrived at Pickup';
-    case 'loading': return 'Loaded & Departing';
-    case 'in_transit': return 'Mark Delivered';
-    default: return '';
-  }
-};
-
-// Get status color classes
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case 'pending': return 'bg-amber-500';
-    case 'assigned': return 'bg-blue-500';
-    case 'loading': return 'bg-purple-500';
-    case 'in_transit': return 'bg-emerald-500';
-    case 'delivered': return 'bg-success';
-    case 'cancelled': return 'bg-destructive';
-    default: return 'bg-muted';
-  }
-};
-
-// Get status label
-const getStatusLabel = (status: string): string => {
-  switch (status) {
-    case 'pending': return 'Pending';
-    case 'assigned': return 'Assigned';
-    case 'loading': return 'Loading';
-    case 'in_transit': return 'In Transit';
-    case 'delivered': return 'Delivered';
-    case 'cancelled': return 'Cancelled';
-    default: return status;
-  }
-};
-
-// Condense address to City, State
-function getCondensedAddress(address: string): string {
-  if (!address) return '-';
-  const parts = address.split(',').map(p => p.trim()).filter(Boolean);
-  
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const match = parts[i].match(/\b([A-Z]{2})\b/);
-    if (match) {
-      const state = match[1];
-      const city = i > 0 ? parts[i - 1] : '';
-      return city ? `${city}, ${state}` : state;
-    }
-  }
-  
-  return parts[0] || address;
-}
-
-// Format date for display
-const formatDate = (date: string | null) => {
-  if (!date) return '-';
-  return format(parseISO(date), 'MMM d, yyyy');
-};
-
-// Format currency
-const formatCurrency = (value: number | null) => {
-  if (value === null || value === undefined) return '$0.00';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-};
-
-interface Load {
-  id: string;
-  landstar_load_id: string | null;
-  origin: string;
-  destination: string;
-  pickup_date: string | null;
-  pickup_time: string | null;
-  pickup_end_time?: string | null;
-  pickup_time_type: string | null;
-  delivery_date: string | null;
-  delivery_time: string | null;
-  delivery_end_time?: string | null;
-  delivery_time_type: string | null;
-  status: string;
-  booked_miles: number | null;
+interface Load extends DetailsLoad {
   rate: number | null;
   fuel_surcharge: number | null;
-  notes: string | null;
   driver_id: string | null;
   start_miles?: number | null;
   end_miles?: number | null;
-  pickup_number: string | null;
-  trailer_id: string | null;
-  trailers?: { unit_number: string | null } | null;
+  pod_required?: boolean;
 }
+
+const money = (value: number | null) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value ?? 0);
+const chipTone = (status: string) =>
+  status === 'in_transit' ? 'active' : status === 'delivered' ? 'good' : status === 'cancelled' ? 'bad' : status === 'loading' ? 'warn' : 'neutral';
 
 interface DriverLoadCardProps {
   load: Load;
@@ -139,337 +36,96 @@ interface DriverLoadCardProps {
 
 function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [startOdometerOpen, setStartOdometerOpen] = useState(false);
-  const [endOdometerOpen, setEndOdometerOpen] = useState(false);
-
-  const canProgress = STATUS_PROGRESSION[load.status] !== undefined;
-  const nextStatus = STATUS_PROGRESSION[load.status];
-
-  // Calculate estimated pay via single source of truth
+  const progress = useLoadProgress(load, onStatusUpdate);
   const paySettings = usePaySettings();
-  const estimatedPay = calculateLoadPay(
-    load as any,
-    { pay_type: payType, pay_rate: payRate },
-    paySettings,
-  ).total;
+  const breakdown = calculateLoadPay(load as any, { pay_type: payType, pay_rate: payRate }, paySettings);
+  const payLabel = breakdown.payType === 'flat' ? 'Accessorials' : 'Est. pay';
+  const payText = breakdown.payType === 'flat' ? (breakdown.accessorialsTotal > 0 ? `+${money(breakdown.accessorialsTotal)}` : '-') : money(breakdown.total);
 
-  const handleProgressStatus = async () => {
-    if (!nextStatus) return;
-
-    // Intercept: starting a load — capture odometer first.
-    if (nextStatus === 'in_transit') {
-      setStartOdometerOpen(true);
-      return;
-    }
-
-    // Intercept: completing a load — capture ending odometer.
-    if (nextStatus === 'delivered') {
-      setEndOdometerOpen(true);
-      return;
-    }
-
-    setIsUpdating(true);
-    try {
-      const { error } = await supabase
-        .from('fleet_loads')
-        .update({ status: nextStatus })
-        .eq('id', load.id);
-
-      if (error) throw error;
-
-      toast.success(`Load status updated to ${getStatusLabel(nextStatus)}`);
-      onStatusUpdate();
-    } catch (error: any) {
-      toast.error('Failed to update status');
-      console.error(error);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
+  const heading = load.status === 'in_transit' ? 'delivery' : 'pickup';
+  const appt = load.status === 'in_transit'
+    ? appointmentText(load.delivery_time_type, load.delivery_time, load.delivery_end_time)
+    : appointmentText(load.pickup_time_type, load.pickup_time, load.pickup_end_time);
 
   return (
-    <>
-      <Card className="overflow-hidden">
-        {/* Status bar */}
-        <div className={`h-2 ${getStatusColor(load.status)}`} />
-        
-        <CardContent className="p-4 space-y-3">
-          {/* Load ID and Status */}
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-sm font-medium">
-              Load #{load.landstar_load_id || 'N/A'}
+    <Panel>
+      <div className="flex items-center justify-between gap-3 px-4 pt-4">
+        <span className="text-sm text-muted-foreground">Load {load.landstar_load_id || 'N/A'}</span>
+        <Chip tone={chipTone(load.status)}>{statusLabel(load.status)}</Chip>
+      </div>
+
+      <div className="px-4 pb-4 pt-2">
+        <p className="flex flex-wrap items-center gap-x-2 font-condensed text-3xl font-bold leading-tight">
+          <span title={load.origin}>{condensedAddress(load.origin)}</span>
+          <ArrowRight className="h-6 w-6 shrink-0 text-muted-foreground" aria-label="to" />
+          <span title={load.destination}>{condensedAddress(load.destination)}</span>
+        </p>
+
+        {load.status === 'cancelled' ? null : load.status === 'delivered' ? (
+          <p className="mt-1.5 text-sm font-medium text-success">{getRelativeTimestamp(load.delivery_date, null)}</p>
+        ) : (
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            <span className="capitalize">{heading}</span>:{' '}
+            <span className="font-medium text-foreground">
+              <StopTime
+                utcIso={heading === 'delivery' ? load.delivery_at : load.pickup_at}
+                tz={heading === 'delivery' ? load.delivery_tz : load.pickup_tz}
+                legacyDate={heading === 'delivery' ? load.delivery_date : load.pickup_date}
+                legacyTime={heading === 'delivery' ? load.delivery_time : load.pickup_time}
+                legacyEndTime={heading === 'delivery' ? load.delivery_end_time : load.pickup_end_time}
+                withDate
+                hideSecondary
+              />
             </span>
-            <Badge variant="outline" className="text-xs">
-              {getStatusLabel(load.status)}
-            </Badge>
+            {appt ? `, ${appt.label.toLowerCase()}` : ''}
+          </p>
+        )}
+
+        {['pending', 'assigned', 'loading'].includes(load.status) && load.pickup_number && (
+          <div className="mt-3 rounded-lg bg-carbon/20 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Pickup number</p>
+            <p className="font-mono text-lg font-semibold tabular-nums">{load.pickup_number}</p>
           </div>
+        )}
+        {(load.trailers?.unit_number || load.trailer_id) && (
+          <p className="mt-2 text-sm text-muted-foreground">Trailer <span className="font-mono font-medium text-foreground">{load.trailers?.unit_number || 'assigned'}</span></p>
+        )}
+      </div>
 
-          {/* Route */}
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="h-4 w-4 text-primary shrink-0" />
-            <span className="font-medium">{getCondensedAddress(load.origin)}</span>
-            <span className="text-muted-foreground">→</span>
-            <span className="font-medium">{getCondensedAddress(load.destination)}</span>
-          </div>
+      <StatRow>
+        <StatCell><Stat label="Miles">{load.booked_miles ? load.booked_miles.toLocaleString() : '-'}</Stat></StatCell>
+        <StatCell><Stat label={payLabel}>{payText}</Stat></StatCell>
+      </StatRow>
 
-          {/* PU# — high-visibility for guard-shack scanning */}
-          {load.pickup_number && (
-            <div className="inline-flex items-center gap-2 rounded-md border-2 border-orange-500 bg-orange-500/15 px-2.5 py-1 text-orange-700 dark:text-orange-300 font-bold tracking-wide shadow-sm">
-              <FileText className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase">Pickup #:</span>
-              <span className="font-mono text-sm">{load.pickup_number}</span>
-            </div>
-          )}
+      <div className="flex gap-2 border-t border-border p-3">
+        <DBtn tone="secondary" size="md" className="flex-1" onClick={() => setDetailsOpen(true)}>Details</DBtn>
+        {progress.nextStatus && (
+          <DBtn tone="primary" size="md" className="flex-[2]" onClick={progress.run} disabled={progress.isUpdating}>
+            {progress.isUpdating ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
+            {progress.isUpdating ? 'Updating' : progress.label}
+          </DBtn>
+        )}
+      </div>
 
-          {/* Trailer */}
-          {(load.trailers?.unit_number || load.trailer_id) && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Truck className="h-4 w-4 shrink-0" />
-              <span className="uppercase text-[11px] tracking-wide">Trailer:</span>
-              <span className="font-mono font-medium text-foreground">
-                {load.trailers?.unit_number || 'Assigned'}
-              </span>
-            </div>
-          )}
-
-          {/* Date & Time - Show relative for delivered, hide time for cancelled */}
-          {!['cancelled'].includes(load.status) && (
-            <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 shrink-0" />
-                {load.status === 'delivered' ? (
-                  <span className="text-success font-medium">
-                    {getRelativeTimestamp(load.delivery_date, null)}
-                  </span>
-                ) : load.status === 'in_transit' ? (
-                  <span>Delivery: {formatDate(load.delivery_date)}</span>
-                ) : (
-                  <span>Pickup: {formatDate(load.pickup_date)}</span>
-                )}
-              </div>
-              {load.status !== 'delivered' && (
-                <div className="pl-6">
-                  {load.status === 'in_transit' ? (
-                    load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} endTime={load.delivery_end_time} variant="driver" />
-                  ) : (
-                    load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="driver" />
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Miles and Estimated Pay */}
-          <div className="flex items-center justify-between pt-2 border-t">
-            <div className="flex items-center gap-2 text-sm">
-              <Route className="h-4 w-4 text-muted-foreground" />
-              <span>{load.booked_miles?.toLocaleString() || 0} mi</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm font-medium text-success">
-              <DollarSign className="h-4 w-4" />
-              <span>Est. {formatCurrency(estimatedPay)}</span>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1"
-              onClick={() => setDetailsOpen(true)}
-            >
-              <FileText className="h-4 w-4 mr-1" />
-              Load Details
-            </Button>
-            {canProgress && (
-              <Button 
-                size="sm" 
-                className="flex-1"
-                onClick={handleProgressStatus}
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <>
-                    <Clock className="h-4 w-4 mr-1 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    {getProgressButtonLabel(load.status)}
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Load Details Dialog */}
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Load #{load.landstar_load_id || 'N/A'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Status */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Status</span>
-              <Badge className={`${getStatusColor(load.status)} text-white`}>
-                {getStatusLabel(load.status)}
-              </Badge>
-            </div>
-
-            {/* Origin */}
-            <div className="space-y-1">
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3" /> Origin
-              </span>
-              <p className="text-sm font-medium">{load.origin}</p>
-            </div>
-
-            {/* Destination */}
-            <div className="space-y-1">
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3" /> Destination
-              </span>
-              <p className="text-sm font-medium">{load.destination}</p>
-            </div>
-
-            {/* PU# + Trailer */}
-            {(load.pickup_number || load.trailers?.unit_number || load.trailer_id) && (
-              <div className="grid grid-cols-2 gap-4">
-                {load.pickup_number && (
-                  <div className="space-y-1">
-                    <span className="text-sm text-muted-foreground flex items-center gap-1">
-                      <FileText className="h-3 w-3" /> Pickup #
-                    </span>
-                    <div className="inline-flex items-center rounded-md border-2 border-orange-500 bg-orange-500/15 px-2 py-0.5 text-orange-700 dark:text-orange-300 font-bold">
-                      <span className="font-mono text-sm">{load.pickup_number}</span>
-                    </div>
-                  </div>
-                )}
-                {(load.trailers?.unit_number || load.trailer_id) && (
-                  <div className="space-y-1">
-                    <span className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Truck className="h-3 w-3" /> Trailer
-                    </span>
-                    <p className="text-sm font-mono font-medium">
-                      {load.trailers?.unit_number || 'Assigned'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Dates & Times */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Pickup
-                </span>
-                <p className="text-sm font-medium">{formatDate(load.pickup_date)}</p>
-                {load.pickup_time && (
-                  <p className="text-xs text-primary font-medium">
-                    {load.pickup_time_type === 'window' && load.pickup_end_time
-                      ? `${load.pickup_time} - ${load.pickup_end_time}`
-                      : load.pickup_time}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Delivery
-                </span>
-                <p className="text-sm font-medium">{formatDate(load.delivery_date)}</p>
-                {load.delivery_time && (
-                  <p className="text-xs text-primary font-medium">
-                    {load.delivery_time_type === 'window' && load.delivery_end_time
-                      ? `${load.delivery_time} - ${load.delivery_end_time}`
-                      : load.delivery_time}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Miles and Pay */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Route className="h-3 w-3" /> Booked Miles
-                </span>
-                <p className="text-sm font-medium">{load.booked_miles?.toLocaleString() || 0}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <DollarSign className="h-3 w-3" /> Estimated Pay
-                </span>
-                <p className="text-sm font-medium text-success">{formatCurrency(estimatedPay)}</p>
-              </div>
-            </div>
-
-            {/* Notes */}
-            {load.notes && (
-              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-                <p className="text-xs text-warning font-medium uppercase tracking-wide mb-2">
-                  Special Instructions
-                </p>
-                <div className="max-h-40 overflow-y-auto pr-3">
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{load.notes}</p>
-                </div>
-                <p className="text-[10px] text-warning/60 mt-1 italic">Scroll for more ↓</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Starting Odometer Intercept */}
-      <StartingOdometerDialog
-        open={startOdometerOpen}
-        onOpenChange={setStartOdometerOpen}
-        loadId={load.id}
-        loadNumber={load.landstar_load_id}
-        nextStatus="in_transit"
-        onComplete={onStatusUpdate}
-      />
-
-      {/* Ending Odometer Intercept */}
-      <EndingOdometerDialog
-        open={endOdometerOpen}
-        onOpenChange={setEndOdometerOpen}
-        loadId={load.id}
-        loadNumber={load.landstar_load_id}
-        startMiles={load.start_miles ?? null}
-        driverId={load.driver_id ?? null}
-        nextStatus="delivered"
-        onComplete={onStatusUpdate}
-      />
-    </>
+      <LoadDetailsSheet load={load} open={detailsOpen} onOpenChange={setDetailsOpen} payLabel={payLabel} payText={payText} />
+      <LoadProgressDialogs progress={progress} load={load} onStatusUpdate={onStatusUpdate} />
+    </Panel>
   );
 }
+
+type View = 'current' | 'upcoming' | 'completed';
 
 export default function DriverLoadsView() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('current');
+  const [activeTab, setActiveTab] = useState<View>('current');
 
   // Fetch driver record for current user
   const { data: driverRecord } = useQuery({
     queryKey: ['driver_record', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      const { data, error } = await supabase.from('drivers').select('*').eq('user_id', user.id).single();
       if (error) return null;
       return data;
     },
@@ -477,29 +133,24 @@ export default function DriverLoadsView() {
     staleTime: 15 * 60 * 1000,
   });
 
-  // Fetch driver's loads
+  // Fetch driver's loads, with their accessorials so the pay shown here matches the home screen.
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['driver_loads', driverRecord?.id],
     queryFn: async () => {
       if (!driverRecord?.id) return [];
       const { data, error } = await supabase
         .from('fleet_loads')
-        .select('*')
+        .select('*, load_accessorials(*)')
         .eq('driver_id', driverRecord.id)
         .is('deleted_at', null);
       if (error) throw error;
       const rows = (data || []) as unknown as Load[];
 
       // Hydrate trailer unit numbers (no FK relationship for nested embed).
-      const trailerIds = Array.from(
-        new Set(rows.map((r) => r.trailer_id).filter((id): id is string => !!id)),
-      );
+      const trailerIds = Array.from(new Set(rows.map((r) => r.trailer_id).filter((id): id is string => !!id)));
       let trailerMap = new Map<string, string | null>();
       if (trailerIds.length > 0) {
-        const { data: trailerRows } = await supabase
-          .from('trailers')
-          .select('id, unit_number')
-          .in('id', trailerIds);
+        const { data: trailerRows } = await supabase.from('trailers').select('id, unit_number').in('id', trailerIds);
         trailerMap = new Map((trailerRows || []).map((t) => [t.id, t.unit_number]));
       }
       return rows.map((r) => ({
@@ -511,128 +162,76 @@ export default function DriverLoadsView() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Sort loads chronologically based on status
-  // For in_transit: sort by delivery_date
-  // For others: sort by pickup_date
-  // Earliest dates first
-  const sortLoadsChronologically = (loadsToSort: Load[]): Load[] => {
-    return [...loadsToSort].sort((a, b) => {
-      const dateA = a.status === 'in_transit' 
-        ? (a.delivery_date || a.pickup_date || '') 
-        : (a.pickup_date || '');
-      const dateB = b.status === 'in_transit' 
-        ? (b.delivery_date || b.pickup_date || '') 
-        : (b.pickup_date || '');
-      
-      // Parse dates for comparison
+  // Sort loads chronologically: in transit by delivery date, the rest by pickup date, earliest first.
+  const sortLoadsChronologically = (loadsToSort: Load[]): Load[] =>
+    [...loadsToSort].sort((a, b) => {
+      const dateA = a.status === 'in_transit' ? (a.delivery_date || a.pickup_date || '') : (a.pickup_date || '');
+      const dateB = b.status === 'in_transit' ? (b.delivery_date || b.pickup_date || '') : (b.pickup_date || '');
       const timeA = dateA ? new Date(dateA).getTime() : Infinity;
       const timeB = dateB ? new Date(dateB).getTime() : Infinity;
-      
-      return timeA - timeB; // Ascending order (earliest first)
+      return timeA - timeB;
     });
-  };
 
   const handleStatusUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ['driver_loads'] });
     queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+    queryClient.invalidateQueries({ queryKey: ['driver-home/loads'] });
   };
 
-  // Categorize and sort loads
-  // Current: only in_transit and loading (actively on the road)
-  const currentLoads = sortLoadsChronologically(
-    loads.filter((load: Load) => ['loading', 'in_transit'].includes(load.status))
-  );
-
-  // Upcoming: pending and assigned loads
-  const upcomingLoads = sortLoadsChronologically(
-    loads.filter((load: Load) => ['pending', 'assigned'].includes(load.status))
-  );
-
-  // Completed: sorted most recent first (reverse chronological)
-  const completedLoads = [...loads.filter((load: Load) => 
-    ['delivered', 'cancelled'].includes(load.status)
-  )].sort((a, b) => {
+  // Current: only in transit and loading (actively on the road). Upcoming: pending and assigned.
+  const currentLoads = sortLoadsChronologically(loads.filter((l: Load) => ['loading', 'in_transit'].includes(l.status)));
+  const upcomingLoads = sortLoadsChronologically(loads.filter((l: Load) => ['pending', 'assigned'].includes(l.status)));
+  // Completed: most recent first.
+  const completedLoads = [...loads.filter((l: Load) => ['delivered', 'cancelled'].includes(l.status))].sort((a, b) => {
     const dateA = a.delivery_date || a.pickup_date || '';
     const dateB = b.delivery_date || b.pickup_date || '';
-    return new Date(dateB).getTime() - new Date(dateA).getTime(); // Most recent first
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
   });
 
-  // Get driver pay info
   const payRate = driverRecord?.pay_rate || 0;
   const payType = driverRecord?.pay_type || 'per_mile';
 
   if (!driverRecord) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Package className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="font-semibold text-lg">No Driver Profile</h3>
-        <p className="text-sm text-muted-foreground max-w-sm mt-1">
-          Your account is not linked to a driver profile. Please contact your dispatcher.
-        </p>
-      </div>
+      <Panel className="px-4 py-10 text-center">
+        <Package className="mx-auto mb-3 h-10 w-10 text-muted-foreground" aria-hidden />
+        <h3 className="text-lg font-semibold">No driver profile</h3>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Your account is not linked to a driver profile. Contact your dispatcher.</p>
+      </Panel>
     );
   }
 
-  const renderLoadsList = (loadsList: Load[], emptyMessage: string) => {
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center py-12">
-          <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      );
-    }
-
-    if (loadsList.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Truck className="h-10 w-10 text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {loadsList.map((load: Load) => (
-          <DriverLoadCard
-            key={load.id}
-            load={load}
-            payRate={payRate}
-            payType={payType}
-            onStatusUpdate={handleStatusUpdate}
-          />
-        ))}
-      </div>
-    );
+  const lists: Record<View, { loads: Load[]; empty: string }> = {
+    current: { loads: currentLoads, empty: 'No current loads assigned.' },
+    upcoming: { loads: upcomingLoads, empty: 'No upcoming loads scheduled.' },
+    completed: { loads: completedLoads, empty: 'No completed loads yet.' },
   };
+  const shown = lists[activeTab];
 
   return (
-    <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="current" className="text-xs sm:text-sm">
-            Current ({currentLoads.length})
-          </TabsTrigger>
-          <TabsTrigger value="upcoming" className="text-xs sm:text-sm">
-            Upcoming ({upcomingLoads.length})
-          </TabsTrigger>
-          <TabsTrigger value="completed" className="text-xs sm:text-sm">
-            Completed ({completedLoads.length})
-          </TabsTrigger>
-        </TabsList>
+    <div className="mx-auto w-full max-w-2xl space-y-3">
+      <Segmented<View>
+        label="Which loads"
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+          { value: 'current', label: 'Current', count: currentLoads.length },
+          { value: 'upcoming', label: 'Upcoming', count: upcomingLoads.length },
+          { value: 'completed', label: 'Completed', count: completedLoads.length },
+        ]}
+      />
 
-        <TabsContent value="current" className="mt-4">
-          {renderLoadsList(currentLoads, 'No current loads assigned')}
-        </TabsContent>
-
-        <TabsContent value="upcoming" className="mt-4">
-          {renderLoadsList(upcomingLoads, 'No upcoming loads scheduled')}
-        </TabsContent>
-
-        <TabsContent value="completed" className="mt-4">
-          {renderLoadsList(completedLoads, 'No completed loads yet')}
-        </TabsContent>
-      </Tabs>
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" /></div>
+      ) : shown.loads.length === 0 ? (
+        <Panel><Note>{shown.empty}</Note></Panel>
+      ) : (
+        <div className="space-y-3">
+          {shown.loads.map((load) => (
+            <DriverLoadCard key={load.id} load={load} payRate={payRate} payType={payType} onStatusUpdate={handleStatusUpdate} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

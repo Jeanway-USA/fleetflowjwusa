@@ -1,19 +1,12 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, Loader2, FileText, CalendarDays } from 'lucide-react';
+import { Download, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/formatters';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
-import {
-  bucketDeduction,
-  netSettlement,
-  useSettlementDetail,
-  type SettlementRow,
-} from '@/hooks/useDriverSettlementsPage';
+import { bucketDeduction, netSettlement, useSettlementDetail, type SettlementRow } from '@/hooks/useDriverSettlementsPage';
+import { Chip, DBtn, Note, Panel, PanelHead } from '@/components/driver/ui/driver-ui';
 import { SettlementDonutChart, type DonutSlice } from './SettlementDonutChart';
 import { SettlementAccordions } from './SettlementAccordions';
 
@@ -29,14 +22,15 @@ function fmt(d: string) {
   }
 }
 
+const statusTone = (status: string) => (status === 'paid' ? 'good' : status === 'approved' ? 'active' : 'neutral');
+
 export function SettlementDetailPanel({ settlement }: Props) {
   const { data, isLoading } = useSettlementDetail(settlement);
   const [downloading, setDownloading] = useState(false);
 
   const slices: DonutSlice[] = useMemo(() => {
     if (!settlement || !data) return [];
-    const items = data.items;
-    const deductions = items.filter((i) => i.item_type === 'deduction');
+    const deductions = data.items.filter((i) => i.item_type === 'deduction');
     let agency = 0;
     let fuel = 0;
     let escrowDeduction = 0;
@@ -46,53 +40,25 @@ export function SettlementDetailPanel({ settlement }: Props) {
       const amt = Number(d.amount ?? 0);
       if (b === 'agency') agency += amt;
       else if (b === 'fuel_advance') fuel += amt;
-      else if (b === 'escrow' || b === 'insurance' || b === 'trailer')
-        escrowDeduction += amt;
+      else if (b === 'escrow' || b === 'insurance' || b === 'trailer') escrowDeduction += amt;
       else other += amt;
     }
     const net = netSettlement(settlement);
     return [
-      {
-        key: 'net',
-        label: 'Net Settlement',
-        value: Math.max(0, net),
-        color: 'hsl(var(--success))',
-      },
-      {
-        key: 'agency',
-        label: 'Brokerage / Agency Split',
-        value: agency,
-        color: 'hsl(var(--primary))',
-      },
-      {
-        key: 'fuel',
-        label: 'Fuel Advances',
-        value: fuel,
-        color: 'hsl(var(--destructive))',
-      },
-      {
-        key: 'deductions',
-        label: 'Deductions / Escrow',
-        value: escrowDeduction + other,
-        color: 'hsl(var(--accent))',
-      },
+      { key: 'net', label: 'Take-home pay', value: Math.max(0, net), color: 'hsl(var(--success))' },
+      { key: 'agency', label: 'Brokerage and agency split', value: agency, color: 'hsl(var(--carbon))' },
+      { key: 'fuel', label: 'Fuel advances', value: fuel, color: 'hsl(var(--destructive))' },
+      { key: 'deductions', label: 'Deductions and escrow', value: escrowDeduction + other, color: 'hsl(var(--muted-foreground))' },
     ];
   }, [data, settlement]);
 
   if (!settlement) {
     return (
-      <Card className="card-elevated h-full">
-        <CardContent className="flex flex-col items-center justify-center min-h-[400px] text-center px-6">
-          <div className="bg-muted/40 p-4 rounded-full mb-3">
-            <FileText className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <p className="text-base font-semibold text-foreground">Select a settlement</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Pick a pay statement from the list to see the full revenue and deduction
-            breakdown.
-          </p>
-        </CardContent>
-      </Card>
+      <Panel className="flex flex-col items-center px-6 py-12 text-center">
+        <FileText className="mb-3 h-9 w-9 text-muted-foreground" aria-hidden />
+        <p className="text-base font-semibold">Pick a statement</p>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">Choose a pay statement from the list to see where the money went.</p>
+      </Panel>
     );
   }
 
@@ -110,84 +76,38 @@ export function SettlementDetailPanel({ settlement }: Props) {
   };
 
   return (
-    <Card className="card-elevated h-full">
-      <CardContent className="p-6 space-y-6">
-        {/* Top bar */}
-        <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-border">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CalendarDays className="h-4 w-4" />
-              <span>
-                {fmt(settlement.period_start)} – {fmt(settlement.period_end)}
-              </span>
-              <Badge variant="outline" className="capitalize ml-1">
-                {settlement.status}
-              </Badge>
-            </div>
-            {settlement.payment_date && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Paid {fmt(settlement.payment_date)}
-              </p>
-            )}
-          </div>
-          <Button
-            onClick={handleDownload}
-            disabled={downloading}
-            className="gap-2"
-            size="lg"
-          >
-            {downloading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
+    <div className="space-y-3">
+      <Panel>
+        <div className="flex items-center justify-between gap-3 px-4 pt-4">
+          <span className="text-sm text-muted-foreground">{fmt(settlement.period_start)} to {fmt(settlement.period_end)}</span>
+          <Chip tone={statusTone(settlement.status)} className="capitalize">{settlement.status}</Chip>
+        </div>
+        <div className="px-4 pb-4 pt-2">
+          <p className="text-sm text-muted-foreground">Take-home pay</p>
+          <p className="font-condensed text-5xl font-bold leading-tight tabular-nums">{formatCurrency(net)}</p>
+          {settlement.payment_date && <p className="mt-1 text-xs text-muted-foreground">Paid {fmt(settlement.payment_date)}</p>}
+        </div>
+        <div className="border-t border-border px-4 py-4">
+          {isLoading ? <Skeleton className="h-28 w-full" /> : <SettlementDonutChart total={Number(settlement.gross_pay ?? 0)} slices={slices} />}
+        </div>
+        <div className="border-t border-border p-3">
+          <DBtn tone="secondary" size="lg" className="w-full" onClick={handleDownload} disabled={downloading}>
+            {downloading ? <Loader2 className="animate-spin" /> : <Download />}
             Download PDF
-          </Button>
+          </DBtn>
         </div>
+      </Panel>
 
-        {/* Hero net settlement */}
-        <div className="text-center py-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Take-Home Pay
-          </p>
-          <p className="text-5xl lg:text-6xl font-bold tracking-tight text-foreground tabular-nums mt-2">
-            {formatCurrency(net)}
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Net Settlement after deductions
-          </p>
-        </div>
-
-        {/* Donut chart */}
-        <div className="pt-2">
-          {isLoading ? (
-            <Skeleton className="h-[260px] w-full" />
-          ) : (
-            <SettlementDonutChart total={Number(settlement.gross_pay ?? 0)} slices={slices} />
-          )}
-        </div>
-
-        {/* Accordions */}
-        <div className="pt-2">
-          {isLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : (
-            data && (
-              <SettlementAccordions
-                settlement={settlement}
-                items={data.items}
-                loads={data.loads}
-                accessorials={data.accessorials}
-                netSettlementValue={net}
-              />
-            )
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      {isLoading ? (
+        <Panel>
+          <PanelHead title="Breakdown" />
+          <div className="space-y-3 px-4 pb-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+        </Panel>
+      ) : data ? (
+        <SettlementAccordions settlement={settlement} items={data.items} loads={data.loads} accessorials={data.accessorials} netSettlementValue={net} />
+      ) : (
+        <Panel><Note>The breakdown could not be loaded.</Note></Panel>
+      )}
+    </div>
   );
 }

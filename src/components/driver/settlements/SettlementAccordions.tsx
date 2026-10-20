@@ -1,9 +1,3 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { formatCurrency } from '@/lib/formatters';
 import {
   bucketDeduction,
@@ -14,6 +8,7 @@ import {
   type SettlementItem,
   type SettlementRow,
 } from '@/hooks/useDriverSettlementsPage';
+import { Panel, PanelHead } from '@/components/driver/ui/driver-ui';
 
 interface Props {
   settlement: SettlementRow;
@@ -23,78 +18,40 @@ interface Props {
   netSettlementValue: number;
 }
 
-function Row({
-  label,
-  amount,
-  sub,
-  emphasis,
-}: {
-  label: string;
-  amount: number;
-  sub?: string;
-  emphasis?: 'positive' | 'negative' | 'total';
-}) {
-  const color =
-    emphasis === 'positive'
-      ? 'text-success'
-      : emphasis === 'negative'
-        ? 'text-destructive'
-        : emphasis === 'total'
-          ? 'text-foreground font-semibold'
-          : 'text-foreground';
+function Line({ label, amount, sub, tone, strong }: { label: string; amount: number; sub?: string; tone?: 'plus' | 'minus'; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-      <div className="min-w-0">
-        <p className="text-sm text-foreground">{label}</p>
-        {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
-      </div>
-      <p className={`text-sm tabular-nums ${color}`}>{formatCurrency(amount)}</p>
-    </div>
+    <li className="flex min-h-12 items-center justify-between gap-3 px-4 py-2">
+      <span className="min-w-0">
+        <span className={strong ? 'block text-sm font-semibold' : 'block text-sm'}>{label}</span>
+        {sub && <span className="block text-xs text-muted-foreground">{sub}</span>}
+      </span>
+      <span className={`shrink-0 text-sm tabular-nums ${strong ? 'font-semibold' : ''} ${tone === 'plus' ? 'text-success' : tone === 'minus' ? 'text-destructive' : ''}`}>
+        {tone === 'minus' && amount > 0 ? '-' : ''}{formatCurrency(amount)}
+      </span>
+    </li>
   );
 }
 
-function sumWhere(
-  accessorials: PeriodAccessorial[],
-  re: RegExp,
-): { total: number; count: number } {
+function sumWhere(accessorials: PeriodAccessorial[], re: RegExp): { total: number; count: number } {
   const matches = accessorials.filter((a) => re.test(a.accessorial_type));
-  return {
-    total: matches.reduce((s, a) => s + Number(a.amount ?? 0), 0),
-    count: matches.length,
-  };
+  return { total: matches.reduce((s, a) => s + Number(a.amount ?? 0), 0), count: matches.length };
 }
 
-export function SettlementAccordions({
-  settlement,
-  items,
-  loads,
-  accessorials,
-  netSettlementValue,
-}: Props) {
+const lineItems = (n: number) => (n > 0 ? `${n} line item${n === 1 ? '' : 's'}` : 'None this period');
+
+/** The settlement's money in three cards: what came in, what was taken out, and the totals. */
+export function SettlementAccordions({ settlement, items, loads, accessorials, netSettlementValue }: Props) {
   const linehaul = loads.reduce((s, l) => s + Number(l.rate ?? 0), 0);
   const fsc = sumWhere(accessorials, FSC_RE);
   const detention = sumWhere(accessorials, DETENTION_RE);
   const otherAccessorials = {
-    total:
-      accessorials.reduce((s, a) => s + Number(a.amount ?? 0), 0) -
-      fsc.total -
-      detention.total,
+    total: accessorials.reduce((s, a) => s + Number(a.amount ?? 0), 0) - fsc.total - detention.total,
     count: accessorials.length - fsc.count - detention.count,
   };
-
-  const reimbursements = items
-    .filter((i) => i.item_type === 'reimbursement')
-    .reduce((s, i) => s + Number(i.amount ?? 0), 0);
+  const reimbursements = items.filter((i) => i.item_type === 'reimbursement').reduce((s, i) => s + Number(i.amount ?? 0), 0);
 
   const deductions = items.filter((i) => i.item_type === 'deduction');
-  const grouped = {
-    fuel_advance: 0,
-    trailer: 0,
-    escrow: 0,
-    insurance: 0,
-    agency: 0,
-    other: 0,
-  } as Record<string, number>;
+  const grouped = { fuel_advance: 0, trailer: 0, escrow: 0, insurance: 0, agency: 0, other: 0 } as Record<string, number>;
   for (const d of deductions) {
     const bucket = bucketDeduction(d.description);
     grouped[bucket] = (grouped[bucket] ?? 0) + Number(d.amount ?? 0);
@@ -103,107 +60,41 @@ export function SettlementAccordions({
   const grossRevenue = Number(settlement.gross_pay ?? 0);
 
   return (
-    <Accordion
-      type="multiple"
-      defaultValue={['revenue', 'deductions', 'totals']}
-      className="w-full"
-    >
-      <AccordionItem value="revenue">
-        <AccordionTrigger className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Revenue
-        </AccordionTrigger>
-        <AccordionContent>
-          <div className="px-1">
-            <Row
-              label="Booked Linehaul"
-              sub={`${loads.length} delivered load${loads.length === 1 ? '' : 's'}`}
-              amount={linehaul}
-              emphasis="positive"
-            />
-            <Row
-              label="100% Fuel Surcharge (FSC)"
-              sub={fsc.count > 0 ? `${fsc.count} line item${fsc.count === 1 ? '' : 's'}` : '—'}
-              amount={fsc.total}
-              emphasis="positive"
-            />
-            <Row
-              label="Detention / Lumpers / Stop Pay"
-              sub={
-                detention.count > 0
-                  ? `${detention.count} line item${detention.count === 1 ? '' : 's'}`
-                  : '—'
-              }
-              amount={detention.total}
-              emphasis="positive"
-            />
-            {otherAccessorials.count > 0 && (
-              <Row
-                label="Other Accessorials"
-                sub={`${otherAccessorials.count} line item${otherAccessorials.count === 1 ? '' : 's'}`}
-                amount={otherAccessorials.total}
-                emphasis="positive"
-              />
-            )}
-            {reimbursements > 0 && (
-              <Row
-                label="Reimbursements"
-                amount={reimbursements}
-                emphasis="positive"
-              />
-            )}
-          </div>
-        </AccordionContent>
-      </AccordionItem>
+    <div className="space-y-3">
+      <Panel>
+        <PanelHead title="Revenue" />
+        <ul className="divide-y divide-border">
+          <Line label="Booked linehaul" sub={`${loads.length} delivered load${loads.length === 1 ? '' : 's'}`} amount={linehaul} tone="plus" />
+          <Line label="100% fuel surcharge" sub={lineItems(fsc.count)} amount={fsc.total} tone="plus" />
+          <Line label="Detention, lumpers and stop pay" sub={lineItems(detention.count)} amount={detention.total} tone="plus" />
+          {otherAccessorials.count > 0 && <Line label="Other accessorials" sub={lineItems(otherAccessorials.count)} amount={otherAccessorials.total} tone="plus" />}
+          {reimbursements > 0 && <Line label="Reimbursements" amount={reimbursements} tone="plus" />}
+        </ul>
+      </Panel>
 
-      <AccordionItem value="deductions">
-        <AccordionTrigger className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Deductions
-        </AccordionTrigger>
-        <AccordionContent>
-          <div className="px-1">
-            <Row label="Fuel Card Advances" amount={grouped.fuel_advance} emphasis="negative" />
-            <Row label="Trailer Rental" amount={grouped.trailer} emphasis="negative" />
-            <Row
-              label="Escrow / Maintenance Reserve"
-              amount={grouped.escrow}
-              emphasis="negative"
-            />
-            <Row
-              label="Insurance (Bobtail / OccAcc)"
-              amount={grouped.insurance}
-              emphasis="negative"
-            />
-            <Row
-              label="Brokerage / Agency Split"
-              amount={grouped.agency}
-              emphasis="negative"
-            />
-            {grouped.other > 0 && (
-              <Row label="Other Deductions" amount={grouped.other} emphasis="negative" />
-            )}
-          </div>
-        </AccordionContent>
-      </AccordionItem>
+      <Panel>
+        <PanelHead title="Deductions" />
+        <ul className="divide-y divide-border">
+          <Line label="Fuel card advances" amount={grouped.fuel_advance} tone="minus" />
+          <Line label="Trailer rental" amount={grouped.trailer} tone="minus" />
+          <Line label="Escrow and maintenance reserve" amount={grouped.escrow} tone="minus" />
+          <Line label="Insurance (bobtail, occupational accident)" amount={grouped.insurance} tone="minus" />
+          <Line label="Brokerage and agency split" amount={grouped.agency} tone="minus" />
+          {grouped.other > 0 && <Line label="Other deductions" amount={grouped.other} tone="minus" />}
+        </ul>
+      </Panel>
 
-      <AccordionItem value="totals">
-        <AccordionTrigger className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Totals
-        </AccordionTrigger>
-        <AccordionContent>
-          <div className="px-1">
-            <Row label="Gross Revenue" amount={grossRevenue} emphasis="total" />
-            <Row label="Total Deductions" amount={totalDeductions} emphasis="negative" />
-            <div className="flex items-center justify-between py-3 mt-2 border-t-2 border-border">
-              <p className="text-sm font-bold uppercase tracking-wider text-foreground">
-                Final Net Settlement
-              </p>
-              <p className="text-lg font-bold text-success tabular-nums">
-                {formatCurrency(netSettlementValue)}
-              </p>
-            </div>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+      <Panel>
+        <PanelHead title="Totals" />
+        <ul className="divide-y divide-border">
+          <Line label="Gross revenue" amount={grossRevenue} strong />
+          <Line label="Total deductions" amount={totalDeductions} tone="minus" />
+          <li className="flex min-h-14 items-center justify-between gap-3 bg-secondary px-4 py-3">
+            <span className="text-sm font-semibold">Final net settlement</span>
+            <span className="font-condensed text-2xl font-bold tabular-nums text-success">{formatCurrency(netSettlementValue)}</span>
+          </li>
+        </ul>
+      </Panel>
+    </div>
   );
 }

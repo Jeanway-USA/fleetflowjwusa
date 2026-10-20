@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { SheetContent } from '@/components/driver/ui/driver-ui';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -213,7 +214,7 @@ export function ProofOfDeliveryDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
+      <SheetContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardCheck className="h-5 w-5 text-primary" />
@@ -369,7 +370,7 @@ export function ProofOfDeliveryDialog({
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </SheetContent>
     </Dialog>
   );
 }

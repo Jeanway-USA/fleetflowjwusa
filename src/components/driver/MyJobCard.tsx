@@ -1,11 +1,12 @@
 import { todayLocal } from '@/lib/datetime';
 import { useQuery } from '@tanstack/react-query';
-import { Briefcase, Check, Circle } from 'lucide-react';
+import { Check, ChevronDown, Circle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePersonPositions, usePositions } from '@/hooks/usePositions';
 import { useDriverAssignments, usePayPackages } from '@/hooks/usePayPackages';
 import { assignmentOn } from '@/lib/pay-packages/resolve';
 import { formatDate } from '@/lib/formatters';
+import { Panel } from '@/components/driver/ui/driver-ui';
 
 /**
  * A driver's own position, onboarding checklist and the name of their pay package. The database only returns the
@@ -37,39 +38,42 @@ export function MyJobCard({ driverId }: { driverId: string }) {
   const steps = position?.onboarding_checklist ?? [];
   const progress = current?.checklist_progress ?? {};
   const open = steps.some((s) => !progress[s.id]);
+  const docs = position?.required_documents ?? [];
+  const doneCount = steps.filter((s) => progress[s.id]).length;
+
+  const item = (key: string, done: boolean, label: string, note?: string) => (
+    <li key={key} className="flex min-h-11 items-center gap-3">
+      {done ? <Check className="h-4 w-4 shrink-0 text-success" aria-label="Done" /> : <Circle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />}
+      <span className={done ? 'text-sm text-muted-foreground line-through' : 'text-sm'}>{label}</span>
+      {note && !done && <span className="ml-auto text-xs text-muted-foreground">{note}</span>}
+    </li>
+  );
 
   return (
-    <details className="rounded-lg border bg-card p-3 text-sm" open={open && steps.length > 0}>
-      <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 font-medium">
-        <Briefcase className="h-4 w-4 text-primary" />
-        My job{position ? `: ${position.name}` : ''}
-        {steps.length > 0 && <span className="ml-auto text-xs font-normal text-muted-foreground">{steps.filter((s) => progress[s.id]).length} of {steps.length} steps done</span>}
-      </summary>
-      <div className="space-y-3 pt-2">
-        {current && position && <p className="text-xs text-muted-foreground">Since {formatDate(current.effective_start)}</p>}
-        {pkg && <p>Pay package: <strong>{pkg.name}</strong></p>}
-        {steps.length > 0 && (
-          <ul className="space-y-1">
-            {steps.map((s) => (
-              <li key={s.id} className="flex items-center gap-2">
-                {progress[s.id] ? <Check className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
-                <span className={progress[s.id] ? 'text-muted-foreground line-through' : ''}>{s.label}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {position && position.required_documents.length > 0 && (
-          <ul className="space-y-1">
-            {position.required_documents.map((d) => (
-              <li key={d.key} className="flex items-center gap-2">
-                {signed.includes(d.key) ? <Check className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
-                <span>{d.label}</span>
-                {!signed.includes(d.key) && <span className="text-xs text-muted-foreground">to sign</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </details>
+    <Panel>
+      <details open={open && steps.length > 0} className="group">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4">
+          <span className="min-w-0">
+            <span className="block text-[15px] font-semibold">My job{position ? `: ${position.name}` : ''}</span>
+            {steps.length > 0 && <span className="block text-xs text-muted-foreground">{doneCount} of {steps.length} steps done</span>}
+          </span>
+          <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="space-y-3 border-t border-border px-4 py-3">
+          {(current && position) || pkg ? (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {current && position && <div><p className="text-xs text-muted-foreground">Since</p><p className="mt-0.5 font-medium tabular-nums">{formatDate(current.effective_start)}</p></div>}
+              {pkg && <div><p className="text-xs text-muted-foreground">Pay package</p><p className="mt-0.5 font-medium">{pkg.name}</p></div>}
+            </div>
+          ) : null}
+          {(steps.length > 0 || docs.length > 0) && (
+            <ul>
+              {steps.map((s) => item(`s-${s.id}`, !!progress[s.id], s.label))}
+              {docs.map((d) => item(`d-${d.key}`, signed.includes(d.key), d.label, 'to sign'))}
+            </ul>
+          )}
+        </div>
+      </details>
+    </Panel>
   );
 }

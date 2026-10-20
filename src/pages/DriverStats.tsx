@@ -2,99 +2,72 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Truck, 
-  Route, 
-  DollarSign, 
-  Calendar,
-  TrendingUp,
-  Package,
-  Gauge,
-  Fuel,
-  Droplets
-} from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfYear, endOfYear, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { Bar, Note, Panel, PanelHead, Row, Segmented, Stat, StatCell, StatRow } from '@/components/driver/ui/driver-ui';
 
 type PeriodType = 'weekly' | 'monthly' | 'annual';
+
+const PERIOD_LABEL: Record<PeriodType, string> = { weekly: 'This week', monthly: 'This month', annual: 'This year' };
+
+/** Four figures in a two-by-two block, hairlines between. */
+function FigureGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 gap-px border-t border-border bg-border [&>*]:bg-card [&>*]:px-4 [&>*]:py-3">{children}</div>;
+}
 
 export default function DriverStats() {
   const { user } = useAuth();
   const paySettings = usePaySettings();
   const [period, setPeriod] = useState<PeriodType>('weekly');
 
-  // Fetch driver settings for custom pay-week start day
-  const { data: driverSettings } = useQuery({
-    queryKey: ['driver-stats-settings', user?.id],
+  // Fetch driver record
+  const { data: driver, isLoading: driverLoading } = useQuery({
+    queryKey: ['driver-stats-profile', user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
-        .select('pay_week_start_day')
-        .eq('driver_id', user?.id)
-        .maybeSingle();
+      const { data, error } = await supabase.from('drivers').select('*').eq('user_id', user?.id).maybeSingle();
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id,
   });
 
-  const weekStartsOn = (driverSettings?.pay_week_start_day ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  // The driver's own pay-week start day (looked up by driver, not by login).
+  const { data: driverSettings } = useQuery({
+    queryKey: ['driver-stats-settings', driver?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
+        .select('pay_week_start_day')
+        .eq('driver_id', driver?.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!driver?.id,
+  });
 
-  // Get date range based on period
+  const weekStartsOn = (driverSettings?.pay_week_start_day ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
   const getDateRange = (periodType: PeriodType) => {
     const now = new Date();
     switch (periodType) {
       case 'weekly':
-        return {
-          start: format(startOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd'),
-          end: format(endOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd'),
-        };
+        return { start: format(startOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd'), end: format(endOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd') };
       case 'monthly':
-        return {
-          start: format(startOfMonth(now), 'yyyy-MM-dd'),
-          end: format(endOfMonth(now), 'yyyy-MM-dd'),
-        };
+        return { start: format(startOfMonth(now), 'yyyy-MM-dd'), end: format(endOfMonth(now), 'yyyy-MM-dd') };
       case 'annual':
-        return {
-          start: format(startOfYear(now), 'yyyy-MM-dd'),
-          end: format(endOfYear(now), 'yyyy-MM-dd'),
-        };
+        return { start: format(startOfYear(now), 'yyyy-MM-dd'), end: format(endOfYear(now), 'yyyy-MM-dd') };
     }
   };
 
   const dateRange = getDateRange(period);
 
-  // Fetch driver record
-  const { data: driver, isLoading: driverLoading } = useQuery({
-    queryKey: ['driver-stats-profile', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('*')
-        .eq('user_id', user?.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
-
   // Fetch assigned truck
   const { data: assignedTruck } = useQuery({
     queryKey: ['driver-stats-truck', driver?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('trucks')
-        .select('*')
-        .eq('current_driver_id', driver?.id)
-        .maybeSingle();
+      const { data, error } = await supabase.from('trucks').select('*').eq('current_driver_id', driver?.id).maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     },
@@ -160,14 +133,12 @@ export default function DriverStats() {
     let totalEmptyMiles = 0;
 
     periodLoads.forEach((load: any) => {
-      const loadedMiles = (load.actual_miles && load.actual_miles > 0)
-        ? load.actual_miles
-        : (load.booked_miles || 0);
+      const loadedMiles = (load.actual_miles && load.actual_miles > 0) ? load.actual_miles : (load.booked_miles || 0);
       totalLoadedMiles += loadedMiles;
       totalEmptyMiles += load.empty_miles || 0;
     });
 
-    // Earnings — single source of truth shared with DriverPayWidget
+    // Earnings: single source of truth shared with DriverPayWidget
     const weekly = calculateWeeklyPay({
       loads: periodLoads as any,
       driver: { pay_type: driver?.pay_type, pay_rate: driver?.pay_rate },
@@ -180,364 +151,145 @@ export default function DriverStats() {
     const loadedPercentage = totalMiles > 0 ? (totalLoadedMiles / totalMiles) * 100 : 100;
     const revenuePerLoadedMile = totalLoadedMiles > 0 ? totalEarnings / totalLoadedMiles : 0;
 
-    return {
-      totalLoads,
-      totalLoadedMiles,
-      totalEmptyMiles,
-      totalMiles,
-      totalEarnings,
-      loadedPercentage,
-      revenuePerLoadedMile,
-    };
+    return { totalLoads, totalLoadedMiles, totalEmptyMiles, totalMiles, totalEarnings, loadedPercentage, revenuePerLoadedMile };
   };
 
   const stats = calculateStats();
-
   const isFlatPay = driver?.pay_type === 'flat';
 
   // Calculate fuel statistics
   const fuelStats = (() => {
     const totalGallons = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.gallons || 0), 0);
     const totalFuelCost = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.total_cost || 0), 0);
-    const avgPricePerGallon = totalGallons > 0 ? totalFuelCost / totalGallons : 0;
     const mpg = totalGallons > 0 ? stats.totalMiles / totalGallons : 0;
     const costPerMile = stats.totalMiles > 0 ? totalFuelCost / stats.totalMiles : 0;
-
-    let mpgColor = 'text-destructive';
-    let mpgLabel = 'Poor';
-    if (mpg >= 6.5) {
-      mpgColor = 'text-success';
-      mpgLabel = 'Good';
-    } else if (mpg >= 5.5) {
-      mpgColor = 'text-warning';
-      mpgLabel = 'Average';
-    }
-
-    return { totalGallons, totalFuelCost, avgPricePerGallon, mpg, costPerMile, mpgColor, mpgLabel };
+    const mpgLabel = mpg >= 6.5 ? 'Good' : mpg >= 5.5 ? 'Average' : 'Low';
+    const mpgColor = mpg >= 6.5 ? 'text-success' : mpg >= 5.5 ? 'text-warning' : 'text-destructive';
+    return { totalGallons, totalFuelCost, mpg, costPerMile, mpgLabel, mpgColor };
   })();
 
   const isLoading = driverLoading || loadsLoading;
 
+
+  const header = (
+    <div className="px-1 pt-1">
+      <h1 className="text-2xl font-semibold leading-tight">My stats</h1>
+      <p className="text-sm text-muted-foreground">How your weeks, months and year are going.</p>
+    </div>
+  );
+
   if (isLoading) {
     return (
-      <>
-        <PageHeader title="My Stats" description="Performance metrics and equipment info" />
-        <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
-      </>
+      <div className="mx-auto w-full max-w-2xl space-y-3 pb-6">
+        {header}
+        <Skeleton className="h-11 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
     );
   }
 
   if (!driver) {
     return (
-      <>
-        <PageHeader title="My Stats" description="Performance metrics and equipment info" />
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
-            Driver profile not found. Please contact an administrator.
-          </CardContent>
-        </Card>
-      </>
+      <div className="mx-auto w-full max-w-2xl space-y-3 pb-6">
+        {header}
+        <Panel><Note>Driver profile not found. Contact an administrator.</Note></Panel>
+      </div>
     );
   }
 
   return (
-    <>
-      <PageHeader title="My Stats" description="Performance metrics and equipment info" />
+    <div className="mx-auto w-full max-w-2xl space-y-3 pb-6">
+      {header}
 
-      <div className="space-y-6">
-        {/* Equipment Assignment Card */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Truck className="h-5 w-5" />
-              My Equipment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Truck Info */}
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline">Truck</Badge>
-                  {assignedTruck ? (
-                    <span className="font-mono font-semibold">#{assignedTruck.unit_number}</span>
-                  ) : (
-                    <span className="text-muted-foreground">Not Assigned</span>
-                  )}
-                </div>
-                {assignedTruck && (
-                  <div className="space-y-1 text-sm">
-                    <p className="text-muted-foreground">
-                      {assignedTruck.year} {assignedTruck.make} {assignedTruck.model}
-                    </p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      VIN: {assignedTruck.vin}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Plate: {assignedTruck.license_plate} ({assignedTruck.license_plate_state})
-                    </p>
-                  </div>
-                )}
-              </div>
+      <Segmented<PeriodType>
+        label="Time period"
+        value={period}
+        onChange={setPeriod}
+        options={(Object.keys(PERIOD_LABEL) as PeriodType[]).map((p) => ({ value: p, label: PERIOD_LABEL[p] }))}
+      />
 
-              {/* Trailer Info */}
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline">Trailer</Badge>
-                  {assignedTrailer ? (
-                    <span className="font-mono font-semibold">#{assignedTrailer.unit_number}</span>
-                  ) : (
-                    <span className="text-muted-foreground">Not Assigned</span>
-                  )}
-                </div>
-                {assignedTrailer && (
-                  <div className="space-y-1 text-sm">
-                    <p className="text-muted-foreground">
-                      {assignedTrailer.trailer_type}
-                    </p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      VIN: {assignedTrailer.vin || 'N/A'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Period Selector */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Performance</h2>
-          <Tabs value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
-            <TabsList>
-              <TabsTrigger value="weekly">This Week</TabsTrigger>
-              <TabsTrigger value="monthly">This Month</TabsTrigger>
-              <TabsTrigger value="annual">This Year</TabsTrigger>
-            </TabsList>
-          </Tabs>
+      <Panel>
+        <PanelHead title={PERIOD_LABEL[period]} aside={`${format(parseISO(dateRange.start + 'T00:00:00'), 'MMM d')} to ${format(parseISO(dateRange.end + 'T00:00:00'), 'MMM d, yyyy')}`} />
+        <div className="px-4 pb-4">
+          <p className="text-xs text-muted-foreground">Earnings</p>
+          {isFlatPay ? (
+            <>
+              <p className="font-condensed text-4xl font-bold leading-tight text-muted-foreground">-</p>
+              <p className="text-xs text-muted-foreground">Flat-rate pay. See payroll.</p>
+            </>
+          ) : (
+            <p className="font-condensed text-5xl font-bold leading-tight tabular-nums text-success">
+              ${stats.totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </p>
+          )}
         </div>
+        <StatRow>
+          <StatCell><Stat label="Loads delivered">{stats.totalLoads}</Stat></StatCell>
+          <StatCell><Stat label="Total miles">{stats.totalMiles.toLocaleString()}</Stat></StatCell>
+        </StatRow>
+        <StatRow>
+          <StatCell><Stat label="Avg per load">{!isFlatPay && stats.totalLoads > 0 ? `$${(stats.totalEarnings / stats.totalLoads).toFixed(0)}` : '-'}</Stat></StatCell>
+          <StatCell><Stat label="Pay per loaded mile">{!isFlatPay && stats.totalLoadedMiles > 0 ? `$${stats.revenuePerLoadedMile.toFixed(2)}` : '-'}</Stat></StatCell>
+        </StatRow>
+      </Panel>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Total Loads */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Package className="h-4 w-4" />
-                <span className="text-sm">Loads Delivered</span>
-              </div>
-              <p className="text-3xl font-bold">{stats.totalLoads}</p>
-            </CardContent>
-          </Card>
-
-          {/* Total Earnings */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <DollarSign className="h-4 w-4" />
-                <span className="text-sm">Earnings</span>
-              </div>
-              {isFlatPay ? (
-                <>
-                  <p className="text-3xl font-bold text-muted-foreground">—</p>
-                  <p className="text-xs text-muted-foreground mt-1">Flat-rate pay — see payroll</p>
-                </>
-              ) : (
-                <p className="text-3xl font-bold text-success">
-                  ${stats.totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Revenue per Loaded Mile */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <TrendingUp className="h-4 w-4" />
-                <span className="text-sm">Pay / Loaded Mile</span>
-              </div>
-              {isFlatPay || stats.totalLoadedMiles === 0 ? (
-                <p className="text-3xl font-bold text-muted-foreground">—</p>
-              ) : (
-                <p className="text-3xl font-bold">${stats.revenuePerLoadedMile.toFixed(2)}</p>
-              )}
-              <p className="text-xs text-muted-foreground mt-1">
-                Earnings ÷ loaded miles
-              </p>
-            </CardContent>
-          </Card>
-
-
-          {/* Total Miles */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Route className="h-4 w-4" />
-                <span className="text-sm">Total Miles</span>
-              </div>
-              <p className="text-3xl font-bold">{stats.totalMiles.toLocaleString()}</p>
-            </CardContent>
-          </Card>
+      <Panel>
+        <PanelHead title="Miles" />
+        <StatRow className="border-t-0">
+          <StatCell><Stat label="Loaded" size="lg">{stats.totalLoadedMiles.toLocaleString()}</Stat></StatCell>
+          <StatCell><Stat label="Empty (deadhead)" size="lg">{stats.totalEmptyMiles.toLocaleString()}</Stat></StatCell>
+        </StatRow>
+        <div className="border-t border-border px-4 py-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm">Loaded percentage</span>
+            <span className="text-sm font-semibold tabular-nums">{stats.loadedPercentage.toFixed(1)}%</span>
+          </div>
+          <Bar className="mt-2" value={stats.loadedPercentage} max={100} label="Share of miles driven loaded" />
+          <p className="mt-2 text-xs text-muted-foreground">A higher share means better routing and less deadhead.</p>
         </div>
+      </Panel>
 
-        {/* Mileage Breakdown */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Gauge className="h-5 w-5" />
-              Mileage Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="p-4 bg-success/10 rounded-lg border border-success/20">
-                <p className="text-sm text-muted-foreground mb-1">Loaded Miles</p>
-                <p className="text-2xl font-bold text-success">
-                  {stats.totalLoadedMiles.toLocaleString()}
+      <Panel>
+        <PanelHead title="Fuel and efficiency" />
+        {fuelPurchases.length === 0 ? (
+          <Note>No fuel purchases recorded for this period.</Note>
+        ) : (
+          <>
+            <FigureGrid>
+              <Stat label="Gallons">{fuelStats.totalGallons.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</Stat>
+              <Stat label="Fuel cost">${fuelStats.totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Stat>
+              <div>
+                <p className="text-xs text-muted-foreground">Average MPG</p>
+                <p className="mt-0.5 flex items-baseline gap-2 text-base font-semibold tabular-nums">
+                  {fuelStats.mpg.toFixed(1)} <span className={`text-xs font-medium ${fuelStats.mpgColor}`}>{fuelStats.mpgLabel}</span>
                 </p>
               </div>
-              <div className="p-4 bg-warning/10 rounded-lg border border-warning/20">
-                <p className="text-sm text-muted-foreground mb-1">Empty Miles (Deadhead)</p>
-                <p className="text-2xl font-bold text-warning">
-                  {stats.totalEmptyMiles.toLocaleString()}
-                </p>
-              </div>
-            </div>
+              <Stat label="Cost per mile">${fuelStats.costPerMile.toFixed(2)}</Stat>
+            </FigureGrid>
+            <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">MPG is total miles (loaded and empty) divided by gallons bought. Aim for 6.5 or better.</p>
+          </>
+        )}
+      </Panel>
 
-            {/* Utilization Progress */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Loaded Percentage</span>
-                <span className="font-medium">{stats.loadedPercentage.toFixed(1)}%</span>
-              </div>
-              <Progress value={stats.loadedPercentage} className="h-3" />
-              <p className="text-xs text-muted-foreground">
-                Higher loaded percentage means more efficient routing and less deadhead
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Fuel & Efficiency */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Fuel className="h-5 w-5" />
-              Fuel &amp; Efficiency
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {fuelPurchases.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No fuel purchases recorded for this period
-              </p>
-            ) : (
-              <>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Droplets className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Total Gallons</span>
-                    </div>
-                    <p className="text-2xl font-bold">
-                      {fuelStats.totalGallons.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Fuel Cost</span>
-                    </div>
-                    <p className="text-2xl font-bold">
-                      ${fuelStats.totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div className={`p-4 rounded-lg border ${
-                    fuelStats.mpg >= 6.5 ? 'bg-success/10 border-success/20' :
-                    fuelStats.mpg >= 5.5 ? 'bg-warning/10 border-warning/20' :
-                    'bg-destructive/10 border-destructive/20'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Gauge className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Avg MPG</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <p className={`text-2xl font-bold ${fuelStats.mpgColor}`}>
-                        {fuelStats.mpg.toFixed(1)}
-                      </p>
-                      <span className={`text-xs font-medium ${fuelStats.mpgColor}`}>
-                        {fuelStats.mpgLabel}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Route className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Cost/Mile</span>
-                    </div>
-                    <p className="text-2xl font-bold">
-                      ${fuelStats.costPerMile.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  MPG is calculated from total miles (loaded + empty) ÷ gallons purchased. Target: 6.5+ MPG for semi-trucks.
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Period Summary */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="h-5 w-5" />
-              {period === 'weekly' ? 'This Week' : period === 'monthly' ? 'This Month' : 'This Year'} Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-              <Calendar className="h-4 w-4" />
-              <span>
-                {format(parseISO(dateRange.start + 'T00:00:00'), 'MMM d, yyyy')} — {format(parseISO(dateRange.end + 'T00:00:00'), 'MMM d, yyyy')}
-              </span>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="text-center p-3 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Avg per Load</p>
-                <p className="font-semibold">
-                  {stats.totalLoads > 0 
-                    ? `$${(stats.totalEarnings / stats.totalLoads).toFixed(0)}` 
-                    : '-'}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Avg Miles/Load</p>
-                <p className="font-semibold">
-                  {stats.totalLoads > 0 
-                    ? Math.round(stats.totalLoadedMiles / stats.totalLoads).toLocaleString() 
-                    : '-'}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">$/Mile</p>
-                <p className="font-semibold">
-                  {stats.totalLoadedMiles > 0 
-                    ? `$${(stats.totalEarnings / stats.totalLoadedMiles).toFixed(2)}` 
-                    : '-'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </>
+      <Panel>
+        <PanelHead title="My equipment" />
+        <Row label="Truck">{assignedTruck ? `#${assignedTruck.unit_number}` : 'Not assigned'}</Row>
+        {assignedTruck && (
+          <>
+            <Row label="Make and model">{[assignedTruck.year, assignedTruck.make, assignedTruck.model].filter(Boolean).join(' ') || '-'}</Row>
+            <Row label="VIN"><span className="font-mono text-xs">{assignedTruck.vin || '-'}</span></Row>
+            <Row label="Plate">{assignedTruck.license_plate ? `${assignedTruck.license_plate} (${assignedTruck.license_plate_state})` : '-'}</Row>
+          </>
+        )}
+        <Row label="Trailer">{assignedTrailer ? `#${assignedTrailer.unit_number}` : 'Not assigned'}</Row>
+        {assignedTrailer && (
+          <>
+            <Row label="Type">{assignedTrailer.trailer_type || '-'}</Row>
+            <Row label="VIN"><span className="font-mono text-xs">{assignedTrailer.vin || '-'}</span></Row>
+          </>
+        )}
+      </Panel>
+    </div>
   );
 }

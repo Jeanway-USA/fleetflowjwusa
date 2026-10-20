@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Truck as TruckIcon, Container, AlertTriangle, Wrench } from 'lucide-react';
+import { AlertTriangle, Container, Truck as TruckIcon } from 'lucide-react';
+import { Chip, Panel, PanelHead } from '@/components/driver/ui/driver-ui';
 
 interface AssignedTruck {
   id: string;
@@ -27,24 +26,10 @@ function resolveSeverity(status?: string | null, hasOpenWorkOrder = false): Seve
   return 'ok';
 }
 
-function StatusBadge({ severity, status, hasOpenWorkOrder }: { severity: Severity; status?: string | null; hasOpenWorkOrder?: boolean }) {
-  if (severity === 'destructive') {
-    return (
-      <Badge variant="destructive" className="gap-1">
-        <AlertTriangle className="h-3 w-3" />
-        Out of Service — Do Not Dispatch
-      </Badge>
-    );
-  }
-  if (severity === 'warning') {
-    return (
-      <Badge className="gap-1 bg-warning text-warning-foreground hover:bg-warning/90">
-        <Wrench className="h-3 w-3" />
-        {hasOpenWorkOrder && (status || '').toLowerCase() !== 'in_shop' ? 'Active Work Order' : 'In Shop'}
-      </Badge>
-    );
-  }
-  return <Badge variant="secondary">Active</Badge>;
+function StatusChip({ severity, status, hasOpenWorkOrder }: { severity: Severity; status?: string | null; hasOpenWorkOrder?: boolean }) {
+  if (severity === 'destructive') return <Chip tone="bad">Out of service</Chip>;
+  if (severity === 'warning') return <Chip tone="warn">{hasOpenWorkOrder && (status || '').toLowerCase() !== 'in_shop' ? 'Open work order' : 'In shop'}</Chip>;
+  return <Chip tone="good">Active</Chip>;
 }
 
 export function MyEquipmentCard({ driverId, assignedTruck }: MyEquipmentCardProps) {
@@ -88,65 +73,47 @@ export function MyEquipmentCard({ driverId, assignedTruck }: MyEquipmentCardProp
   const anyCritical = truckSeverity === 'destructive' || trailerSeverity === 'destructive';
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <TruckIcon className="h-4 w-4 text-primary" />
-          My Equipment
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 pt-0">
-        {anyCritical && (
-          <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/30 p-2 text-sm">
-            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-            <span className="text-destructive font-medium">
-              Equipment flagged Out of Service — do not dispatch. Contact dispatch immediately.
-            </span>
-          </div>
-        )}
-
-        {/* Truck row */}
-        <div className="flex items-center justify-between gap-2 rounded-md border p-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <TruckIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-            {assignedTruck ? (
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">Truck #{assignedTruck.unit_number || '—'}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {[assignedTruck.year, assignedTruck.make, assignedTruck.model].filter(Boolean).join(' ') || 'Details unavailable'}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-warning">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="font-medium">No truck assigned. Contact dispatch</span>
-              </div>
-            )}
-          </div>
-          {assignedTruck && (
-            <StatusBadge severity={truckSeverity} status={assignedTruck.status} hasOpenWorkOrder={truckHasOpenWO} />
-          )}
+    <div className="space-y-3">
+      {anyCritical && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl bg-destructive px-4 py-3 text-destructive-foreground">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+          <p className="text-sm font-semibold">Equipment is out of service. Do not dispatch. Contact dispatch now.</p>
         </div>
-
-        {/* Trailer row */}
-        <div className="flex items-center justify-between gap-2 rounded-md border p-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Container className="h-4 w-4 text-muted-foreground shrink-0" />
-            {trailer ? (
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">Trailer #{trailer.unit_number || '—'}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {trailer.trailer_type || 'Trailer'}
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">No trailer assigned</div>
-            )}
-          </div>
-          {trailer && <StatusBadge severity={trailerSeverity} status={trailer.status} />}
-        </div>
-      </CardContent>
-    </Card>
+      )}
+      <Panel>
+        <PanelHead title="My equipment" />
+        <ul className="divide-y divide-border">
+          <li className="flex items-center gap-3 px-4 py-3">
+            <TruckIcon className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+            <div className="min-w-0 flex-1">
+              {assignedTruck ? (
+                <>
+                  <p className="truncate text-sm font-semibold">Truck {assignedTruck.unit_number || '-'}</p>
+                  <p className="truncate text-xs text-muted-foreground">{[assignedTruck.year, assignedTruck.make, assignedTruck.model].filter(Boolean).join(' ') || 'Details unavailable'}</p>
+                </>
+              ) : (
+                <p className="text-sm font-medium text-warning">No truck assigned. Contact dispatch.</p>
+              )}
+            </div>
+            {assignedTruck && <StatusChip severity={truckSeverity} status={assignedTruck.status} hasOpenWorkOrder={truckHasOpenWO} />}
+          </li>
+          <li className="flex items-center gap-3 px-4 py-3">
+            <Container className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+            <div className="min-w-0 flex-1">
+              {trailer ? (
+                <>
+                  <p className="truncate text-sm font-semibold">Trailer {trailer.unit_number || '-'}</p>
+                  <p className="truncate text-xs text-muted-foreground">{trailer.trailer_type || 'Trailer'}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No trailer assigned</p>
+              )}
+            </div>
+            {trailer && <StatusChip severity={trailerSeverity} status={trailer.status} />}
+          </li>
+        </ul>
+      </Panel>
+    </div>
   );
 }
 

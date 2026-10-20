@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { SheetContent } from '@/components/driver/ui/driver-ui';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -169,7 +169,7 @@ export function EndingOdometerDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-sm">
+      <SheetContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gauge className="h-5 w-5 text-primary" />
@@ -236,7 +236,7 @@ export function EndingOdometerDialog({
                 className={`h-11 ${driveHours !== '' && !driveValid ? 'border-destructive focus-visible:ring-destructive' : ''}`}
               />
               {driveHours !== '' && !driveValid && (
-                <p className="text-[11px] text-destructive">Enter 0–11 hours.</p>
+                <p className="text-xs text-destructive">Enter 0–11 hours.</p>
               )}
             </div>
             <div className="space-y-1">
@@ -255,7 +255,7 @@ export function EndingOdometerDialog({
                 className={`h-11 ${cycleHours !== '' && !cycleValid ? 'border-destructive focus-visible:ring-destructive' : ''}`}
               />
               {cycleHours !== '' && !cycleValid && (
-                <p className="text-[11px] text-destructive">Enter 0–70 hours.</p>
+                <p className="text-xs text-destructive">Enter 0–70 hours.</p>
               )}
             </div>
           </div>
@@ -289,7 +289,7 @@ export function EndingOdometerDialog({
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </SheetContent>
     </Dialog>
   );
 }
