@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Receipt } from 'lucide-react';
 import {
   useDriverIdForUser,
   useDriverSettlementsList,
@@ -10,13 +9,13 @@ import {
 import { SettlementHistoryList } from '@/components/driver/settlements/SettlementHistoryList';
 import { SettlementDetailPanel } from '@/components/driver/settlements/SettlementDetailPanel';
 import { TaxAndYtdPanel } from '@/components/driver/settlements/TaxAndYtdPanel';
+import { Panel } from '@/components/driver/ui/driver-ui';
 
 export default function DriverSettlements() {
   const { data: driver, isLoading: driverLoading } = useDriverIdForUser();
   const driverId = driver?.id ?? null;
 
-  const { data: settlements = [], isLoading: settlementsLoading } =
-    useDriverSettlementsList(driverId);
+  const { data: settlements = [], isLoading: settlementsLoading } = useDriverSettlementsList(driverId);
   const { data: milesByPeriod = {} } = usePerSettlementMiles(driverId, settlements);
   const { data: ytd, isLoading: ytdLoading } = useYtdSnapshot(driverId);
   useSettlementsRealtimeRefresh(driverId);
@@ -25,79 +24,42 @@ export default function DriverSettlements() {
 
   // Default selection = most recent
   useEffect(() => {
-    if (!selectedId && settlements.length > 0) {
-      setSelectedId(settlements[0].id);
-    }
+    if (!selectedId && settlements.length > 0) setSelectedId(settlements[0].id);
   }, [settlements, selectedId]);
 
   // If the selected settlement disappears, fall back to the most recent.
   useEffect(() => {
-    if (selectedId && !settlements.some((s) => s.id === selectedId)) {
-      setSelectedId(settlements[0]?.id ?? null);
-    }
+    if (selectedId && !settlements.some((s) => s.id === selectedId)) setSelectedId(settlements[0]?.id ?? null);
   }, [settlements, selectedId]);
 
-  const selected = useMemo(
-    () => settlements.find((s) => s.id === selectedId) ?? null,
-    [settlements, selectedId],
-  );
+  const selected = useMemo(() => settlements.find((s) => s.id === selectedId) ?? null, [settlements, selectedId]);
 
   if (!driverLoading && !driver) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="bg-muted/40 p-4 rounded-full mb-3">
-          <Receipt className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h2 className="text-lg font-semibold text-foreground">
-          Driver profile not linked
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1 max-w-md">
-          We couldn't find a driver record tied to your account. Contact your dispatcher
-          to get linked.
-        </p>
+      <div className="mx-auto w-full max-w-2xl">
+        <Panel className="px-4 py-10 text-center">
+          <h2 className="text-lg font-semibold">Driver profile not linked</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">We couldn't find a driver record tied to your account. Contact your dispatcher to get linked.</p>
+        </Panel>
       </div>
     );
   }
 
+  const choose = (id: string) => {
+    setSelectedId(id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <header className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <Receipt className="h-5 w-5 text-primary" />
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            My Settlements
-          </h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          1099 Owner-Operator pay statements, breakdowns, and year-to-date totals.
-        </p>
-      </header>
-
-      {/* 3-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)_22rem] gap-6 items-start">
-        <div className="lg:max-h-[calc(100vh-12rem)] lg:sticky lg:top-4">
-          <SettlementHistoryList
-            settlements={settlements}
-            isLoading={settlementsLoading || driverLoading}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            milesByPeriod={milesByPeriod}
-          />
-        </div>
-
-        <div className="min-w-0">
-          <SettlementDetailPanel settlement={selected} />
-        </div>
-
-        <div className="lg:sticky lg:top-4">
-          <TaxAndYtdPanel
-            settlements={settlements}
-            ytd={ytd}
-            ytdLoading={ytdLoading}
-          />
-        </div>
+    <div className="mx-auto w-full max-w-2xl space-y-3 pb-6">
+      <div className="px-1 pt-1">
+        <h1 className="text-2xl font-semibold leading-tight">My pay</h1>
+        <p className="text-sm text-muted-foreground">Your pay statements, year to date, and tax forms.</p>
       </div>
+
+      <SettlementDetailPanel settlement={selected} />
+      <SettlementHistoryList settlements={settlements} isLoading={settlementsLoading || driverLoading} selectedId={selectedId} onSelect={choose} milesByPeriod={milesByPeriod} />
+      <TaxAndYtdPanel settlements={settlements} ytd={ytd} ytdLoading={ytdLoading} />
     </div>
   );
 }

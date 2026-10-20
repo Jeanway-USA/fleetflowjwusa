@@ -103,7 +103,7 @@ export default function DriverSpectatorView() {
   const isFlatPay = driver.pay_type === 'flat';
 
   return (
-    <div className="space-y-3 pb-6 max-w-4xl mx-auto">
+    <div className="space-y-3 pb-6 max-w-2xl mx-auto">
       {/* Spectator Mode Banner */}
       <Card className="border-primary/50 bg-primary/5">
         <CardContent className="py-4">
@@ -181,6 +181,7 @@ export default function DriverSpectatorView() {
               payRate={driver.pay_rate}
               payType={driver.pay_type}
               driverId={driver.id}
+              readOnly
             />
           ) : nextLoad ? (
             <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
@@ -190,6 +191,7 @@ export default function DriverSpectatorView() {
               payRate={driver.pay_rate}
               payType={driver.pay_type}
               driverId={driver.id}
+              readOnly
             />
           )}
         </ReadOnly>
@@ -204,11 +206,11 @@ export default function DriverSpectatorView() {
 
       {/* Scan Doc Button (read-only) */}
       <ReadOnly>
-        <DocumentScanButton driverId={driver.id} />
+        <DocumentScanButton driverId={driver.id} variant="tile" />
       </ReadOnly>
 
       {/* GPS + Pay row — matches driver layout exactly */}
-      <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+      <div className="space-y-3">
         <ErrorBoundary compact>
           <ReadOnly>
             <LocationSharing
@@ -242,7 +244,7 @@ export default function DriverSpectatorView() {
 
       {/* Driver Leaderboard */}
       <ErrorBoundary compact>
-        <DriverLeaderboard readOnly />
+        <DriverLeaderboard readOnly variant="app" />
       </ErrorBoundary>
 
       {/* Unified Driver Requests & Maintenance (read-only via overlay) */}

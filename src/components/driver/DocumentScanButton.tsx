@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { SheetContent } from '@/components/driver/ui/driver-ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Camera, Loader2, CheckCircle, Upload, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react';
@@ -12,9 +13,12 @@ import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { compressImage } from '@/lib/compress-image';
 import { useOfflineDocumentQueue } from '@/hooks/useOfflineDocumentQueue';
 import { PhotoQualityGate } from './PhotoQualityGate';
+import { Tile } from '@/components/driver/ui/driver-ui';
 
 interface DocumentScanButtonProps {
   driverId: string;
+  /** 'tile' is the quick-action tile on the home screen. */
+  variant?: 'default' | 'tile';
 }
 
 const DOC_TYPES = [
@@ -26,7 +30,7 @@ const DOC_TYPES = [
   { value: 'other', label: 'Other Document' },
 ];
 
-export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
+export function DocumentScanButton({ driverId, variant = 'default' }: DocumentScanButtonProps) {
   const { user } = useAuth();
   const { upload } = useStorageProvider();
   const queryClient = useQueryClient();
@@ -210,12 +214,16 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="h-auto min-h-16 flex-col gap-1 py-3 w-full">
-          <Camera className="h-5 w-5" />
-          <span className="text-xs">Scan Doc</span>
-        </Button>
+        {variant === 'tile' ? (
+          <Tile icon={<Camera />} label="Scan" />
+        ) : (
+          <Button variant="outline" className="h-auto min-h-16 flex-col gap-1 py-3 w-full">
+            <Camera className="h-5 w-5" />
+            <span className="text-xs">Scan Doc</span>
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <SheetContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
         </DialogHeader>
@@ -330,7 +338,7 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
             )}
           </Button>
         </div>
-      </DialogContent>
+      </SheetContent>
 
       <PhotoQualityGate
         open={qualityGateOpen}

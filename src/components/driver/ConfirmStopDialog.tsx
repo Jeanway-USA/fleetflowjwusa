@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { SheetContent } from '@/components/driver/ui/driver-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Clock, MapPin, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { toast } from 'sonner';
 
 interface StopLike {
@@ -33,6 +36,8 @@ const sanitizeHours = (raw: string) => {
 export function ConfirmStopDialog({ open, onOpenChange, stop, onConfirmed }: ConfirmStopDialogProps) {
   const [hosValue, setHosValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { enqueue } = useOfflineQueue();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (open) {
@@ -46,6 +51,20 @@ export function ConfirmStopDialog({ open, onOpenChange, stop, onConfirmed }: Con
 
   const handleSubmit = async () => {
     if (!stop || !isValid) return;
+    const completedAt = new Date().toISOString();
+
+    // No signal: keep the confirmation on the phone, show the stop as done now, and send it when the signal returns.
+    if (!navigator.onLine) {
+      enqueue('stop_confirm', { id: stop.id, remaining_hos: num, completed_at: completedAt });
+      queryClient.setQueriesData<any[]>({ queryKey: ['load-intermediate-stops'] }, (rows) =>
+        Array.isArray(rows) ? rows.map((r) => (r.id === stop.id ? { ...r, status: 'completed', remaining_hos: num, completed_at: completedAt } : r)) : rows,
+      );
+      toast.success('Stop saved. Will sync when online.');
+      onOpenChange(false);
+      onConfirmed?.();
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { error } = await supabase
@@ -53,7 +72,7 @@ export function ConfirmStopDialog({ open, onOpenChange, stop, onConfirmed }: Con
         .update({
           status: 'completed',
           remaining_hos: num,
-          completed_at: new Date().toISOString(),
+          completed_at: completedAt,
         })
         .eq('id', stop.id);
 
@@ -71,7 +90,7 @@ export function ConfirmStopDialog({ open, onOpenChange, stop, onConfirmed }: Con
 
   return (
     <Dialog open={open} onOpenChange={(v) => !isSubmitting && onOpenChange(v)}>
-      <DialogContent className="max-w-md">
+      <SheetContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
@@ -114,9 +133,9 @@ export function ConfirmStopDialog({ open, onOpenChange, stop, onConfirmed }: Con
             className={`h-12 ${hosValue !== '' && !isValid ? 'border-destructive focus-visible:ring-destructive' : ''}`}
           />
           {hosValue !== '' && !isValid && (
-            <p className="text-[11px] text-destructive">Enter a value between 0 and 11 hours.</p>
+            <p className="text-xs text-destructive">Enter a value between 0 and 11 hours.</p>
           )}
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Rough hours only — used by dispatch for planning the next leg.
           </p>
         </div>
@@ -141,7 +160,7 @@ export function ConfirmStopDialog({ open, onOpenChange, stop, onConfirmed }: Con
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </SheetContent>
     </Dialog>
   );
 }

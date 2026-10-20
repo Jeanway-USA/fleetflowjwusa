@@ -1,8 +1,4 @@
 import { toLocalIso } from '@/lib/datetime';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, Receipt } from 'lucide-react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
@@ -10,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
 import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
+import { Bar, HeadLink, Panel, PanelHead, Stat, StatCell, StatRow } from '@/components/driver/ui/driver-ui';
 
 interface DriverPayWidgetProps {
   driverId: string;
@@ -17,10 +14,11 @@ interface DriverPayWidgetProps {
   payType: string | null;
 }
 
+const dollars = (v: number, fraction = 2) => `$${v.toLocaleString(undefined, { minimumFractionDigits: fraction, maximumFractionDigits: fraction })}`;
+
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
   // Keep widget + settlements list in sync with admin changes in real-time.
   useDriverSettlementsRealtime(driverId);
-
 
   // Get driver settings for goals and pay week start day
   const { data: driverSettings } = useQuery({
@@ -79,81 +77,28 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
 
   const isMileageGoal = goalType === 'mileage';
   const weeklyGoal = isMileageGoal ? targetMiles : weeklyRevenueGoal;
-  const progress = isMileageGoal
-    ? (totalMiles / Math.max(weeklyGoal, 1)) * 100
-    : (weeklyEarnings / Math.max(weeklyGoal, 1)) * 100;
-
-  const deliveredCount = weeklyLoads.length;
+  const progressValue = isMileageGoal ? totalMiles : weeklyEarnings;
+  const pct = Math.round(Math.min(100, (progressValue / Math.max(weeklyGoal, 1)) * 100));
 
   return (
-    <Card>
-      <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-base flex items-center gap-2">
-          <DollarSign className="h-5 w-5 text-primary" />
-          My Pay This Week
-        </CardTitle>
-        <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
-          <Link to="/driver/settlements">
-            <Receipt className="h-3.5 w-3.5 mr-1.5" />
-            My Settlements
-          </Link>
-        </Button>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Earnings Summary */}
-        <div className="flex items-end justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-2xl sm:text-3xl font-bold text-primary truncate">
-              ${weeklyEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
-            </p>
-          </div>
-          <div className="text-right text-sm">
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <TrendingUp className="h-4 w-4" />
-              {totalMiles.toLocaleString()} miles
-            </div>
-            <p className="text-muted-foreground">
-              {deliveredCount} delivered this week
-            </p>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Weekly Progress</span>
-            <span className="font-medium">
-              {isMileageGoal
-                ? `${totalMiles.toLocaleString()} / ${weeklyGoal.toLocaleString()} mi`
-                : `$${weeklyEarnings.toLocaleString(undefined, { maximumFractionDigits: 0 })} / $${weeklyGoal.toLocaleString()}`
-              }
-            </span>
-          </div>
-          <Progress value={Math.min(progress, 100)} className="h-3" />
-          {progress >= 100 && (
-            <p className="text-xs text-success font-medium">
-              🎉 Weekly goal reached!
-            </p>
-          )}
-        </div>
-
-
-
-
-        {/* Pay Rate Info */}
-        <div className="text-xs text-muted-foreground pt-2 border-t">
-          Pay structure: {payType === 'percentage' 
-            ? `${payRate}% of line haul` 
-            : payType === 'per_mile' 
-              ? `$${payRate}/mile` 
-              : 'Contact payroll'
-          }
-        </div>
-      </CardContent>
-    </Card>
+    <Panel>
+      <PanelHead title="Pay this week" aside={<HeadLink asChild><Link to="/driver/settlements">Settlements</Link></HeadLink>} />
+      <div className="px-4 pb-4">
+        <p className="text-xs text-muted-foreground">{format(weekStart, 'MMM d')} to {format(weekEnd, 'MMM d')}</p>
+        <p className="mt-0.5 font-condensed text-4xl font-bold tabular-nums leading-tight">{dollars(weeklyEarnings)}</p>
+        <Bar className="mt-3" value={progressValue} max={weeklyGoal} label={isMileageGoal ? 'Miles toward weekly goal' : 'Pay toward weekly goal'} />
+        <p className="mt-2 text-xs text-muted-foreground">
+          {pct}% of your {isMileageGoal ? `${weeklyGoal.toLocaleString()} mile` : dollars(weeklyGoal, 0)} goal
+          {progressValue >= weeklyGoal ? '. Goal reached.' : ''}
+        </p>
+      </div>
+      <StatRow>
+        <StatCell><Stat label="Miles">{totalMiles.toLocaleString()}</Stat></StatCell>
+        <StatCell><Stat label="Delivered">{weeklyLoads.length}</Stat></StatCell>
+      </StatRow>
+      <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+        Pay structure: {payType === 'percentage' ? `${payRate}% of line haul` : payType === 'per_mile' ? `$${payRate} a mile` : 'Contact payroll'}
+      </p>
+    </Panel>
   );
 }

@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { fetchOutstandingTemplates } from '@/lib/onboarding/outstanding';
+import { DBtn } from '@/components/driver/ui/driver-ui';
 
 interface Props {
   driverId: string;
@@ -52,36 +52,27 @@ export function OnboardingRevisionBanner({ driverId, credentialsStatus }: Props)
 
   // If the only work is unsigned templates (no revision requests), deep-link
   // to the docs-only mode; otherwise use the standard revision flow.
-  const targetHref =
-    revisionTotal === 0 ? '/driver/onboarding?docs=1' : '/driver/onboarding?revision=1';
+  const targetHref = revisionTotal === 0 ? '/driver/onboarding?docs=1' : '/driver/onboarding?revision=1';
 
   const message =
     revisionTotal > 0
-      ? `Your onboarding requires a revision${total > 1 ? ` on ${total} items` : ''}. Please review and resubmit.`
+      ? `Your onboarding needs a revision${total > 1 ? ` on ${total} items` : ''}. Review it and send it again.`
       : outstandingCount === 1
         ? 'You have 1 document that still needs your signature.'
         : `You have ${outstandingCount} documents that still need your signature.`;
 
   return (
-    <div
-      role="alert"
-      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md border-2 border-destructive bg-destructive text-destructive-foreground px-4 py-3 shadow-lg"
-    >
+    <div role="alert" className="flex flex-col gap-3 rounded-xl bg-destructive px-4 py-3 text-destructive-foreground sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
         <div>
-          <p className="font-bold leading-tight">Action Required</p>
-          <p className="text-sm leading-snug opacity-95">{message}</p>
+          <p className="text-sm font-semibold">Action required</p>
+          <p className="text-sm leading-snug">{message}</p>
         </div>
       </div>
-      <Button
-        size="sm"
-        variant="secondary"
-        className="bg-white text-destructive hover:bg-white/90 font-semibold shrink-0"
-        onClick={() => navigate(targetHref)}
-      >
-        {revisionTotal > 0 ? 'View Details' : 'Complete Documents'}
-      </Button>
+      <DBtn tone="secondary" size="md" className="shrink-0 border-transparent bg-white text-destructive hover:bg-white/90" onClick={() => navigate(targetHref)}>
+        {revisionTotal > 0 ? 'View details' : 'Sign documents'}
+      </DBtn>
     </div>
   );
 }

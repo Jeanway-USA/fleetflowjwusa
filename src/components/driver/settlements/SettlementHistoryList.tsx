@@ -1,11 +1,9 @@
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/formatters';
 import { netSettlement, type SettlementRow } from '@/hooks/useDriverSettlementsPage';
+import { Chip, Note, Panel, PanelHead } from '@/components/driver/ui/driver-ui';
 
 interface Props {
   settlements: SettlementRow[];
@@ -23,112 +21,43 @@ function fmt(d: string) {
   }
 }
 
-function statusVariant(status: string): 'default' | 'secondary' | 'outline' {
-  if (status === 'paid') return 'default';
-  if (status === 'approved') return 'secondary';
-  return 'outline';
-}
+const statusTone = (status: string) => (status === 'paid' ? 'good' : status === 'approved' ? 'active' : 'neutral');
 
-export function SettlementHistoryList({
-  settlements,
-  isLoading,
-  selectedId,
-  onSelect,
-  milesByPeriod,
-}: Props) {
+/** Every pay statement, newest first. Tap one to open it above. */
+export function SettlementHistoryList({ settlements, isLoading, selectedId, onSelect, milesByPeriod }: Props) {
   return (
-    <Card className="card-elevated h-full flex flex-col">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Settlement History
-          </p>
-          <p className="text-sm font-medium text-foreground mt-0.5">
-            {settlements.length} {settlements.length === 1 ? 'statement' : 'statements'}
-          </p>
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1">
-        <div className="divide-y divide-border">
-          {isLoading && (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-20 w-full" />
-              ))}
-            </div>
-          )}
-
-          {!isLoading && settlements.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              No settlements yet. Once dispatch issues your first pay statement, it will
-              appear here.
-            </div>
-          )}
-
-          {!isLoading &&
-            settlements.map((s) => {
-              const isSelected = s.id === selectedId;
-              const net = netSettlement(s);
-              const miles = milesByPeriod[s.id] ?? 0;
-              return (
+    <Panel>
+      <PanelHead title="All statements" aside={`${settlements.length} ${settlements.length === 1 ? 'statement' : 'statements'}`} />
+      {isLoading ? (
+        <div className="space-y-2 px-4 pb-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+      ) : settlements.length === 0 ? (
+        <Note>No settlements yet. Once dispatch issues your first pay statement, it will appear here.</Note>
+      ) : (
+        <ul className="divide-y divide-border border-t border-border">
+          {settlements.map((s) => {
+            const selected = s.id === selectedId;
+            return (
+              <li key={s.id}>
                 <button
-                  key={s.id}
                   type="button"
                   onClick={() => onSelect(s.id)}
-                  className={cn(
-                    'w-full text-left px-4 py-3 transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/40',
-                    isSelected &&
-                      'bg-primary/10 border-l-2 border-primary -ml-[1px]',
-                  )}
+                  aria-current={selected ? 'true' : undefined}
+                  className={cn('flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none', selected && 'bg-secondary')}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground">
-                        {fmt(s.period_end)}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {fmt(s.period_start)} – {fmt(s.period_end)}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={statusVariant(s.status)}
-                      className="text-[10px] capitalize shrink-0"
-                    >
-                      {s.status}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <p className="text-muted-foreground">Miles</p>
-                      <p className="font-semibold text-foreground tabular-nums">
-                        {miles.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Gross</p>
-                      <p className="font-semibold text-foreground tabular-nums">
-                        {formatCurrency(s.gross_pay)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Net</p>
-                      <p
-                        className={cn(
-                          'font-semibold tabular-nums',
-                          isSelected ? 'text-primary' : 'text-success',
-                        )}
-                      >
-                        {formatCurrency(net)}
-                      </p>
-                    </div>
-                  </div>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold tabular-nums">{fmt(s.period_end)}</span>
+                    <span className="block text-xs text-muted-foreground">{(milesByPeriod[s.id] ?? 0).toLocaleString()} miles, gross {formatCurrency(s.gross_pay)}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className={cn('block text-sm font-semibold tabular-nums', selected ? 'text-foreground' : 'text-success')}>{formatCurrency(netSettlement(s))}</span>
+                    <Chip tone={statusTone(s.status)} className="mt-1 capitalize">{s.status}</Chip>
+                  </span>
                 </button>
-              );
-            })}
-        </div>
-      </ScrollArea>
-    </Card>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
   );
 }

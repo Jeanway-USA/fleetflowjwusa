@@ -4,9 +4,12 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Medal, Award } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Panel, PanelHead } from '@/components/driver/ui/driver-ui';
 
 interface DriverLeaderboardProps {
   readOnly?: boolean;
+  /** 'app' is the ranked list the driver app uses; the default keeps the dispatcher's card. */
+  variant?: 'card' | 'app';
 }
 
 interface DriverRanking {
@@ -51,7 +54,7 @@ function RankRow({ rank, name, value }: { rank: number; name: string; value: str
   );
 }
 
-export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
+export function DriverLeaderboard({ readOnly, variant = 'card' }: DriverLeaderboardProps) {
   const now = new Date();
   const monthStart = startOfMonth(now).toISOString();
   const monthEnd = endOfMonth(now).toISOString();
@@ -84,6 +87,15 @@ export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
     staleTime: 5 * 60 * 1000,
   });
 
+  if (isLoading && variant === 'app') {
+    return (
+      <Panel>
+        <PanelHead title="Leaderboard" />
+        <div className="px-4 pb-4"><Skeleton className="h-11 w-full" /></div>
+      </Panel>
+    );
+  }
+
   if (isLoading) {
     return (
       <Card className="card-elevated">
@@ -105,6 +117,24 @@ export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
   const byMiles = [...all].sort((a, b) => b.totalMiles - a.totalMiles);
   const top3 = byMiles.slice(0, 3);
   const rest = byMiles.slice(3).filter((d) => d.totalMiles > 0);
+
+  if (variant === 'app') {
+    const ranked = [...top3, ...rest];
+    return (
+      <Panel>
+        <PanelHead title="Leaderboard" aside={monthLabel} />
+        <ol className="divide-y divide-border">
+          {ranked.map((d, i) => (
+            <li key={d.driverId} className="flex min-h-12 items-center gap-3 px-4">
+              <span className={`w-5 text-sm font-semibold tabular-nums ${i === 0 ? 'text-foreground' : 'text-muted-foreground'}`}>{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{d.firstName} {d.lastName}</span>
+              <span className="text-sm tabular-nums text-muted-foreground">{d.totalMiles.toLocaleString()} mi</span>
+            </li>
+          ))}
+        </ol>
+      </Panel>
+    );
+  }
 
   return (
     <Card className="card-elevated">

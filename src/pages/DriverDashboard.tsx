@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +13,7 @@ import { WeeklyPerformanceWidget } from '@/components/driver/WeeklyPerformanceWi
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
 import { DriverPayStubsCard } from '@/components/driver/DriverPayStubsCard';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
+import { ReportIssueTile } from '@/components/driver/ReportIssueTile';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
 
@@ -25,9 +25,8 @@ import { OnboardingRevisionBanner } from '@/components/driver/OnboardingRevision
 
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { MyJobCard } from '@/components/driver/MyJobCard';
-import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { DBtn, Panel } from '@/components/driver/ui/driver-ui';
 
 const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboard(_, _ref) {
   const { user } = useAuth();
@@ -45,15 +44,8 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
     setTimeout(() => setIsRefreshing(false), 600);
   }, [queryClient]);
 
-  // Shared driver-home payload (same source spectator view uses → guaranteed parity)
-  const {
-    driver,
-    activeLoad,
-    nextLoad,
-    assignedTruck,
-    isLoading,
-    refetchLoads,
-  } = useDriverHomeData({ userId: user?.id });
+  // Shared driver-home payload (same source spectator view uses, so the two can never drift)
+  const { driver, activeLoad, nextLoad, assignedTruck, isLoading, refetchLoads } = useDriverHomeData({ userId: user?.id });
 
   // Driver-only: live GPS coords for geofence auto-arrival (requires is_sharing=true)
   const { data: driverLocation } = useQuery({
@@ -74,184 +66,128 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
     staleTime: 30 * 1000,
   });
 
-  const driverCoords = driverLocation
-    ? { lat: driverLocation.latitude, lng: driverLocation.longitude }
-    : null;
+  const driverCoords = driverLocation ? { lat: driverLocation.latitude, lng: driverLocation.longitude } : null;
 
-
-  // Silent background geofence — auto-arrival at origin or destination,
+  // Silent background geofence: auto-arrival at origin or destination,
   // flips fleet_loads.status without a driver prompt and writes a log row.
   useAutoArrival(activeLoad ?? null, driverCoords, refetchLoads);
 
   if (isLoading) {
     return (
-      <>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading" />
+      </div>
     );
   }
 
   if (!driver) {
     return (
-      <>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-          <div className="bg-destructive/10 p-6 rounded-full mb-4">
-            <Moon className="h-12 w-12 text-destructive" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Driver Profile Not Found</h2>
-          <p className="text-muted-foreground max-w-md">
-            Your account is not linked to a driver profile. Please contact your dispatcher or administrator to link your account.
+      <div className="mx-auto max-w-2xl px-1">
+        <Panel className="px-4 py-8 text-center">
+          <h2 className="text-lg font-semibold">Driver profile not found</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            Your account is not linked to a driver profile. Contact your dispatcher or administrator to link it.
           </p>
-        </div>
-      </>
+        </Panel>
+      </div>
     );
   }
 
   return (
-    <>
-      <div className="space-y-3 pb-6 max-w-4xl mx-auto">
-        <OnboardingRevisionBanner
-          driverId={driver.id}
-          credentialsStatus={(driver as any).credentials_review_status ?? null}
-        />
-        <ErrorBoundary compact>
-          <MyJobCard driverId={driver.id} />
-        </ErrorBoundary>
-        {/* Compact Header */}
-
-        <div className="flex items-center justify-between py-1">
-          <h1 className="text-lg font-semibold flex items-center gap-2">
-            {currentHour >= 6 && currentHour < 18 ? (
-              <Sun className="h-5 w-5 text-primary" />
-            ) : (
-              <Moon className="h-5 w-5 text-primary" />
-            )}
-            {greeting}, {driver.first_name}
-          </h1>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            <ErrorBoundary compact>
-              <div id="tour-notifications" className="flex items-center gap-1">
-                <DriverNotifications driverId={driver.id} />
-              </div>
-            </ErrorBoundary>
-            <span className="text-sm text-muted-foreground">
-              {format(new Date(), 'EEE, MMM d')}
-            </span>
-          </div>
+    <div className="mx-auto w-full max-w-2xl space-y-3 pb-6">
+      <div className="flex items-center justify-between gap-2 px-1 pt-1">
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, MMM d')}</p>
+          <h1 className="truncate text-2xl font-semibold leading-tight">{greeting}, {driver.first_name}</h1>
         </div>
-
-        {/* My Equipment Card */}
-        <ErrorBoundary compact>
-          <MyEquipmentCard driverId={driver.id} assignedTruck={assignedTruck as any} />
-        </ErrorBoundary>
-
-        {/* Active Load Card — prioritized at the top. If no active load,
-            fall back to the Up Next pre-plan as the primary feed item. */}
-        <div id="tour-active-load">
+        <div className="flex shrink-0 items-center">
+          <DBtn tone="ghost" size="md" className="!w-11 !px-0" onClick={handleRefresh} disabled={isRefreshing} aria-label="Refresh">
+            <RefreshCw className={isRefreshing ? 'animate-spin' : ''} />
+          </DBtn>
           <ErrorBoundary compact>
-            {activeLoad ? (
-              <ActiveLoadCard
-                load={activeLoad}
-                payRate={driver.pay_rate}
-                payType={driver.pay_type}
-                driverId={driver.id}
-                onStatusUpdate={refetchLoads}
-              />
-            ) : nextLoad ? (
-              <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
-            ) : (
-              <ActiveLoadCard
-                load={undefined}
-                payRate={driver.pay_rate}
-                payType={driver.pay_type}
-                driverId={driver.id}
-                onStatusUpdate={refetchLoads}
-              />
-            )}
+            <div id="tour-notifications">
+              <DriverNotifications driverId={driver.id} />
+            </div>
           </ErrorBoundary>
         </div>
-
-
-        {/* Up Next (Pre-Plan) — only when an active load is already showing above */}
-        {activeLoad && nextLoad && (
-          <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
-        )}
-
-        {/* Scan Doc Button */}
-        <div id="tour-document-scan">
-          <DocumentScanButton driverId={driver.id} />
-        </div>
-
-        {/* GPS + Pay in one row on larger screens */}
-        <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-          <ErrorBoundary compact>
-            <LocationSharing 
-              driverId={driver.id}
-              truckId={assignedTruck?.id}
-              loadId={activeLoad?.id}
-            />
-          </ErrorBoundary>
-          <div id="tour-pay-widget">
-            <ErrorBoundary compact>
-              {driver.pay_type === 'flat' ? (
-                <WeeklyPerformanceWidget
-                  driverId={driver.id}
-                  payRate={driver.pay_rate}
-                  payType={driver.pay_type}
-                />
-              ) : (
-                <DriverPayWidget
-                  driverId={driver.id}
-                  payRate={driver.pay_rate}
-                  payType={driver.pay_type}
-                />
-              )}
-            </ErrorBoundary>
-          </div>
-        </div>
-
-        {/* Monthly Bonus Goal */}
-        <div id="tour-safety-bonus">
-          <MonthlyBonusWidget driverId={driver.id} />
-        </div>
-        {/* W-2 Pay Stubs (only renders for W-2 drivers with history) */}
-        <ErrorBoundary compact>
-          <DriverPayStubsCard />
-        </ErrorBoundary>
-
-        {/* Driver Leaderboard */}
-        <DriverLeaderboard readOnly />
-
-
-
-        {/* Unified Driver Requests & Maintenance */}
-        <div id="tour-driver-requests" className="space-y-3">
-          <ErrorBoundary compact>
-            <DriverRequestsCard 
-              driverId={driver.id}
-              truckId={assignedTruck?.id}
-              activeLoadId={activeLoad?.id}
-              activeLoadNumber={activeLoad?.landstar_load_id}
-            />
-          </ErrorBoundary>
-
-          <ErrorBoundary compact>
-            <MaintenanceRequestCard
-              driverId={driver.id}
-              truckId={assignedTruck?.id}
-            />
-          </ErrorBoundary>
-        </div>
-
       </div>
 
-    </>
+      <OnboardingRevisionBanner driverId={driver.id} credentialsStatus={(driver as any).credentials_review_status ?? null} />
+
+      {/* The current load comes first. With none, the load after it takes its place. */}
+      <div id="tour-active-load" className="space-y-3">
+        <ErrorBoundary compact>
+          {activeLoad ? (
+            <ActiveLoadCard load={activeLoad} payRate={driver.pay_rate} payType={driver.pay_type} driverId={driver.id} truckId={assignedTruck?.id} onStatusUpdate={refetchLoads} />
+          ) : nextLoad ? (
+            <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
+          ) : (
+            <ActiveLoadCard load={undefined} payRate={driver.pay_rate} payType={driver.pay_type} driverId={driver.id} onStatusUpdate={refetchLoads} />
+          )}
+        </ErrorBoundary>
+        {activeLoad && nextLoad && <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />}
+      </div>
+
+      {/* With a load running, scan and issue sit under the load card. Without one they stand alone. */}
+      {!activeLoad && (
+        <div id="tour-document-scan" className="grid grid-cols-2 gap-2">
+          <DocumentScanButton driverId={driver.id} variant="tile" />
+          <ReportIssueTile driverId={driver.id} truckId={assignedTruck?.id} />
+        </div>
+      )}
+
+      <div id="tour-pay-widget">
+        <ErrorBoundary compact>
+          {driver.pay_type === 'flat' ? (
+            <WeeklyPerformanceWidget driverId={driver.id} payRate={driver.pay_rate} payType={driver.pay_type} />
+          ) : (
+            <DriverPayWidget driverId={driver.id} payRate={driver.pay_rate} payType={driver.pay_type} />
+          )}
+        </ErrorBoundary>
+      </div>
+
+      <ErrorBoundary compact>
+        <MyEquipmentCard driverId={driver.id} assignedTruck={assignedTruck as any} />
+      </ErrorBoundary>
+
+      <ErrorBoundary compact>
+        <LocationSharing driverId={driver.id} truckId={assignedTruck?.id} loadId={activeLoad?.id} />
+      </ErrorBoundary>
+
+      <div id="tour-safety-bonus">
+        <ErrorBoundary compact>
+          <MonthlyBonusWidget driverId={driver.id} />
+        </ErrorBoundary>
+      </div>
+
+      <div id="tour-driver-requests" className="space-y-3">
+        <ErrorBoundary compact>
+          <DriverRequestsCard
+            driverId={driver.id}
+            truckId={assignedTruck?.id}
+            activeLoadId={activeLoad?.id}
+            activeLoadNumber={activeLoad?.landstar_load_id}
+          />
+        </ErrorBoundary>
+
+        <ErrorBoundary compact>
+          <MaintenanceRequestCard driverId={driver.id} truckId={assignedTruck?.id} />
+        </ErrorBoundary>
+      </div>
+
+      <ErrorBoundary compact>
+        <MyJobCard driverId={driver.id} />
+      </ErrorBoundary>
+
+      {/* W-2 pay stubs (only renders for W-2 drivers with history) */}
+      <ErrorBoundary compact>
+        <DriverPayStubsCard />
+      </ErrorBoundary>
+
+      <ErrorBoundary compact>
+        <DriverLeaderboard readOnly variant="app" />
+      </ErrorBoundary>
+    </div>
   );
 });
 

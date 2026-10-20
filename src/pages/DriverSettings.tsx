@@ -4,16 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DBtn, Note, Panel, PanelHead, Row } from '@/components/driver/ui/driver-ui';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Target, Sun, Moon, DollarSign, Route, Loader2, CalendarClock, Flag } from 'lucide-react';
+import { Sun, Moon, Loader2 } from 'lucide-react';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
@@ -26,6 +23,18 @@ const DAY_OPTIONS = [
   { value: 5, label: 'Friday' },
   { value: 6, label: 'Saturday' },
 ];
+
+function Page({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-2xl space-y-3 pb-6">
+      <div className="px-1 pt-1">
+        <h1 className="text-2xl font-semibold leading-tight">Settings</h1>
+        <p className="text-sm text-muted-foreground">Your look, your goals, and your details.</p>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function DriverSettings() {
   const { user } = useAuth();
@@ -149,264 +158,120 @@ export default function DriverSettings() {
 
   if (isLoading) {
     return (
-      <>
-        <PageHeader title="Settings" description="Manage your preferences and goals" />
-        <div className="space-y-6">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
-      </>
+      <Page>
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </Page>
     );
   }
 
   if (!driver) {
     return (
-      <>
-        <PageHeader title="Settings" description="Manage your preferences and goals" />
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
-            Driver profile not found. Please contact an administrator.
-          </CardContent>
-        </Card>
-      </>
+      <Page>
+        <Panel><Note>Driver profile not found. Contact an administrator.</Note></Panel>
+      </Page>
     );
   }
 
+  const field = 'h-12 text-base';
+
   return (
-    <>
-      <PageHeader title="Settings" description="Manage your preferences and goals" />
-      
-      <div className="space-y-6">
-        {/* Appearance Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sun className="h-5 w-5" />
-              Appearance
-            </CardTitle>
-            <CardDescription>
-              Customize how the app looks on your device
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Theme</Label>
-                <p className="text-sm text-muted-foreground">
-                  Choose between light, dark, or system theme
-                </p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant={theme === 'light' ? 'default' : 'outline'}
-                className="flex flex-col items-center justify-center gap-2 h-auto min-h-[72px] px-4 py-4"
-                onClick={() => setTheme('light')}
-              >
-                <Sun className="h-5 w-5" />
-                <span>Light</span>
-              </Button>
-              <Button
-                variant={theme === 'dark' ? 'default' : 'outline'}
-                className="flex flex-col items-center justify-center gap-2 h-auto min-h-[72px] px-4 py-4"
-                onClick={() => setTheme('dark')}
-              >
-                <Moon className="h-5 w-5" />
-                <span>Dark</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+    <Page>
+      <Panel>
+        <PanelHead title="Appearance" aside="Light or dark" />
+        <div className="grid grid-cols-2 gap-2 px-4 pb-4">
+          {([
+            { value: 'light', label: 'Light', icon: <Sun /> },
+            { value: 'dark', label: 'Dark', icon: <Moon /> },
+          ] as const).map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={theme === o.value}
+              onClick={() => setTheme(o.value)}
+              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-6 ${theme === o.value ? 'border-carbon bg-carbon/20 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-secondary'}`}
+            >
+              {o.icon}
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </Panel>
 
-        {/* Goals Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Weekly Goals
-            </CardTitle>
-            <CardDescription>
-              Set your personal weekly targets to track your progress
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {isFlatRate ? (
-              <div className="space-y-2">
-                <Label htmlFor="targetMiles" className="flex items-center gap-2">
-                  <Route className="h-4 w-4" />
-                  Weekly Mileage Target
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="targetMiles"
-                    type="number"
-                    value={targetMiles}
-                    onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)}
-                    min={0}
-                    step={100}
-                    className="w-full sm:w-64"
-                  />
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {targetMiles > 0
-                    ? `Aim for steady weekly progress to hit your ${targetMiles.toLocaleString()}-mile target and climb to the next safety-bonus tier.`
-                    : 'Aim for steady weekly progress to climb to the next safety-bonus tier.'}
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Goal Type */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Flag className="h-4 w-4" />
-                    Primary Goal Type
-                  </Label>
-                  <Select value={goalType} onValueChange={(val) => setGoalType(val as 'financial' | 'mileage')}>
-                    <SelectTrigger className="w-full sm:w-64">
-                      <SelectValue placeholder="Select goal type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="financial">Financial (Revenue)</SelectItem>
-                      <SelectItem value="mileage">Mileage</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Choose which goal drives the progress bar on your dashboard.
-                  </p>
-                </div>
-
-                {goalType === 'mileage' ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="targetMiles" className="flex items-center gap-2">
-                      <Route className="h-4 w-4" />
-                      Weekly Mileage Target
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="targetMiles"
-                        type="number"
-                        value={targetMiles}
-                        onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)}
-                        min={0}
-                        step={100}
-                        className="w-full sm:w-64"
-                      />
-                      <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Your target miles to drive each week.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="revenueGoal" className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Weekly Revenue Goal
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">$</span>
-                      <Input
-                        id="revenueGoal"
-                        type="number"
-                        value={weeklyRevenueGoal}
-                        onChange={(e) => setWeeklyRevenueGoal(parseInt(e.target.value) || 0)}
-                        min={0}
-                        step={100}
-                        className="w-full sm:w-64"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Your target earnings each week.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-
-
-            {/* Pay Week Start Day */}
+      <Panel>
+        <PanelHead title="Weekly goals" aside="Shown on your home screen" />
+        <div className="space-y-5 px-4 pb-4">
+          {isFlatRate ? (
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <CalendarClock className="h-4 w-4" />
-                Pay Week Start Day (Scan Day)
-              </Label>
-              <Select
-                value={String(payWeekStartDay)}
-                onValueChange={(val) => setPayWeekStartDay(Number(val))}
-              >
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Select scan day" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAY_OPTIONS.map((d) => (
-                    <SelectItem key={d.value} value={String(d.value)}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="targetMiles">Weekly mileage target</Label>
+              <div className="flex items-center gap-2">
+                <Input id="targetMiles" type="number" inputMode="numeric" value={targetMiles} onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)} min={0} step={100} className={field} />
+                <span className="text-sm text-muted-foreground">miles</span>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Set this to your Landstar scan day so the weekly progress in the dashboard matches your settlement cycle.
+                {targetMiles > 0
+                  ? `Steady weekly progress to your ${targetMiles.toLocaleString()} mile target climbs you to the next safety-bonus tier.`
+                  : 'Steady weekly progress climbs you to the next safety-bonus tier.'}
               </p>
             </div>
-
-            <Separator />
-
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleSaveGoals} 
-                disabled={saveGoalsMutation.isPending}
-                className="gradient-gold text-primary-foreground"
-              >
-                {saveGoalsMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Goals'
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-
-        {/* Profile Info (Read-only) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Information</CardTitle>
-            <CardDescription>
-              Your driver profile details (contact admin to update)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label className="text-muted-foreground">Name</Label>
-                <p className="font-medium">{driver.first_name} {driver.last_name}</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>Main goal</Label>
+                <Select value={goalType} onValueChange={(val) => setGoalType(val as 'financial' | 'mileage')}>
+                  <SelectTrigger className={field}><SelectValue placeholder="Select goal type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="financial">Money earned</SelectItem>
+                    <SelectItem value="mileage">Miles driven</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">This is the goal the progress bar on your home screen follows.</p>
               </div>
-              <div>
-                <Label className="text-muted-foreground">Email</Label>
-                <p className="font-medium">{driver.email || user?.email || '-'}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground">Phone</Label>
-                <p className="font-medium">{driver.phone || '-'}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground">Pay Rate</Label>
-                <p className="font-medium">
-                  {formatPayRate(driver.pay_type, driver.pay_rate)}
-                </p>
 
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </>
+              {goalType === 'mileage' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="targetMiles">Weekly mileage target</Label>
+                  <div className="flex items-center gap-2">
+                    <Input id="targetMiles" type="number" inputMode="numeric" value={targetMiles} onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)} min={0} step={100} className={field} />
+                    <span className="text-sm text-muted-foreground">miles</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="revenueGoal">Weekly earnings goal</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base text-muted-foreground">$</span>
+                    <Input id="revenueGoal" type="number" inputMode="numeric" value={weeklyRevenueGoal} onChange={(e) => setWeeklyRevenueGoal(parseInt(e.target.value) || 0)} min={0} step={100} className={field} />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="space-y-2">
+            <Label>Pay week starts on (your scan day)</Label>
+            <Select value={String(payWeekStartDay)} onValueChange={(val) => setPayWeekStartDay(Number(val))}>
+              <SelectTrigger className={field}><SelectValue placeholder="Select scan day" /></SelectTrigger>
+              <SelectContent>
+                {DAY_OPTIONS.map((d) => <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Set this to your Landstar scan day so your weekly progress matches your settlement cycle.</p>
+          </div>
+
+          <DBtn tone="primary" size="lg" className="w-full" onClick={handleSaveGoals} disabled={saveGoalsMutation.isPending}>
+            {saveGoalsMutation.isPending ? <><Loader2 className="animate-spin" /> Saving</> : 'Save goals'}
+          </DBtn>
+        </div>
+      </Panel>
+
+      <Panel>
+        <PanelHead title="Your details" aside="Ask the office to change these" />
+        <Row label="Name">{driver.first_name} {driver.last_name}</Row>
+        <Row label="Email">{driver.email || user?.email || '-'}</Row>
+        <Row label="Phone">{driver.phone || '-'}</Row>
+        <Row label="Pay rate">{formatPayRate(driver.pay_type, driver.pay_rate)}</Row>
+      </Panel>
+    </Page>
   );
 }

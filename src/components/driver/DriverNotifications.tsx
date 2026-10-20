@@ -170,7 +170,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative h-11 w-11" aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}>
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge 
@@ -182,7 +182,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
+      <PopoverContent className="w-[min(22rem,calc(100vw-1rem))] rounded-xl p-0" align="end">
         <div className="flex items-center justify-between p-3 border-b">
           <h4 className="font-semibold">Notifications</h4>
           <div className="flex items-center gap-1">
@@ -212,7 +212,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
           </div>
         </div>
         
-        <ScrollArea className="h-[300px]">
+        <ScrollArea className="h-[min(20rem,60dvh)]">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Bell className="h-8 w-8 text-muted-foreground mb-2" />

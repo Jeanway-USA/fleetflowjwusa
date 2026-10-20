@@ -1,16 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { downloadW2PayStub } from '@/lib/pdf/generateW2PayStubPdf';
+import { DBtn, Panel, PanelHead } from '@/components/driver/ui/driver-ui';
 
 /**
- * Driver-facing card that lists the signed-in driver's W-2 pay stubs.
+ * Driver-facing list of the signed-in driver's W-2 pay stubs.
  * Only renders if the driver has at least one W-2 payroll row.
  */
 export function DriverPayStubsCard() {
@@ -60,71 +58,35 @@ export function DriverPayStubsCard() {
   };
 
   return (
-    <Card className="card-elevated">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" /> Pay Stubs
-        </CardTitle>
-        <CardDescription>Your W-2 pay history. Tap Download to save a stub as PDF.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Pay Date</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead className="text-right">Gross</TableHead>
-                <TableHead className="text-right">Taxes</TableHead>
-                <TableHead className="text-right">Net</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stubs.map((s: any) => {
-                const taxes =
-                  Number(s.federal_income_tax ?? 0) +
-                  Number(s.social_security_tax ?? 0) +
-                  Number(s.medicare_tax ?? 0) +
-                  Number(s.additional_medicare_tax ?? 0);
-                return (
-                  <TableRow key={s.id}>
-                    <TableCell>{formatDate(s.payment_date ?? s.period_end)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatDate(s.period_start)} – {formatDate(s.period_end)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(Number(s.gross_pay ?? 0))}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatCurrency(taxes)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-semibold text-primary">
-                      {formatCurrency(Number(s.net_pay ?? 0))}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload(s.id)}
-                        disabled={downloadingId === s.id}
-                      >
-                        {downloadingId === s.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4 mr-1" /> PDF
-                          </>
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+    <Panel>
+      <PanelHead title="Pay stubs" aside="W-2 pay history" />
+      <ul className="divide-y divide-border">
+        {stubs.map((s: any) => {
+          const taxes =
+            Number(s.federal_income_tax ?? 0) +
+            Number(s.social_security_tax ?? 0) +
+            Number(s.medicare_tax ?? 0) +
+            Number(s.additional_medicare_tax ?? 0);
+          return (
+            <li key={s.id} className="px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold tabular-nums">{formatDate(s.payment_date ?? s.period_end)}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(s.period_start)} to {formatDate(s.period_end)}</p>
+                </div>
+                <DBtn tone="secondary" size="md" onClick={() => handleDownload(s.id)} disabled={downloadingId === s.id} aria-label="Download pay stub as PDF">
+                  {downloadingId === s.id ? <Loader2 className="animate-spin" /> : <Download />} PDF
+                </DBtn>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                <div><p className="text-muted-foreground">Gross</p><p className="mt-0.5 font-medium tabular-nums">{formatCurrency(Number(s.gross_pay ?? 0))}</p></div>
+                <div><p className="text-muted-foreground">Taxes</p><p className="mt-0.5 font-medium tabular-nums">{formatCurrency(taxes)}</p></div>
+                <div><p className="text-muted-foreground">Net</p><p className="mt-0.5 text-sm font-semibold tabular-nums">{formatCurrency(Number(s.net_pay ?? 0))}</p></div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
   );
 }

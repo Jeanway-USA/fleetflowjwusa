@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { SheetContent } from '@/components/driver/ui/driver-ui';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { IntegerInput } from '@/components/ui/numeric-input';
@@ -99,7 +99,7 @@ export function StartingOdometerDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-sm">
+      <SheetContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gauge className="h-5 w-5 text-primary" />
@@ -155,7 +155,7 @@ export function StartingOdometerDialog({
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </SheetContent>
     </Dialog>
   );
 }
