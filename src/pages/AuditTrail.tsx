@@ -16,7 +16,6 @@ export default function AuditTrail() {
       <PageHeader
         title="Audit Trail"
         description="Immutable, append-only record of every change across fleet, drivers, and settlements."
-        hideNotifications
       />
 
       <MetricsSnapshot />

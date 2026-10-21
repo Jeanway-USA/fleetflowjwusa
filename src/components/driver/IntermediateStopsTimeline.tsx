@@ -126,7 +126,7 @@ export function IntermediateStopsTimeline({ loadId }: IntermediateStopsTimelineP
                     Stop {stop.stop_number ?? idx + 1}
                   </span>
                   {stop.stop_type && (
-                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    <span className="text-xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                       {stop.stop_type}
                     </span>
                   )}

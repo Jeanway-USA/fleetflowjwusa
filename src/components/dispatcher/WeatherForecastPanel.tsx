@@ -118,7 +118,7 @@ function ForecastList({ coords }: { coords: Coords | null }) {
                 <p className="text-sm font-semibold leading-tight">
                   {Math.round(d.tempMaxF)}°
                 </p>
-                <p className="text-[10px] text-muted-foreground leading-tight">
+                <p className="text-xs text-muted-foreground leading-tight">
                   {Math.round(d.tempMinF)}°
                 </p>
               </div>

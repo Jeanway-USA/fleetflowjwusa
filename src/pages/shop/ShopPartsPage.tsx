@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { useAllPartsInventory, useRequestReorder, type PartInventoryItem } from '@/hooks/useMaintenanceData';
 import { money } from '@/lib/shop/board';
 import { ShopNav } from '@/components/shop/ShopNav';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { StatStrip } from '@/components/shared/StatStrip';
 import { ShopEmpty } from '@/components/shop/shared';
 
 const db = supabase as any;
@@ -165,37 +167,21 @@ export default function ShopPartsPage() {
 
   return (
     <div>
-      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Boxes className="h-4 w-4 text-primary" />Shop</p>
-          <h1 className="font-condensed text-[32px] font-bold leading-tight">Parts room</h1>
-        </div>
+      <PageHeader title="Parts room">
         <Button className="h-11 gap-2 gradient-gold text-primary-foreground" onClick={() => setCreating(true)}><Plus className="h-4 w-4" />New part</Button>
-      </header>
+      </PageHeader>
       <ShopNav />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: 'Parts on the shelf', value: counts.total, tone: '' },
-          { label: 'Running low', value: counts.low, tone: counts.low ? 'text-orange-300' : '' },
-          { label: 'Out of stock', value: counts.out, tone: counts.out ? 'text-red-400' : '' },
-          { label: 'Shelf value', value: money(counts.value), tone: '' },
-        ].map((s) => (
-          <div key={s.label} className="rounded-2xl border bg-card px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{s.label}</p>
-            <p className={cn('mt-1 font-condensed text-4xl font-bold leading-none tabular-nums', s.tone)}>{s.value}</p>
-          </div>
-        ))}
-      </div>
+      <StatStrip className="mb-4" cells={[{ label: 'Parts on the shelf', value: counts.total }, { label: 'Running low', value: counts.low, problem: counts.low > 0 }, { label: 'Out of stock', value: counts.out, problem: counts.out > 0 }, { label: 'Shelf value', value: money(counts.value) }]} />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number or vendor" className="h-11 pl-9 sm:pl-9" />
         </div>
-        <div role="tablist" className="flex rounded-xl bg-muted p-1">
+        <div role="tablist" className="flex rounded-md bg-muted p-1">
           {(['all', 'low', 'out'] as Filter[]).map((f) => (
-            <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={cn('min-h-[40px] rounded-lg px-4 text-sm font-medium capitalize', filter === f ? 'bg-background shadow' : 'text-muted-foreground')}>{f === 'all' ? 'All' : f === 'low' ? 'Low' : 'Out'}</button>
+            <button key={f} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={cn('min-h-[40px] rounded-sm px-4 text-sm font-medium capitalize', filter === f ? 'bg-background shadow' : 'text-muted-foreground')}>{f === 'all' ? 'All' : f === 'low' ? 'Low' : 'Out'}</button>
           ))}
         </div>
         {categories.length > 0 && (
@@ -207,7 +193,7 @@ export default function ShopPartsPage() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
+        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}</div>
       ) : shown.length === 0 ? (
         <ShopEmpty icon={Boxes} title={parts.length === 0 ? 'The shelf is empty' : 'No parts match'}>{parts.length === 0 ? 'Add the parts you keep in stock so mechanics can log them to jobs.' : 'Try a different search or filter.'}</ShopEmpty>
       ) : (
@@ -216,7 +202,7 @@ export default function ShopPartsPage() {
             const state = stockState(p);
             const pct = Math.min(100, Math.round((Number(p.quantity_on_hand) / Math.max(1, Number(p.min_threshold) * 2)) * 100));
             return (
-              <li key={p.id} className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-l-4 bg-card p-3.5', state === 'out' ? 'border-l-red-500' : state === 'low' ? 'border-l-orange-500' : 'border-l-emerald-500/60')}>
+              <li key={p.id} className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card p-3.5')}>
                 <div className="min-w-0 flex-1 basis-56">
                   <p className="truncate font-medium">{p.part_name}</p>
                   <p className="truncate text-xs text-muted-foreground">{[p.part_number, p.category, p.vendor_name].filter(Boolean).join(' · ') || 'No details yet'}</p>
@@ -227,7 +213,7 @@ export default function ShopPartsPage() {
                     {Number(p.quantity_on_hand)} <span className="text-sm font-normal text-muted-foreground">{p.unit}</span>
                   </p>
                   <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full', state === 'out' ? 'bg-red-500' : state === 'low' ? 'bg-orange-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} /></div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">Reorder at {Number(p.min_threshold)}{p.unit_cost ? ` · ${money(Number(p.unit_cost))} each` : ''}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Reorder at {Number(p.min_threshold)}{p.unit_cost ? ` · ${money(Number(p.unit_cost))} each` : ''}</p>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <Button size="sm" className="h-10 gap-1.5" onClick={() => setReceiving(p)}><Truck className="h-4 w-4" />Receive</Button>

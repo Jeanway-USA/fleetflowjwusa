@@ -38,7 +38,7 @@ export function BlockDialog({ detail, open, onOpenChange, touch }: { detail: Sho
         </DialogHeader>
         <div className="grid gap-2">
           {BLOCK_REASONS.map((r) => (
-            <button key={r} type="button" onClick={() => setReason(r)} className={cn('rounded-xl border px-4 text-left font-medium transition-colors', touch ? 'min-h-[60px] text-lg' : 'min-h-[48px]', reason === r ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500' : 'hover:bg-accent')}>
+            <button key={r} type="button" onClick={() => setReason(r)} className={cn('rounded-lg border px-4 text-left font-medium transition-colors', touch ? 'min-h-[60px] text-lg' : 'min-h-[48px]', reason === r ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500' : 'hover:bg-accent')}>
               {r}
             </button>
           ))}
@@ -89,9 +89,9 @@ export function FinishDialog({ detail, open, onOpenChange, onDone, touch }: { de
         )}
 
         <dl className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-xl bg-muted/60 p-3"><dt className="text-xs text-muted-foreground">Time</dt><dd className="font-condensed text-2xl font-bold">{formatMinutes(job.laborMinutes)}</dd></div>
-          <div className="rounded-xl bg-muted/60 p-3"><dt className="text-xs text-muted-foreground">Parts</dt><dd className="font-condensed text-2xl font-bold">{money(job.partsCost)}</dd></div>
-          <div className="rounded-xl bg-muted/60 p-3"><dt className="text-xs text-muted-foreground">Tasks</dt><dd className="font-condensed text-2xl font-bold">{job.tasksDone}/{job.tasksTotal}</dd></div>
+          <div className="rounded-lg bg-muted/60 p-3"><dt className="text-xs text-muted-foreground">Time</dt><dd className="font-condensed text-2xl font-bold">{formatMinutes(job.laborMinutes)}</dd></div>
+          <div className="rounded-lg bg-muted/60 p-3"><dt className="text-xs text-muted-foreground">Parts</dt><dd className="font-condensed text-2xl font-bold">{money(job.partsCost)}</dd></div>
+          <div className="rounded-lg bg-muted/60 p-3"><dt className="text-xs text-muted-foreground">Tasks</dt><dd className="font-condensed text-2xl font-bold">{job.tasksDone}/{job.tasksTotal}</dd></div>
         </dl>
 
         <label className="block space-y-1.5 text-sm font-medium">

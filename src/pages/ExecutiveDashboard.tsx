@@ -28,6 +28,7 @@ import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/Critica
 import { MorningBriefingWidget } from '@/components/executive/MorningBriefingWidget';
 import { PendingActionsCard, PendingAction } from '@/components/executive/PendingActionsCard';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { PrintableExecutiveSummary } from '@/components/executive/PrintableExecutiveSummary';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
@@ -669,16 +670,12 @@ export default function ExecutiveDashboard() {
   return (
     <>
       <div className="space-y-4 lg:space-y-6">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h1 className="font-condensed text-[28px] font-bold leading-tight sm:text-[32px]">Today</h1>
-            <p className="text-[15px] text-muted-foreground">{format(new Date(), 'EEEE, MMMM d')}</p>
-          </div>
-          <Button variant="outline" onClick={() => setShowReport(true)} className="h-11 gap-2 sm:h-10">
+        <PageHeader title="Today" description={format(new Date(), 'EEEE, MMMM d')}>
+          <Button variant="outline" onClick={() => setShowReport(true)} className="h-11 gap-2 sm:h-10 w-full sm:w-auto">
             <FileText className="h-4 w-4" />
             EOW report
           </Button>
-        </div>
+        </PageHeader>
 
         {/* The week on a log page, and the period's money as statement lines */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6" data-tour="revenue-kpi">

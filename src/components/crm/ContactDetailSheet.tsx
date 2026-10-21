@@ -55,7 +55,7 @@ function Field({ icon: Icon, label, value, href }: { icon?: any; label: string; 
     <div className="flex items-start gap-2">
       {Icon && <Icon className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />}
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <div className="text-sm text-foreground break-words">{value}</div>
       </div>
     </div>
@@ -100,7 +100,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
                 <Badge variant="outline" className={`text-xs capitalize ${TYPE_COLORS[contact.contact_type] || ''}`}>
                   {contact.contact_type}
                 </Badge>
-                {subType && <Badge variant="secondary" className="text-[10px]">{subType}</Badge>}
+                {subType && <Badge variant="secondary" className="text-xs">{subType}</Badge>}
                 {contact.agent_code && (
                   <Badge variant="outline" className="text-xs font-mono">Code: {contact.agent_code}</Badge>
                 )}
@@ -168,10 +168,10 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               <Field icon={MapPin} label="Address" value={addressLine || null} />
               {contact.tags && contact.tags.length > 0 && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Tags</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Tags</div>
                   <div className="flex flex-wrap gap-1">
                     {contact.tags.map((t) => (
-                      <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
+                      <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
                     ))}
                   </div>
                 </div>
@@ -186,7 +186,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
             <section className="space-y-3 pb-4 border-b border-border">
               {contact.agent_code && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">Agent Code</div>
+                  <div className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-400">Agent Code</div>
                   <div className="text-2xl font-mono font-bold tracking-widest text-amber-700 dark:text-amber-300">{contact.agent_code}</div>
                 </div>
               )}
@@ -212,7 +212,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               </div>
               <Field icon={Info} label="Dock Info" value={contact.dock_info} />
               {contact.appointment_required && (
-                <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">
+                <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">
                   Appointment Required
                 </Badge>
               )}
@@ -226,7 +226,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
             <section className="space-y-3 pb-4 border-b border-border">
               {contact.service_area && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-wide text-red-700 dark:text-red-400 flex items-center gap-1">
+                  <div className="text-xs uppercase tracking-wide text-red-700 dark:text-red-400 flex items-center gap-1">
                     <MapPinned className="h-3 w-3" /> Service Area
                   </div>
                   <div className="text-base font-semibold text-red-700 dark:text-red-300 mt-0.5">{contact.service_area}</div>
@@ -268,10 +268,10 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               <Field icon={MapPin} label="Address" value={addressLine || null} />
               {contact.tags && contact.tags.length > 0 && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Tags</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Tags</div>
                   <div className="flex flex-wrap gap-1">
                     {contact.tags.map((t) => (
-                      <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
+                      <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
                     ))}
                   </div>
                 </div>
@@ -315,7 +315,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
                                 <Route className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                 <span className="truncate">{lane.origin} → {lane.destination}</span>
                               </div>
-                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                              <div className="text-xs text-muted-foreground mt-0.5">
                                 Revenue: {formatCurrency(lane.totalRevenue)}
                                 {lane.lastDeliveredAt && (
                                   <> · Last: {format(parseISO(`${lane.lastDeliveredAt}T00:00:00`), 'MMM d, yyyy')}</>
@@ -324,7 +324,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
                             </div>
                             <div className="text-right shrink-0">
                               <div className="text-sm font-semibold tabular-nums">{lane.count}</div>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">loads</div>
+                              <div className="text-xs uppercase tracking-wide text-muted-foreground">loads</div>
                             </div>
                           </div>
                         </li>

@@ -110,7 +110,7 @@ export function CompanyHealthScore({ data, isLoading }: CompanyHealthScoreProps)
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className={`text-2xl font-bold ${status.color}`}>{score}</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Score</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Score</span>
           </div>
         </div>
         

@@ -13,12 +13,14 @@ import { toLocalIso } from '@/lib/datetime';
 import { buildPlanner, planCounts, projectedDate, remainingLabel, sortPlan, type PlannerItem, type PlanStatus } from '@/lib/shop/planner';
 import { NewJobSheet } from '@/components/shop/NewJobSheet';
 import { ShopNav } from '@/components/shop/ShopNav';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { StatStrip } from '@/components/shared/StatStrip';
 import { ShopEmpty } from '@/components/shop/shared';
 
-const TONE: Record<PlanStatus, { rail: string; text: string; bar: string; label: string }> = {
-  overdue: { rail: 'border-l-red-500', text: 'text-red-400', bar: 'bg-red-500', label: 'Overdue' },
-  soon: { rail: 'border-l-orange-500', text: 'text-orange-300', bar: 'bg-orange-500', label: 'Due soon' },
-  ok: { rail: 'border-l-emerald-500/60', text: 'text-emerald-400', bar: 'bg-emerald-500', label: 'On track' },
+const TONE: Record<PlanStatus, { text: string; bar: string; label: string }> = {
+  overdue: { text: 'text-red-400', bar: 'bg-red-500', label: 'Overdue' },
+  soon: { text: 'text-orange-300', bar: 'bg-orange-500', label: 'Due soon' },
+  ok: { text: 'text-emerald-400', bar: 'bg-emerald-500', label: 'On track' },
 };
 
 type View = 'attention' | 'trucks' | 'forecast';
@@ -67,7 +69,7 @@ export default function ShopPlannerPage() {
     const pct = Math.max(0, Math.min(100, Math.round((i.used / Math.max(1, i.interval)) * 100)));
     const existing = scheduledFor(i);
     return (
-      <li className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-l-4 bg-card p-3.5', tone.rail)}>
+      <li className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card p-3.5')}>
         {showUnit && <span className="w-20 shrink-0 font-condensed text-3xl font-bold leading-none">{i.unit}</span>}
         <div className="min-w-0 flex-1 basis-48">
           <p className="truncate font-medium">{i.name}</p>
@@ -85,35 +87,25 @@ export default function ShopPlannerPage() {
 
   return (
     <div>
-      <header className="mb-4">
-        <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><CalendarClock className="h-4 w-4 text-primary" />Shop</p>
-        <h1 className="font-condensed text-[32px] font-bold leading-tight">Service planner</h1>
-      </header>
+      <PageHeader title="Service planner" />
       <ShopNav />
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
-        {(['overdue', 'soon', 'ok'] as PlanStatus[]).map((s) => (
-          <div key={s} className="rounded-2xl border bg-card px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{TONE[s].label}</p>
-            <p className={cn('mt-1 font-condensed text-4xl font-bold leading-none tabular-nums', counts[s] > 0 && TONE[s].text)}>{counts[s]}</p>
-          </div>
-        ))}
-      </div>
+      <StatStrip className="mb-4" cells={(['overdue', 'soon', 'ok'] as PlanStatus[]).map((s) => ({ label: TONE[s].label, value: counts[s], problem: s === 'overdue' && counts[s] > 0 }))} />
 
-      <div role="tablist" className="mb-4 inline-flex rounded-xl bg-muted p-1">
+      <div role="tablist" className="mb-4 inline-flex rounded-md bg-muted p-1">
         {([['attention', `Needs attention (${attention.length})`], ['trucks', 'By truck'], ['forecast', 'Coming up']] as Array<[View, string]>).map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={cn('min-h-[44px] rounded-lg px-4 text-sm font-medium', view === k ? 'bg-background shadow' : 'text-muted-foreground')}>{label}</button>
+          <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={cn('min-h-[44px] rounded-sm px-4 text-sm font-medium', view === k ? 'bg-background shadow' : 'text-muted-foreground')}>{label}</button>
         ))}
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl" />)}</div>
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
       ) : view === 'attention' ? (
         attention.length === 0 ? <ShopEmpty icon={CalendarClock} title="Nothing is due">Every truck is within its service intervals.</ShopEmpty> : <ul className="space-y-2">{attention.map((i) => <Row key={`${i.truckId}-${i.name}`} i={i} />)}</ul>
       ) : view === 'trucks' ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {byTruck.map(([id, list]) => (
-            <section key={id} className="rounded-2xl border bg-muted/30 p-3">
+            <section key={id} className="rounded-lg border bg-muted/30 p-3">
               <h2 className="mb-2 px-1 font-condensed text-2xl font-bold">{list[0].unit} <span className="text-sm font-normal text-muted-foreground">{list[0].make}</span></h2>
               <ul className="space-y-2">{list.map((i) => <Row key={i.name} i={i} showUnit={false} />)}</ul>
             </section>
@@ -124,7 +116,7 @@ export default function ShopPlannerPage() {
       ) : (
         <ul className="space-y-2">
           {forecast.map(({ i, when }) => (
-            <li key={`${i.truckId}-${i.name}`} className="flex items-center gap-4 rounded-2xl border bg-card p-3.5">
+            <li key={`${i.truckId}-${i.name}`} className="flex items-center gap-4 rounded-lg border bg-card p-3.5">
               <div className="w-16 shrink-0 text-center"><p className="font-condensed text-3xl font-bold leading-none">{format(when, 'd')}</p><p className="text-xs uppercase text-muted-foreground">{format(when, 'MMM')}</p></div>
               <span className="w-16 shrink-0 font-condensed text-2xl font-bold">{i.unit}</span>
               <span className="min-w-0 flex-1 truncate">{i.name}</span>

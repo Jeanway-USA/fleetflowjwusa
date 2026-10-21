@@ -132,7 +132,7 @@ export default function PublicLoadTracker() {
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
         <header className="space-y-2">
-          <h1 className="text-2xl font-semibold">Shipment Tracking</h1>
+          <h1 className="font-condensed text-[32px] font-bold leading-tight">Shipment Tracking</h1>
           <p className="text-sm text-muted-foreground">
             Load {data.landstar_load_id ? `#${data.landstar_load_id}` : ""}
           </p>
@@ -149,7 +149,7 @@ export default function PublicLoadTracker() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
-              <div className="text-xs uppercase text-muted-foreground mb-1 flex items-center gap-1">
+              <div className="text-[13px] text-muted-foreground mb-1 flex items-center gap-1">
                 <MapPin className="h-3 w-3" /> Origin
               </div>
               <div className="font-medium">{data.origin || "—"}</div>
@@ -159,7 +159,7 @@ export default function PublicLoadTracker() {
               </div>
             </div>
             <div>
-              <div className="text-xs uppercase text-muted-foreground mb-1 flex items-center gap-1">
+              <div className="text-[13px] text-muted-foreground mb-1 flex items-center gap-1">
                 <MapPin className="h-3 w-3" /> Destination
               </div>
               <div className="font-medium">{data.destination || "—"}</div>

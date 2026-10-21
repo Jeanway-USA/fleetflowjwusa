@@ -12,7 +12,7 @@ import { DialogContent } from '@/components/ui/dialog';
 
 /** A card. 12px corners, a hairline edge, no shadow: it sits on the page rather than floating over it. */
 export function Panel({ className, ...props }: React.HTMLAttributes<HTMLElement> & { as?: React.ElementType }) {
-  return <section className={cn('overflow-hidden rounded-xl border border-border bg-card text-card-foreground', className)} {...props} />;
+  return <section className={cn('overflow-hidden rounded-lg border border-border bg-card text-card-foreground', className)} {...props} />;
 }
 
 /** The title line of a card: a name on the left, an action or hint on the right. */
@@ -71,7 +71,7 @@ export function Chip({ tone, className, ...props }: React.HTMLAttributes<HTMLSpa
 }
 
 const btn = cva(
-  'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-5 [&_svg]:shrink-0',
+  'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-5 [&_svg]:shrink-0',
   {
     variants: {
       tone: {
@@ -109,7 +109,7 @@ export const Tile = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttribut
       ref={ref}
       type="button"
       className={cn(
-        'flex min-h-[72px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-secondary active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [&_svg]:size-6',
+        'flex min-h-[72px] w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-secondary active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [&_svg]:size-6',
         className,
       )}
       {...props}
@@ -161,7 +161,7 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className="grid auto-cols-fr grid-flow-col gap-1 rounded-xl bg-secondary p-1">
+    <div role="tablist" aria-label={label} className="grid auto-cols-fr grid-flow-col gap-1 rounded-md bg-secondary p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -170,8 +170,8 @@ export function Segmented<T extends string>({
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'min-h-11 rounded-lg px-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            value === o.value ? 'bg-card text-foreground' : 'text-muted-foreground hover:text-foreground',
+            'min-h-11 rounded-sm px-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            value === o.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
           )}
         >
           {o.label}
@@ -195,7 +195,7 @@ export const SheetContent = React.forwardRef<
   <DialogContent
     ref={ref}
     className={cn(
-      'rounded-xl shadow-lg',
+      'rounded-lg shadow-lg',
       'max-sm:!bottom-0 max-sm:!left-0 max-sm:!top-auto max-sm:!h-auto max-sm:!max-h-[92dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!translate-x-0 max-sm:!translate-y-0 max-sm:!rounded-b-none max-sm:!rounded-t-2xl',
       className,
     )}

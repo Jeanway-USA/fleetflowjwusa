@@ -71,8 +71,8 @@ function formatAddress(c: UnifiedContact): string {
 }
 
 function renderAgentStatus(status: string | null) {
-  if (status === 'safe') return <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>;
-  if (status === 'unsafe') return <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>;
+  if (status === 'safe') return <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/20">Safe</Badge>;
+  if (status === 'unsafe') return <Badge variant="outline" className="text-xs bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>;
   return <span className="text-xs text-muted-foreground">Unrated</span>;
 }
 
@@ -86,9 +86,9 @@ function renderTags(tags: string[] | null) {
   return (
     <div className="flex flex-wrap gap-1">
       {tags.slice(0, 3).map((t) => (
-        <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
+        <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
       ))}
-      {tags.length > 3 && <Badge variant="secondary" className="text-[10px]">+{tags.length - 3}</Badge>}
+      {tags.length > 3 && <Badge variant="secondary" className="text-xs">+{tags.length - 3}</Badge>}
     </div>
   );
 }
@@ -203,7 +203,7 @@ function getColumnsFor(typeFilter: string, scope: 'agencies' | 'shops', ctx: Col
       { key: 'hours', header: 'Hours', hiddenOnMobile: true, render: (c: UnifiedContact) => c.operating_hours || '—' },
       { key: 'appt', header: 'Appt', hiddenOnMobile: true, render: (c: UnifiedContact) =>
         c.appointment_required
-          ? <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Required</Badge>
+          ? <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">Required</Badge>
           : <span className="text-xs text-muted-foreground">No</span>
       },
       actionsColumn(ctx),
@@ -222,7 +222,7 @@ function getColumnsFor(typeFilter: string, scope: 'agencies' | 'shops', ctx: Col
           <Badge variant="outline" className={`text-xs capitalize w-fit ${TYPE_COLORS[c.contact_type] || ''}`}>
             {c.contact_type}
           </Badge>
-          {subType && <span className="text-[10px] text-muted-foreground">{subType}</span>}
+          {subType && <span className="text-xs text-muted-foreground">{subType}</span>}
         </div>
       );
     }},
@@ -239,22 +239,22 @@ function getColumnsFor(typeFilter: string, scope: 'agencies' | 'shops', ctx: Col
     { key: 'flags', header: 'Flags', hiddenOnMobile: true, render: (c: UnifiedContact) => (
       <div className="flex flex-wrap gap-1">
         {c.source === 'crm' && c.agent_status === 'safe' && (c.notes || '').startsWith('Auto-added from') && (
-          <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Auto-added</Badge>
+          <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">Auto-added</Badge>
         )}
         {c.source === 'facility' && c.appointment_required && (
-          <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
+          <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
         )}
         {c.agent_status === 'unsafe' && (
-          <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>
+          <Badge variant="outline" className="text-xs bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>
         )}
         {c.agent_status === 'safe' && c.source === 'resource' && (
-          <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>
+          <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/20">Safe</Badge>
         )}
         {(c.tags || []).slice(0, 2).map((tag) => (
-          <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+          <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
         ))}
         {(c.tags || []).length > 2 && (
-          <Badge variant="secondary" className="text-[10px]">+{c.tags!.length - 2}</Badge>
+          <Badge variant="secondary" className="text-xs">+{c.tags!.length - 2}</Badge>
         )}
       </div>
     )},

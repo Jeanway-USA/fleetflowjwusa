@@ -11,11 +11,11 @@ const ITEMS = [
   { to: '/shop/hours', label: 'Mechanic hours', icon: Clock, ownerOnly: true },
 ] as Array<{ to: string; label: string; icon: typeof History; end?: boolean; ownerOnly?: boolean }>;
 
-/** Moves between the shop's screens. Scrolls sideways on a phone instead of wrapping. */
+/** Moves between the shop's screens. Same tab strip as the Money page; scrolls sideways on a phone instead of wrapping. */
 export function ShopNav({ className }: { className?: string }) {
   const { isOwner } = useAuth();
   return (
-    <nav aria-label="Shop sections" className={cn('-mx-1 mb-4 flex gap-1 overflow-x-auto px-1 pb-1 scrollbar-hide', className)}>
+    <nav aria-label="Shop sections" className={cn('mb-5 flex gap-1 overflow-x-auto rounded-md bg-muted p-1 scrollbar-hide', className)}>
       {ITEMS.filter((item) => !item.ownerOnly || isOwner).map((item) => (
         <NavLink
           key={item.to}
@@ -23,8 +23,8 @@ export function ShopNav({ className }: { className?: string }) {
           end={item.end}
           className={({ isActive }) =>
             cn(
-              'flex min-h-[44px] shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
-              isActive ? 'border-primary bg-primary/10 text-primary' : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
+              'flex h-11 shrink-0 items-center gap-2 rounded-sm px-4 text-sm font-medium transition-colors',
+              isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
             )
           }
         >

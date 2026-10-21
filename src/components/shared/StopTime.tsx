@@ -105,7 +105,7 @@ export function StopTime({
     <span className={cn('inline-flex flex-col leading-tight', className)}>
       <span>{fullLine}</span>
       {secondaryLine && (
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           ({secondaryLine} your time)
         </span>
       )}

@@ -832,7 +832,7 @@ export default function IFTA() {
           <TabsTrigger value="fuel" className="gap-1.5">
             Fuel Purchases
             {filteredFuelPurchases.length > 0 && (
-              <Badge variant="secondary" className="h-5 min-w-5 px-1 text-[10px]">
+              <Badge variant="secondary" className="h-5 min-w-5 px-1 text-xs">
                 {filteredFuelPurchases.length}
               </Badge>
             )}
@@ -840,7 +840,7 @@ export default function IFTA() {
           <TabsTrigger value="summary" className="gap-1.5">
             Jurisdiction Summary
             {jurisdictionStates.size > 0 && (
-              <Badge variant="secondary" className="h-5 min-w-5 px-1 text-[10px]">
+              <Badge variant="secondary" className="h-5 min-w-5 px-1 text-xs">
                 {jurisdictionStates.size}
               </Badge>
             )}
@@ -915,7 +915,7 @@ export default function IFTA() {
                             <div className="flex items-center gap-1.5">
                               {format(parseISO(fp.purchase_date), 'MM/dd/yyyy')}
                               {fp.source_expense_id && (
-                                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-primary/30 text-primary">
+                                <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-primary/30 text-primary">
                                   <Link2 className="h-2.5 w-2.5 mr-0.5" />
                                   synced
                                 </Badge>
@@ -924,12 +924,12 @@ export default function IFTA() {
                           </TableCell>
                           <TableCell>
                             {isDiscount ? (
-                              <Badge className="bg-success/10 text-success border-success/20 text-[11px]" variant="outline">
+                              <Badge className="bg-success/10 text-success border-success/20 text-xs" variant="outline">
                                 <TrendingDown className="h-3 w-3 mr-0.5" />
                                 Discount
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[11px]">
+                              <Badge variant="outline" className="text-xs">
                                 <Fuel className="h-3 w-3 mr-0.5" />
                                 Fuel
                               </Badge>

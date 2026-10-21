@@ -62,7 +62,7 @@ export function OnboardingRevisionBanner({ driverId, credentialsStatus }: Props)
         : `You have ${outstandingCount} documents that still need your signature.`;
 
   return (
-    <div role="alert" className="flex flex-col gap-3 rounded-xl bg-destructive px-4 py-3 text-destructive-foreground sm:flex-row sm:items-center sm:justify-between">
+    <div role="alert" className="flex flex-col gap-3 rounded-lg bg-destructive px-4 py-3 text-destructive-foreground sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
         <div>

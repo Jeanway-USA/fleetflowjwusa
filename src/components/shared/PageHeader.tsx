@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { NotificationCenter } from '@/components/shared/NotificationCenter';
 
 interface PageHeaderProps {
   title: string;
@@ -11,10 +10,9 @@ interface PageHeaderProps {
     onClick: () => void;
   };
   children?: ReactNode;
-  hideNotifications?: boolean;
 }
 
-export function PageHeader({ title, description, action, children, hideNotifications }: PageHeaderProps) {
+export function PageHeader({ title, description, action, children }: PageHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-end sm:justify-between gap-3 sm:gap-4 mb-5">
       <div className="min-w-0">
@@ -22,7 +20,6 @@ export function PageHeader({ title, description, action, children, hideNotificat
         {description && <p className="text-muted-foreground mt-0.5 text-[15px]">{description}</p>}
       </div>
       <div className="flex w-full sm:w-auto items-center gap-2">
-        {!hideNotifications && <span className="hidden md:inline-flex"><NotificationCenter /></span>}
         {children}
         {action && (
           <Button onClick={action.onClick} className="h-11 sm:h-10 w-full sm:w-auto">

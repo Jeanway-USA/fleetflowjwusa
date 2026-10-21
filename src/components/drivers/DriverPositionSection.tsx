@@ -181,7 +181,7 @@ export function DriverPositionSection({ driver, userId: userIdProp, onSuggestPac
                   <li key={d.key} className="flex items-center gap-2">
                     {done ? <Check className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
                     <span className={done ? '' : 'text-muted-foreground'}>{d.label}</span>
-                    {driverId && !done && <Badge variant="outline" className="text-[10px]">Not signed</Badge>}
+                    {driverId && !done && <Badge variant="outline" className="text-xs">Not signed</Badge>}
                   </li>
                 );
               })}

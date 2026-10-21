@@ -26,7 +26,7 @@ export function FloorLayout() {
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground md:flex-row">
       <nav aria-label="Shop floor" className="order-2 flex shrink-0 border-t bg-card md:order-1 md:w-28 md:flex-col md:border-r md:border-t-0">
-        <div className="hidden items-center justify-center py-4 md:flex"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary"><Wrench className="h-6 w-6" /></span></div>
+        <div className="hidden items-center justify-center py-4 md:flex"><span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/15 text-primary"><Wrench className="h-6 w-6" /></span></div>
         {TABS.map((t) => (
           <NavLink
             key={t.to}

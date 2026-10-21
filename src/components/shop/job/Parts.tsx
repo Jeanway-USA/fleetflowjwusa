@@ -84,7 +84,7 @@ export function PartPicker({ jobId, open, onOpenChange, touch, initialPart }: { 
                       </span>
                       <span className={cn('shrink-0 text-right text-sm tabular-nums', out ? 'font-semibold text-red-400' : low ? 'font-semibold text-orange-300' : 'text-muted-foreground')}>
                         {out ? 'Out of stock' : `${Number(p.quantity_on_hand)} ${p.unit}`}
-                        {low && <span className="block text-[11px]">low</span>}
+                        {low && <span className="block text-xs">low</span>}
                       </span>
                     </button>
                   </li>
@@ -96,13 +96,13 @@ export function PartPicker({ jobId, open, onOpenChange, touch, initialPart }: { 
         ) : (
           <div className="space-y-5 p-5">
             <div className="flex items-center justify-center gap-4">
-              <Button type="button" variant="outline" className="h-20 w-20 rounded-2xl" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="One fewer"><Minus className="h-8 w-8" /></Button>
+              <Button type="button" variant="outline" className="h-20 w-20 rounded-lg" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="One fewer"><Minus className="h-8 w-8" /></Button>
               <span className="min-w-[110px] text-center font-condensed text-7xl font-bold tabular-nums">{qty}</span>
-              <Button type="button" variant="outline" className="h-20 w-20 rounded-2xl" onClick={() => setQty((q) => Math.min(Number(picked.quantity_on_hand), q + 1))} aria-label="One more"><Plus className="h-8 w-8" /></Button>
+              <Button type="button" variant="outline" className="h-20 w-20 rounded-lg" onClick={() => setQty((q) => Math.min(Number(picked.quantity_on_hand), q + 1))} aria-label="One more"><Plus className="h-8 w-8" /></Button>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
               {QUICK.filter((n) => n <= Number(picked.quantity_on_hand)).map((n) => (
-                <button key={n} type="button" onClick={() => setQty(n)} className={cn('min-h-[48px] min-w-[56px] rounded-full border px-4 text-base font-medium', qty === n ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent')}>{n}</button>
+                <button key={n} type="button" onClick={() => setQty(n)} className={cn('min-h-[48px] min-w-[56px] rounded-md border px-4 text-base font-medium', qty === n ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent')}>{n}</button>
               ))}
             </div>
             <p className="text-center text-sm text-muted-foreground">
@@ -133,7 +133,7 @@ export function PartsList({ detail, touch, onAdd }: { detail: ShopJobDetail; tou
       ) : (
         <ul className="space-y-2">
           {live.map((p) => (
-            <li key={p.id} className={cn('flex items-center gap-3 rounded-xl border bg-card px-3.5', touch ? 'min-h-[68px]' : 'min-h-[52px]')}>
+            <li key={p.id} className={cn('flex items-center gap-3 rounded-lg border bg-card px-3.5', touch ? 'min-h-[68px]' : 'min-h-[52px]')}>
               <span className={cn('flex shrink-0 items-center justify-center rounded-lg bg-muted font-condensed font-bold tabular-nums', touch ? 'h-11 min-w-11 text-xl' : 'h-9 min-w-9 text-base')}>{Number(p.quantity)}</span>
               <span className="min-w-0 flex-1">
                 <span className={cn('block truncate font-medium', touch && 'text-lg')}>{p.part_name}</span>

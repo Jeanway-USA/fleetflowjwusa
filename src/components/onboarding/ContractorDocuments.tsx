@@ -128,7 +128,7 @@ function DocCardShell({
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <CardTitle className="text-base">{title}</CardTitle>
-            <Badge variant="secondary" className="uppercase tracking-wide text-[10px]">
+            <Badge variant="secondary" className="uppercase tracking-wide text-xs">
               Required
             </Badge>
           </div>

@@ -98,7 +98,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, truckId, onSt
   return (
     <div className="space-y-3">
       {load.is_in_bond && (
-        <div role="alert" className="flex items-start gap-3 rounded-xl bg-destructive px-4 py-3 text-destructive-foreground">
+        <div role="alert" className="flex items-start gap-3 rounded-lg bg-destructive px-4 py-3 text-destructive-foreground">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-semibold">In-bond shipment. Do not break the seal.</p>

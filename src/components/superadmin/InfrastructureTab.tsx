@@ -118,7 +118,7 @@ export function InfrastructureTab() {
                       <TableCell className="font-medium">
                         {row.org_name}
                         {!row.is_active && (
-                          <Badge variant="destructive" className="ml-2 text-[10px] px-1.5 py-0">inactive</Badge>
+                          <Badge variant="destructive" className="ml-2 text-xs px-1.5 py-0">inactive</Badge>
                         )}
                       </TableCell>
                       <TableCell>

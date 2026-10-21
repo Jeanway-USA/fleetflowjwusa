@@ -508,7 +508,7 @@ function W2Tab({ year }: { year: number }) {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span>{r.first_name} {r.last_name}</span>
                         {missing.length > 0 && (
-                          <span className="text-[10px] uppercase tracking-wide rounded border border-amber-500/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.5">
+                          <span className="text-xs uppercase tracking-wide rounded border border-amber-500/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.5">
                             Missing: {missing.join(', ')}
                           </span>
                         )}
@@ -822,7 +822,6 @@ export default function TaxHub() {
       <PageHeader
         title="Tax Hub"
         description="Multi-state employer tax tracking and IRS-accurate W-2 / 1099-NEC generation for every driver and contractor."
-        hideNotifications
       >
         <div className="flex items-center gap-2">
           <Label className="text-sm">Tax year</Label>
@@ -838,13 +837,13 @@ export default function TaxHub() {
       <EmployerCard />
 
       <Tabs defaultValue="states">
-        <TabsList className="grid grid-cols-3 lg:grid-cols-6 gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-4xl">
-          <TabsTrigger value="states" className="h-10 data-[state=active]:bg-background">Multi-State</TabsTrigger>
-          <TabsTrigger value="federal" className="h-10 data-[state=active]:bg-background">Federal</TabsTrigger>
-          <TabsTrigger value="w2" className="h-10 data-[state=active]:bg-background">W-2 Forms</TabsTrigger>
-          <TabsTrigger value="1099" className="h-10 data-[state=active]:bg-background">1099 Forms</TabsTrigger>
-          <TabsTrigger value="liability" className="h-10 data-[state=active]:bg-background">Employer Liability</TabsTrigger>
-          <TabsTrigger value="settings" className="h-10 data-[state=active]:bg-background">Tax Setup</TabsTrigger>
+        <TabsList className="mb-1 h-auto w-full justify-start gap-1 overflow-x-auto">
+          <TabsTrigger value="states" className="h-11 shrink-0 px-4">Multi-State</TabsTrigger>
+          <TabsTrigger value="federal" className="h-11 shrink-0 px-4">Federal</TabsTrigger>
+          <TabsTrigger value="w2" className="h-11 shrink-0 px-4">W-2 Forms</TabsTrigger>
+          <TabsTrigger value="1099" className="h-11 shrink-0 px-4">1099 Forms</TabsTrigger>
+          <TabsTrigger value="liability" className="h-11 shrink-0 px-4">Employer Liability</TabsTrigger>
+          <TabsTrigger value="settings" className="h-11 shrink-0 px-4">Tax Setup</TabsTrigger>
         </TabsList>
         <TabsContent value="states" className="mt-4"><MultiStateTab year={year} /></TabsContent>
         <TabsContent value="federal" className="mt-4"><FederalTab year={year} /></TabsContent>

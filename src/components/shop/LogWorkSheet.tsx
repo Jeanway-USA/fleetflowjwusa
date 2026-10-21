@@ -117,7 +117,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
               <Label>Which truck?</Label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {trucks.map((t) => (
-                  <button key={t.id} type="button" onClick={() => setTruck(t.id)} className={cn('min-h-[60px] rounded-xl border p-3 text-left', truck === t.id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent')}>
+                  <button key={t.id} type="button" onClick={() => setTruck(t.id)} className={cn('min-h-[60px] rounded-lg border p-3 text-left', truck === t.id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent')}>
                     <span className="block font-condensed text-xl font-bold leading-none">{t.unit_number}</span>
                     <span className="block truncate text-xs text-muted-foreground">{[t.make, t.model].filter(Boolean).join(' ')}</span>
                   </button>
@@ -125,7 +125,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
               </div>
             </section>
           )}
-          {trucks.length === 1 && <p className="rounded-xl bg-muted/50 px-4 py-3 text-sm">Truck <strong>{trucks[0].unit_number}</strong> {[trucks[0].make, trucks[0].model].filter(Boolean).join(' ')}</p>}
+          {trucks.length === 1 && <p className="rounded-lg bg-muted/50 px-4 py-3 text-sm">Truck <strong>{trucks[0].unit_number}</strong> {[trucks[0].make, trucks[0].model].filter(Boolean).join(' ')}</p>}
 
           <section className="grid gap-3 sm:grid-cols-2">
             <div><Label>Date it was done</Label><Input type="date" max={todayLocal()} value={date} onChange={(e) => { setDate(e.target.value); setDupe(null); }} className="h-12" /></div>
@@ -136,7 +136,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
             <Label>What was done?</Label>
             <div className="mb-2 flex flex-wrap gap-2">
               {WORK_KINDS.map((k) => (
-                <button key={k.key} type="button" onClick={() => toggle(k.key)} className={cn('min-h-[44px] rounded-full border px-4 text-sm font-medium', kinds.includes(k.key) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent')}>{k.label}</button>
+                <button key={k.key} type="button" onClick={() => toggle(k.key)} className={cn('min-h-[44px] rounded-md border px-4 text-sm font-medium', kinds.includes(k.key) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent')}>{k.label}</button>
               ))}
             </div>
             <Textarea value={what} onChange={(e) => setWhat(e.target.value)} rows={3} placeholder="Details: what was replaced, what was found, anything worth remembering" />
@@ -149,7 +149,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
 
           <section>
             <Label>Receipt or photos <span className="font-normal text-muted-foreground">(optional)</span></Label>
-            <label className="flex min-h-[56px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed px-4 text-sm font-medium hover:bg-accent">
+            <label className="flex min-h-[56px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-4 text-sm font-medium hover:bg-accent">
               <ImagePlus className="h-5 w-5" />Add a photo or scan
               <input type="file" accept="image/*,application/pdf" multiple className="sr-only" onChange={(e) => { setReceipts((p) => [...p, ...Array.from(e.target.files ?? [])]); e.target.value = ''; }} />
             </label>
@@ -163,7 +163,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
           </section>
 
           {dupe && (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               <p className="font-medium text-amber-300">This may already be logged</p>
               <p className="mt-0.5 text-muted-foreground">There is already a finished job on this truck for {date}: <Link className="text-primary underline" to={`/shop/jobs/${dupe.id}`}>{dupe.title}</Link>. Save it anyway only if it is a different job.</p>
             </div>

@@ -31,7 +31,7 @@ export function Tasks({ detail, touch }: { detail: ShopJobDetail; touch?: boolea
       {tasks.length === 0 && <ShopEmpty title="No tasks yet">Add the steps for this job. Ticking them all moves the job to Ready to close.</ShopEmpty>}
       <ul className="space-y-2">
         {tasks.map((t) => (
-          <li key={t.id} className={cn('flex items-stretch overflow-hidden rounded-xl border bg-card', t.is_done && 'bg-emerald-500/5')}>
+          <li key={t.id} className={cn('flex items-stretch overflow-hidden rounded-lg border bg-card', t.is_done && 'bg-emerald-500/5')}>
             <button
               type="button"
               disabled={locked || actions.toggleTask.isPending}

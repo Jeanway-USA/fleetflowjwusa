@@ -59,7 +59,7 @@ export default function FloorTrucksPage() {
             const jobs = jobsByTruck.get(t.id) ?? [];
             const st = STATUS[t.status ?? 'active'] ?? STATUS.active;
             return (
-              <button key={t.id} type="button" onClick={() => setOpenId(t.id)} className="rounded-2xl border bg-card p-4 text-left transition-colors hover:bg-accent">
+              <button key={t.id} type="button" onClick={() => setOpenId(t.id)} className="rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent">
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-condensed text-5xl font-bold leading-none">{t.unit_number}</span>
                   <span className={cn('text-sm font-semibold', jobs.length > 0 ? 'text-primary' : st.style)}>{jobs.length > 0 ? 'In the shop' : st.label}</span>
