@@ -11,7 +11,6 @@ import { TimeDisplayProvider } from "@/contexts/TimeDisplayContext";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { RoleBasedRedirect } from "@/components/shared/RoleBasedRedirect";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
-import { SuperAdminGuard } from "@/components/shared/SuperAdminGuard";
 import { BrandColorInjector } from "@/components/shared/BrandColorInjector";
 import { RouteTitle } from "@/components/shared/RouteTitle";
 import { Loader2 } from "lucide-react";
@@ -60,7 +59,6 @@ const CRM = lazy(() => import("./pages/CRM"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PendingAccess = lazy(() => import("./pages/PendingAccess"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
-const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
 const AccountDeactivated = lazy(() => import("./pages/AccountDeactivated"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -350,12 +348,6 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/401" element={<Unauthorized />} />
-
-                    <Route path="/super-admin" element={
-                      <SuperAdminGuard>
-                        <SuperAdminDashboard />
-                      </SuperAdminGuard>
-                    } />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>

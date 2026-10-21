@@ -30,7 +30,6 @@ const LABELS: Record<string, string> = {
   stats: 'Stats',
   onboarding: 'Onboarding',
   admin: 'Admin',
-  'super-admin': 'Super Admin',
   driver: 'Driver',
 };
 

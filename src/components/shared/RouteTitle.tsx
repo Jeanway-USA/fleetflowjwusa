@@ -34,7 +34,6 @@ const ROUTE_TITLES: Record<string, string> = {
   '/incidents': 'Incidents',
   '/settings': 'Settings',
   '/admin/document-templates': 'Document Templates',
-  '/super-admin': 'Super Admin',
   '/pending-access': 'Pending Access',
   '/onboarding': 'Onboarding',
   '/account-deactivated': 'Account Deactivated',

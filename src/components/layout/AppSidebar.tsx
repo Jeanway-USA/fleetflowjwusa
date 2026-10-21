@@ -99,7 +99,6 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   ]),
 };
 
-// Super admin check moved to server-side RPC via useAuth()
 
 const STORAGE_KEY = 'sidebar-groups';
 
@@ -195,7 +194,7 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl, isSuperAdmin, orgName } = useAuth();
+  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl, orgName } = useAuth();
   const { tmsMode: currentTmsMode } = useOrganizationMode();
   const { theme } = useTheme();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -483,21 +482,6 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Super Admin */}
-        {isSuperAdmin && (
-          <SidebarGroup className="py-0">
-            <div className={`px-3 pt-5 pb-1.5 ${GROUP_LABEL_CLASS} group-data-[collapsible=icon]:hidden`}>System</div>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/super-admin'} tooltip="Super Admin" className={NAV_BUTTON_CLASS}>
-                    <Link to="/super-admin"><ShieldCheck /><span>Super Admin</span></Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4 group-data-[collapsible=icon]:hidden">
