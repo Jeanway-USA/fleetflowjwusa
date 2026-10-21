@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T00:00:00Z",
+  "title": "Design System: Fleet Flow (JeanWay USA)",
+  "extensions": {
+    "colorMeta": {
+      "action-dark-gold": { "role": "primary", "displayName": "Action Dark Gold", "canonical": "hsl(36 66% 34%)", "tonalRamp": ["#2A1C09", "#4A3213", "#6B491A", "#906221", "#B27D33", "#CC9C5C", "#E3C28F", "#F4E4C9"] },
+      "carbon-gold": { "role": "accent", "displayName": "Carbon Gold", "canonical": "hsl(45 100% 65%)", "tonalRamp": ["#3D3000", "#665000", "#8F7000", "#CCA300", "#FFC81A", "#FFD34D", "#FFE089", "#FFF2C7"] },
+      "shell-black": { "role": "neutral", "displayName": "Shell Black", "canonical": "hsl(0 0% 4%)", "tonalRamp": ["#0A0A0A", "#1F1F1F", "#333333", "#4D4D4D", "#6D6E70", "#999999", "#CCCCCC", "#F2F2F2"] },
+      "page-stock": { "role": "neutral", "displayName": "Page Stock", "canonical": "hsl(40 10% 97%)", "tonalRamp": ["#2B2A28", "#4A4845", "#6B6965", "#8E8C87", "#B3B1AC", "#D3D1CC", "#EBEAE8", "#F8F7F5"] },
+      "signal-red": { "role": "signal", "displayName": "Signal Red", "canonical": "hsl(4 64% 46%)", "tonalRamp": ["#2E0E0B", "#521913", "#76231B", "#9A2D22", "#C03429", "#D9665D", "#EA9C96", "#F7D5D2"] }
+    },
+    "typographyMeta": {
+      "page-title": { "displayName": "Page title", "purpose": "One per page via PageHeader; 28px phone, 32px from sm." },
+      "panel-title": { "displayName": "Panel title", "purpose": "Card and panel headings, text-xl condensed." },
+      "figure": { "displayName": "Figure", "purpose": "Headline numbers in StatStrip and driver stats; condensed tabular." },
+      "label": { "displayName": "Label", "purpose": "13px sentence-case captions in brand gray." },
+      "small": { "displayName": "Small", "purpose": "12px floor for notes, counts, compact tables." }
+    },
+    "shadows": [
+      { "name": "none-at-rest", "value": "none", "purpose": "Cards, panels, strips, buttons are flat with a hairline border." },
+      { "name": "tab-raised", "value": "0 1px 2px rgba(0,0,0,0.05)", "purpose": "Active tab or segment inside its grey well." },
+      { "name": "dialog", "value": "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)", "purpose": "Dialogs and bottom sheets (Tailwind shadow-lg)." }
+    ],
+    "motion": [
+      { "name": "press", "value": "translateY(1px) on active", "purpose": "Button and tile press feedback." },
+      { "name": "row-highlight", "value": "2.5s ease-out fade from 35% carbon gold", "purpose": "Marks a row the user was sent to." },
+      { "name": "reduced-motion", "value": "durations forced to 0.01ms", "purpose": "Honored globally via prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "2xl-container", "value": "1400px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid dark gold, the ordinary action.",
+      "html": "<button class=\"ds-btn\">Save changes</button>",
+      "css": ".ds-btn{background:#906221;color:#fff;height:40px;padding:8px 16px;border:0;border-radius:4px;font:600 14px Barlow,system-ui,sans-serif;cursor:pointer}.ds-btn:hover{background:rgba(144,98,33,.9)}.ds-btn:focus-visible{outline:2px solid #A97423;outline-offset:2px}.ds-btn:active{transform:translateY(1px)}"
+    },
+    {
+      "name": "Driver Main Action",
+      "kind": "button",
+      "refersTo": "driver-action",
+      "description": "The one gold button in the driver app, 52px tall.",
+      "html": "<button class=\"ds-dbtn\">Arrived at pickup</button>",
+      "css": ".ds-dbtn{background:#FFD34D;color:#0D0D0D;height:52px;padding:0 20px;width:100%;border:0;border-radius:4px;font:600 16px Barlow,system-ui,sans-serif;cursor:pointer}.ds-dbtn:hover{background:rgba(255,211,77,.9)}.ds-dbtn:focus-visible{outline:2px solid #FFD34D;outline-offset:2px}.ds-dbtn:active{transform:translateY(1px)}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Hairline card, 6px radius, no shadow.",
+      "html": "<section class=\"ds-card\"><h3>Open loads</h3><p>3 in transit</p></section>",
+      "css": ".ds-card{background:#fff;color:#121212;border:1px solid #DDDCD9;border-radius:6px;padding:16px;font-family:Barlow,system-ui,sans-serif}.ds-card h3{font:700 20px/1.25 'Barlow Condensed',Barlow,sans-serif;margin:0 0 4px}.ds-card p{margin:0;font-size:14px;color:#6D6E70}"
+    },
+    {
+      "name": "Stat Strip",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Headline figures in one ruled box, hairlines between cells.",
+      "html": "<dl class=\"ds-strip\"><div><dt>Revenue</dt><dd>$12,480</dd></div><div><dt>Loads</dt><dd>9</dd></div><div><dt>Miles</dt><dd>6,210</dd></div></dl>",
+      "css": ".ds-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin:0;background:#DDDCD9;border:1px solid #DDDCD9;border-radius:6px;overflow:hidden;font-family:Barlow,sans-serif}.ds-strip div{background:#fff;padding:12px 20px}.ds-strip dt{font-size:13px;color:#6D6E70}.ds-strip dd{margin:0;font:700 24px/1.25 'Barlow Condensed',Barlow,sans-serif;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Tab Strip",
+      "kind": "nav",
+      "refersTo": "tab-strip",
+      "description": "Grey well with raised active tab.",
+      "html": "<nav class=\"ds-tabs\"><a class=\"on\">Overview</a><a>Settlements</a><a>Expenses</a></nav>",
+      "css": ".ds-tabs{display:inline-flex;gap:4px;background:#EBEAE8;padding:4px;border-radius:4px;font-family:Barlow,sans-serif}.ds-tabs a{height:36px;display:flex;align-items:center;padding:0 16px;border-radius:2px;font-size:14px;font-weight:500;color:#6D6E70;cursor:pointer}.ds-tabs a:hover{color:#121212}.ds-tabs a.on{background:#F8F7F5;color:#121212;box-shadow:0 1px 2px rgba(0,0,0,.05)}"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "40px desk field, 4px radius.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search loads\">",
+      "css": ".ds-input{height:40px;width:240px;padding:8px 12px;border:1px solid #CFCDC9;border-radius:4px;background:#F8F7F5;font:14px Barlow,sans-serif;color:#121212}.ds-input::placeholder{color:#6D6E70}.ds-input:focus-visible{outline:2px solid #A97423;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Black Shell, White Pages",
+    "overview": "Fleet Flow is JeanWay's private working tool: a brand-black shell frames plain white pages of hairline cards. Emphasis comes from weight, condensed figures and one gold marker. The main app look is the standard for every page; the driver app differs only in phone sizing and its extra rules.",
+    "keyCharacteristics": [
+      "Black shell in both themes; pages white (light) or near-black (dark).",
+      "Dark gold is the action color; carbon gold is the marker.",
+      "Hairline borders, 6px radius, no shadows on resting surfaces, no gradients, no glows.",
+      "Barlow Condensed for titles and figures, Barlow for everything else."
+    ],
+    "rules": [
+      { "name": "The Marker Rule", "body": "Carbon gold marks the current thing or the one action; dark gold is for ordinary actions.", "section": "colors" },
+      { "name": "The Token Rule", "body": "Colors come from semantic Tailwind names. No raw hex, no new hues.", "section": "colors" },
+      { "name": "The Sentence-Case Rule", "body": "Labels, headings and buttons are sentence case; uppercase only in print documents and the existing StatusBadge.", "section": "typography" },
+      { "name": "The 12px Floor", "body": "No text under 12px on screen.", "section": "typography" }
+    ],
+    "dos": [
+      "Do start every page with PageHeader, then the optional tab strip, then the optional StatStrip, then content.",
+      "Do use StatStrip for headline figures, Panel / Card for grouped content, DataTable for lists, EmptyState for nothing-here.",
+      "Do use rounded-lg for containers and rounded-md for controls, and the semantic color tokens in both themes.",
+      "Do keep touch targets at 44px or more on phone surfaces, and driver main actions at 52px.",
+      "Do show the status word with any color, and show exact numbers beside any bar.",
+      "Do keep labels at 13px sentence case and text at 12px or larger.",
+      "Do make offline and queued state visible to the user."
+    ],
+    "donts": [
+      "Don't use shadows, gradients, glows or .card-elevated on new work.",
+      "Don't add colored side rails (left border stripes) to cards, rows or alerts.",
+      "Don't use pills for buttons, tabs or segments.",
+      "Don't put a bell or notification control in a page header; the top bar owns it.",
+      "Don't use carbon gold for ordinary buttons, backgrounds or decoration, or dark gold as the marker.",
+      "Don't build a grid of equal stat tiles; use StatStrip.",
+      "Don't introduce new radii, fonts or hues, or text under 12px."
+    ]
+  }
+}
