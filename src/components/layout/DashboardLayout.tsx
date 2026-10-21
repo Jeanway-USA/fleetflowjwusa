@@ -8,7 +8,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { DemoControls } from '@/components/demo/DemoControls';
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProductTour } from '@/components/shared/ProductTour';
@@ -126,7 +125,6 @@ function DashboardLayoutInner({ children, isDemoMode, signOut }: {
         </div>
       </main>
       <MobileTabBar />
-      {isDemoMode && <DemoControls />}
       <CommandPalette />
       {tourDef && (
         <ProductTour
