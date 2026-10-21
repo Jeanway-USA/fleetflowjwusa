@@ -75,7 +75,7 @@ export function MyEquipmentCard({ driverId, assignedTruck }: MyEquipmentCardProp
   return (
     <div className="space-y-3">
       {anyCritical && (
-        <div role="alert" className="flex items-start gap-3 rounded-xl bg-destructive px-4 py-3 text-destructive-foreground">
+        <div role="alert" className="flex items-start gap-3 rounded-lg bg-destructive px-4 py-3 text-destructive-foreground">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
           <p className="text-sm font-semibold">Equipment is out of service. Do not dispatch. Contact dispatch now.</p>
         </div>

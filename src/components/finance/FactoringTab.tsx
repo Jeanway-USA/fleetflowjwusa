@@ -289,7 +289,7 @@ export function FactoringTab() {
                                   <span className="flex items-center gap-1 text-xs">
                                     <Camera className={`h-3.5 w-3.5 ${docs.hasPOD ? 'text-green-600' : 'text-destructive'}`} />
                                     {missingPOD && (
-                                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">Missing</Badge>
+                                      <Badge variant="destructive" className="text-xs px-1.5 py-0 h-4">Missing</Badge>
                                     )}
                                   </span>
                                 </div>

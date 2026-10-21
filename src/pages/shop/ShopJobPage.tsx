@@ -18,7 +18,7 @@ import { TruckRecent } from '@/components/shop/job/TruckRecent';
 
 function Card({ title, children, aside }: { title: string; children: React.ReactNode; aside?: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border bg-card p-4">
+    <section className="rounded-lg border bg-card p-4">
       <header className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-condensed text-xl font-bold leading-none">{title}</h2>
         {aside}
@@ -37,7 +37,7 @@ export default function ShopJobPage() {
   const [blockOpen, setBlockOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
 
-  if (isLoading) return <div className="space-y-4"><Skeleton className="h-24 rounded-2xl" /><Skeleton className="h-64 rounded-2xl" /></div>;
+  if (isLoading) return <div className="space-y-4"><Skeleton className="h-24 rounded-lg" /><Skeleton className="h-64 rounded-lg" /></div>;
   if (error || !detail) {
     return (
       <div className="space-y-3">
@@ -56,12 +56,12 @@ export default function ShopJobPage() {
     <div className="space-y-4">
       <Button asChild variant="ghost" className="-ml-3 h-10"><Link to="/shop"><ArrowLeft className="mr-2 h-4 w-4" />Shop board</Link></Button>
 
-      <header className={cn('flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-l-4 bg-card p-4', done ? 'border-l-emerald-500' : LANE_STYLE[lane].rail)}>
+      <header className={cn('flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-card p-4')}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-condensed text-5xl font-bold leading-none">{job.unit}</span>
             <PriorityTag priority={job.priority} />
-            <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', done ? 'bg-emerald-500/15 text-emerald-300' : cn(LANE_STYLE[lane].tint, LANE_STYLE[lane].text))}>{done ? 'Finished' : laneInfo.title}</span>
+            <span className={cn('rounded-md px-2.5 py-1 text-xs font-semibold', done ? 'bg-emerald-500/15 text-emerald-300' : cn(LANE_STYLE[lane].tint, LANE_STYLE[lane].text))}>{done ? 'Finished' : laneInfo.title}</span>
           </div>
           <p className="mt-1 text-lg font-medium">{jobTitle(job)}</p>
           <p className="text-sm text-muted-foreground">{[job.truckName, job.odometer ? `${job.odometer.toLocaleString()} mi` : null, `In ${format(parseISO(job.entryDate), 'MMM d')}`].filter(Boolean).join(' · ')}</p>
@@ -72,7 +72,7 @@ export default function ShopJobPage() {
         </div>
       </header>
 
-      {job.description && <p className="rounded-xl bg-muted/50 px-4 py-3 text-sm">{job.description}</p>}
+      {job.description && <p className="rounded-lg bg-muted/50 px-4 py-3 text-sm">{job.description}</p>}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">

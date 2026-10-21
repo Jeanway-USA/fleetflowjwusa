@@ -100,7 +100,7 @@ function BonusRing({ weeks }: { weeks: number }) {
                 className={weeks >= 4 ? 'stroke-success' : 'stroke-primary'}
               />
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold">
+            <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold">
               {weeks}/4
             </div>
           </div>

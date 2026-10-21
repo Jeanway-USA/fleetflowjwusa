@@ -607,7 +607,7 @@ export function DataTable<T extends { id: string }>({
                     const isSorted = sortState?.key === key;
                     const SortIcon = !col.sortable ? null : (isSorted ? (sortState!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown);
                     return (
-                      <th key={i} className={cn(thClass, "text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ width: computedWidths[i] }}>
+                      <th key={i} className={cn(thClass, "text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ width: computedWidths[i] }}>
                         {col.sortable ? (
                           <button
                             type="button"

@@ -189,7 +189,7 @@ export function LogbookWeek() {
             const isToday = i === todayCol;
             return (
               <div key={i} className="flex flex-col items-center leading-none">
-                <span className="text-[11px] font-semibold text-muted-foreground">{DAY_LETTERS[i]}</span>
+                <span className="text-xs font-semibold text-muted-foreground">{DAY_LETTERS[i]}</span>
                 <span
                   className={cn(
                     'figure mt-1 text-base font-semibold',

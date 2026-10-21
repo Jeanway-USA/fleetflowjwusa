@@ -283,7 +283,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                     <p className="font-semibold text-primary">{formatCurrency(ytdNet)}</p>
                   </div>
                 </div>
-                <p className="text-[11px] italic text-muted-foreground mt-3">
+                <p className="text-xs italic text-muted-foreground mt-3">
                   Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions − Tax Withholding
 
                 </p>
@@ -523,16 +523,16 @@ function LineItemColumn({
   return (
     <div className="flex flex-col">
       <div className="px-3 py-2 border-b bg-muted/30">
-        <h4 className="text-[11px] font-bold tracking-wider text-muted-foreground">{title}</h4>
+        <h4 className="text-xs font-bold tracking-wider text-muted-foreground">{title}</h4>
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="py-1.5 px-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <TableHead className="py-1.5 px-3 text-xs uppercase tracking-wide text-muted-foreground">
               Description
             </TableHead>
-            <TableHead className="py-1.5 px-3 text-right text-[11px] uppercase tracking-wide text-muted-foreground">
+            <TableHead className="py-1.5 px-3 text-right text-xs uppercase tracking-wide text-muted-foreground">
               Amount
             </TableHead>
             {editable && <TableHead className="w-8 py-1.5 px-2" />}
@@ -571,7 +571,7 @@ function LineItemColumn({
                     {r.is_escrow && (
                       <Badge
                         variant="outline"
-                        className="ml-2 text-[10px] py-0 px-1.5 align-middle"
+                        className="ml-2 text-xs py-0 px-1.5 align-middle"
                       >
                         Escrow
                       </Badge>

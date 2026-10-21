@@ -55,7 +55,7 @@ export function TruckStatusGrid() {
       id: truck.id,
       title: `Unit ${truck.unit_number}`,
       onOpen: () => navigate('/trucks'),
-      chips: <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${state.className}`}>{state.label}</span>,
+      chips: <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${state.className}`}>{state.label}</span>,
       facts: [
         { label: 'Driver', value: truck.current_driver ? `${truck.current_driver.first_name} ${truck.current_driver.last_name}` : <span className="font-normal text-muted-foreground">Unassigned</span> },
         { label: 'ELD', value: eld ? <span className={`font-normal ${eld.textClass}`}>{eld.label}</span> : <span className="font-normal text-muted-foreground">No ELD paired</span> },

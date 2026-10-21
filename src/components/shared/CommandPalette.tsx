@@ -353,7 +353,7 @@ export function CommandPalette() {
           </>
         )}
       </CommandList>
-      <div className="border-t border-border px-3 py-2 text-[10px] text-muted-foreground flex items-center justify-between">
+      <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
         <span>Tip: press <kbd className="rounded bg-muted px-1">⌘K</kbd> from anywhere</span>
         <span>↵ to select · esc to close</span>
       </div>

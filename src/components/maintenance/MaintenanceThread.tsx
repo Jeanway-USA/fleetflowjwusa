@@ -64,7 +64,7 @@ function MessageBubble({
             <Wrench className="h-3.5 w-3.5 text-primary" />
             <Badge
               variant="outline"
-              className="text-[10px] uppercase tracking-wide border-primary/40 text-primary bg-primary/10"
+              className="text-xs uppercase tracking-wide border-primary/40 text-primary bg-primary/10"
             >
               Recommendation
             </Badge>
@@ -79,7 +79,7 @@ function MessageBubble({
           </div>
           <p className="text-sm whitespace-pre-wrap text-foreground/90">{msg.body}</p>
           <time
-            className="block text-[11px] text-muted-foreground mt-1.5"
+            className="block text-xs text-muted-foreground mt-1.5"
             title={format(new Date(msg.created_at), 'PPpp')}
           >
             {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
@@ -92,11 +92,11 @@ function MessageBubble({
   return (
     <div className={cn('flex w-full', isOwnSide ? 'justify-end' : 'justify-start')}>
       <div className={cn('max-w-[85%] space-y-1', isOwnSide && 'items-end text-right')}>
-        <div className={cn('flex items-center gap-1.5 text-[11px]', isOwnSide && 'justify-end')}>
+        <div className={cn('flex items-center gap-1.5 text-xs', isOwnSide && 'justify-end')}>
           <Badge
             variant="outline"
             className={cn(
-              'text-[10px] uppercase tracking-wide',
+              'text-xs uppercase tracking-wide',
               isDriverMsg
                 ? 'border-primary/40 text-primary bg-primary/5'
                 : 'border-border text-muted-foreground'
@@ -117,7 +117,7 @@ function MessageBubble({
           {msg.body}
         </div>
         <time
-          className="block text-[11px] text-muted-foreground"
+          className="block text-xs text-muted-foreground"
           title={format(new Date(msg.created_at), 'PPpp')}
         >
           {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
@@ -281,7 +281,7 @@ export function MaintenanceThread({
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-72 p-1">
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground px-2 py-1.5">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground px-2 py-1.5">
                   Quick recommendations
                 </div>
                 <div className="max-h-72 overflow-y-auto">

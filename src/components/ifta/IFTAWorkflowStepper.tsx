@@ -59,7 +59,7 @@ export function IFTAWorkflowStepper({ hasFuelPurchases, hasIFTARecords, hasJuris
               )}>
                 {step.label}
               </p>
-              <p className="text-[11px] text-muted-foreground leading-tight truncate hidden sm:block">
+              <p className="text-xs text-muted-foreground leading-tight truncate hidden sm:block">
                 {step.description}
               </p>
             </div>

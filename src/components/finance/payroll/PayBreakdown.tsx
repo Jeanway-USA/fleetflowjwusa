@@ -127,7 +127,7 @@ export function PayBreakdown({
       )}
 
       {audit && !compact && (
-        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           Calculated {new Date(audit.calculatedAt).toLocaleString()} · tax year {audit.taxYear} ·
           IRS Pub 15-T percentage method ({audit.fit.tableSet === 'multiple_jobs' ? 'multiple jobs' : 'standard'} table),
           {' '}{audit.payFrequency} ({audit.periodsPerYear}/yr) · engine v{audit.engineVersion}

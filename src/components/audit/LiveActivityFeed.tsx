@@ -53,7 +53,7 @@ export function LiveActivityFeed({ rows, isLoading }: Props) {
                 </TableCell>
                 <TableCell>
                   <div className="font-mono text-xs">{row.table_name}</div>
-                  <div className="font-mono text-[10px] text-muted-foreground">{row.record_id?.slice(0, 8) ?? '—'}</div>
+                  <div className="font-mono text-xs text-muted-foreground">{row.record_id?.slice(0, 8) ?? '—'}</div>
                 </TableCell>
                 <TableCell className="text-sm">{row.user_name ?? <span className="text-muted-foreground">system</span>}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{row.user_role ?? '—'}</TableCell>

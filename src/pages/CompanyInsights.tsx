@@ -250,10 +250,10 @@ const CompanyInsights = () => {
       </PageHeader>
 
       <Tabs defaultValue="fleet-driver" className="space-y-5">
-        <TabsList className="grid h-12 w-full grid-cols-3">
-          <TabsTrigger value="fleet-driver" className="h-10">Fleet and drivers</TabsTrigger>
-          <TabsTrigger value="agency" className="h-10">Agencies</TabsTrigger>
-          <TabsTrigger value="tax" className="h-10">Tax summary</TabsTrigger>
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto">
+          <TabsTrigger value="fleet-driver" className="h-11 shrink-0 px-4">Fleet and drivers</TabsTrigger>
+          <TabsTrigger value="agency" className="h-11 shrink-0 px-4">Agencies</TabsTrigger>
+          <TabsTrigger value="tax" className="h-11 shrink-0 px-4">Tax summary</TabsTrigger>
         </TabsList>
 
         <TabsContent value="fleet-driver" className="mt-0 space-y-5">

@@ -636,7 +636,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                         className={`border-b border-border p-2 text-center text-xs font-medium ${today ? 'bg-primary/15 text-foreground' : weekend ? 'bg-muted/40 text-muted-foreground' : 'text-muted-foreground'}`}
                       >
                         <div className={today ? 'font-bold' : ''}>{today ? 'Today' : format(day, 'EEE')}</div>
-                        <div className="text-[11px]">{format(day, 'M/d')}</div>
+                        <div className="text-xs">{format(day, 'M/d')}</div>
                       </div>
                     );
                   })}
@@ -680,7 +680,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                             >
                               {outbound && dayIdx + 2 === outbound.startCol && (
                                 <div
-                                  className="pointer-events-none absolute inset-y-1 left-0.5 right-0.5 z-[5] flex items-center truncate rounded border border-dashed border-amber-500/70 bg-amber-100/50 px-1 text-[10px] font-medium text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
+                                  className="pointer-events-none absolute inset-y-1 left-0.5 right-0.5 z-[5] flex items-center truncate rounded border border-dashed border-amber-500/70 bg-amber-100/50 px-1 text-xs font-medium text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
                                   style={{ width: `calc(${outbound.span * 100}% - 4px)` }}
                                   title={`Free to reload near ${outbound.region}`}
                                 >
@@ -708,7 +708,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                                     tabIndex={0}
                                     onClick={() => navigate(`/fleet-loads?highlight=${load.id}`)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/fleet-loads?highlight=${load.id}`); }}
-                                    className={`group/bar absolute left-0.5 right-0.5 z-10 flex overflow-hidden cursor-pointer items-center rounded px-2 py-0.5 text-[11px] font-semibold ${barClass(load, todayStr)} ${isBeingResized ? 'shadow-lg ring-2 ring-primary' : ''}`}
+                                    className={`group/bar absolute left-0.5 right-0.5 z-10 flex overflow-hidden cursor-pointer items-center rounded px-2 py-0.5 text-xs font-semibold ${barClass(load, todayStr)} ${isBeingResized ? 'shadow-lg ring-2 ring-primary' : ''}`}
                                     style={{ width: `calc(${widthPercent}% - 4px)`, minWidth: 'calc(100% - 4px)', top: `calc(${((laneOf.get(load.id) ?? 0) * 100) / laneCount}% + 3px)`, height: `calc(${100 / laneCount}% - 6px)` }}
                                     title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${cityState(load.origin) || load.origin} to ${cityState(load.destination) || load.destination}${load.booked_miles ? ` · ${load.booked_miles} mi` : ''}${late ? ' · past due' : ''}. Click to open.`}
                                   >
@@ -776,7 +776,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                         <span className="hidden text-muted-foreground sm:inline">
                           {cityState(load.origin)} to {cityState(load.destination)}
                         </span>
-                        {load.pickup_date && <Badge variant="outline" className="h-4 px-1 text-[10px]">{format(parseISO(load.pickup_date), 'M/d')}</Badge>}
+                        {load.pickup_date && <Badge variant="outline" className="h-4 px-1 text-xs">{format(parseISO(load.pickup_date), 'M/d')}</Badge>}
                       </div>
                     ))
                   ) : (

@@ -12,8 +12,7 @@ export function JobCard({ job, to, large }: { job: ShopJob; to: string; large?: 
     <Link
       to={to}
       className={cn(
-        'group block rounded-xl border border-l-4 bg-card p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
-        style.rail,
+        'group block rounded-lg border bg-card p-3.5 transition-colors hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
         large && 'p-5',
       )}
     >
@@ -39,7 +38,7 @@ export function JobCard({ job, to, large }: { job: ShopJob; to: string; large?: 
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className="inline-flex min-w-0 items-center gap-1.5 text-xs">
-          {job.assignedName ? <Initials name={job.assignedName} className="h-6 w-6 text-[10px]" /> : <UserRound className="h-4 w-4 text-muted-foreground" />}
+          {job.assignedName ? <Initials name={job.assignedName} className="h-6 w-6 text-xs" /> : <UserRound className="h-4 w-4 text-muted-foreground" />}
           <span className={cn('truncate', !job.assignedName && 'text-muted-foreground')}>{job.assignedName ?? 'Unassigned'}</span>
         </span>
         {job.runningTimer && (
@@ -48,7 +47,7 @@ export function JobCard({ job, to, large }: { job: ShopJob; to: string; large?: 
             <RunningClock since={job.runningTimer.startedAt} />
           </span>
         )}
-        {job.bay && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Bay {job.bay}</span>}
+        {job.bay && <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">Bay {job.bay}</span>}
         {job.partsCount > 0 && (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <Package className="h-3 w-3" />

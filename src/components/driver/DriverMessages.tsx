@@ -295,7 +295,7 @@ export function DriverMessages() {
         {unreadCount > 0 && (
           <Badge
             variant="destructive"
-            className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] leading-none rounded-full flex items-center justify-center"
+            className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-xs leading-none rounded-full flex items-center justify-center"
           >
             {badgeLabel}
           </Badge>
@@ -357,7 +357,7 @@ export function DriverMessages() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="font-medium text-sm truncate">{t.name}</span>
-                            <span className="text-[10px] text-muted-foreground shrink-0">
+                            <span className="text-xs text-muted-foreground shrink-0">
                               {formatDistanceToNow(new Date(t.lastMessage.created_at), { addSuffix: true })}
                             </span>
                           </div>
@@ -367,7 +367,7 @@ export function DriverMessages() {
                           </p>
                         </div>
                         {t.unread > 0 && (
-                          <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-[10px]">
+                          <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
                             {t.unread}
                           </Badge>
                         )}
@@ -395,24 +395,24 @@ export function DriverMessages() {
                       <div key={m.id} className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
                         <div
                           className={cn(
-                            'max-w-[80%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap break-words',
+                            'max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap break-words',
                             mine ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
                           )}
                         >
                           {m.content}
                         </div>
                         <div className="flex items-center gap-1 mt-1 px-1">
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
                           </span>
                           {mine && (
                             m.is_read ? (
-                              <span className="flex items-center gap-0.5 text-[10px] text-primary" title="Read">
+                              <span className="flex items-center gap-0.5 text-xs text-primary" title="Read">
                                 <CheckCheck className="h-3 w-3" />
                                 Read
                               </span>
                             ) : (
-                              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Delivered">
+                              <span className="flex items-center gap-0.5 text-xs text-muted-foreground" title="Delivered">
                                 <Check className="h-3 w-3" />
                                 Delivered
                               </span>

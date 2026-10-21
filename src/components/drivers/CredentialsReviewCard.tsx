@@ -115,12 +115,12 @@ export function CredentialsReviewCard({ driverId, status, notes }: Props) {
 
 function StatusPill({ status }: { status: ReviewStatus }) {
   if (status === 'approved') {
-    return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[10px]">Approved</Badge>;
+    return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs">Approved</Badge>;
   }
   if (status === 'revision_requested') {
-    return <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-[10px]">Revision requested</Badge>;
+    return <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-xs">Revision requested</Badge>;
   }
-  return <Badge variant="secondary" className="text-[10px]">Pending review</Badge>;
+  return <Badge variant="secondary" className="text-xs">Pending review</Badge>;
 }
 
 export { ShieldCheck };

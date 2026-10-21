@@ -123,11 +123,11 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
                   key={t.id}
                   type="button"
                   onClick={() => setTruck(t.id)}
-                  className={cn('min-h-[64px] rounded-xl border p-3 text-left transition-colors', truck === t.id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent')}
+                  className={cn('min-h-[64px] rounded-lg border p-3 text-left transition-colors', truck === t.id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent')}
                 >
                   <span className="block font-condensed text-xl font-bold leading-none">{t.unit_number}</span>
                   <span className="block truncate text-xs text-muted-foreground">{[t.make, t.model].filter(Boolean).join(' ') || 'Truck'}</span>
-                  {t.busy && <span className="mt-1 block text-[11px] font-medium text-orange-400">Already has an open job</span>}
+                  {t.busy && <span className="mt-1 block text-xs font-medium text-orange-400">Already has an open job</span>}
                 </button>
               ))}
               {shown.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No trucks match.</p>}
@@ -142,7 +142,7 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
                   key={k.key}
                   type="button"
                   onClick={() => toggleKind(k.key)}
-                  className={cn('min-h-[44px] rounded-full border px-4 text-sm font-medium transition-colors', kinds.includes(k.key) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent')}
+                  className={cn('min-h-[44px] rounded-md border px-4 text-sm font-medium transition-colors', kinds.includes(k.key) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent')}
                 >
                   {k.label}
                 </button>
@@ -159,7 +159,7 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
                   key={p}
                   type="button"
                   onClick={() => setPriority(p)}
-                  className={cn('min-h-[48px] rounded-xl border text-sm font-medium transition-colors', priority === p ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent')}
+                  className={cn('min-h-[48px] rounded-lg border text-sm font-medium transition-colors', priority === p ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent')}
                 >
                   {PRIORITY_LABEL[p]}
                 </button>

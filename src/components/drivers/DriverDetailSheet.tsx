@@ -172,15 +172,15 @@ export function DriverDetailSheet({
                   {driver.first_name} {driver.last_name}
                 </SheetTitle>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <Badge variant={driver.status === 'active' ? 'default' : 'secondary'} className="text-[10px] capitalize">
+                  <Badge variant={driver.status === 'active' ? 'default' : 'secondary'} className="text-xs capitalize">
                     {driver.status || 'active'}
                   </Badge>
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-xs">
                     {employmentLabel}
                   </Badge>
 
                   {hireDate && (
-                    <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> Hired {format(hireDate, 'MMM d, yyyy')}
                     </span>
                   )}
@@ -262,9 +262,9 @@ export function DriverDetailSheet({
                 </SelectContent>
               </Select>
             ) : (
-              <Badge variant="outline" className="text-[10px]">{driver.tax_state || 'Org default'}</Badge>
+              <Badge variant="outline" className="text-xs">{driver.tax_state || 'Org default'}</Badge>
             )}
-            <span className="text-[10px] text-muted-foreground">Used for SUTA & state income tax withholding.</span>
+            <span className="text-xs text-muted-foreground">Used for SUTA & state income tax withholding.</span>
           </div>
         </div>
 

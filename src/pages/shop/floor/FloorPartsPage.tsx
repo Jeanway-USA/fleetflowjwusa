@@ -34,7 +34,7 @@ export default function FloorPartsPage() {
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a part" className="h-14 pl-12 sm:pl-12 text-lg" />
         </div>
-        <button type="button" onClick={() => setLowOnly((v) => !v)} aria-pressed={lowOnly} className={cn('min-h-[56px] rounded-2xl border px-5 text-base font-semibold', lowOnly ? 'border-orange-500 bg-orange-500/10 text-orange-300' : 'hover:bg-accent')}>Low stock only</button>
+        <button type="button" onClick={() => setLowOnly((v) => !v)} aria-pressed={lowOnly} className={cn('min-h-[56px] rounded-lg border px-5 text-base font-semibold', lowOnly ? 'border-orange-500 bg-orange-500/10 text-orange-300' : 'hover:bg-accent')}>Low stock only</button>
       </div>
 
       {isLoading ? <p className="text-muted-foreground">Loading the shelf…</p> : shown.length === 0 ? (
@@ -46,7 +46,7 @@ export default function FloorPartsPage() {
             const low = !out && Number(p.quantity_on_hand) <= Number(p.min_threshold);
             return (
               <li key={p.id}>
-                <button type="button" disabled={out} onClick={() => setChosen(p)} className="flex min-h-[76px] w-full items-center gap-3 rounded-2xl border bg-card px-4 text-left transition-colors hover:bg-accent disabled:opacity-50">
+                <button type="button" disabled={out} onClick={() => setChosen(p)} className="flex min-h-[76px] w-full items-center gap-3 rounded-lg border bg-card px-4 text-left transition-colors hover:bg-accent disabled:opacity-50">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-lg font-medium">{p.part_name}</span>
                     <span className="block truncate text-sm text-muted-foreground">{[p.part_number, p.category].filter(Boolean).join(' · ')}</span>
@@ -74,7 +74,7 @@ export default function FloorPartsPage() {
             <ul className="max-h-[50vh] space-y-2 overflow-y-auto">
               {jobs.map((j) => (
                 <li key={j.id}>
-                  <button type="button" onClick={() => setJobId(j.id)} className="flex min-h-[64px] w-full items-center gap-3 rounded-xl border px-4 text-left hover:bg-accent">
+                  <button type="button" onClick={() => setJobId(j.id)} className="flex min-h-[64px] w-full items-center gap-3 rounded-lg border px-4 text-left hover:bg-accent">
                     <span className="font-condensed text-3xl font-bold">{j.unit}</span>
                     <span className="text-base">{jobTitle(j)}</span>
                   </button>
