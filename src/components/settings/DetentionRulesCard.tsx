@@ -18,7 +18,7 @@ interface DetentionRule {
 }
 
 export function DetentionRulesCard() {
-  const { orgId, isDemoMode } = useAuth();
+  const { orgId } = useAuth();
   const qc = useQueryClient();
   const [rows, setRows] = useState<DetentionRule[]>([]);
   const [saving, setSaving] = useState(false);
@@ -47,7 +47,6 @@ export function DetentionRulesCard() {
   };
 
   const handleSave = async () => {
-    if (isDemoMode) return;
     setSaving(true);
     try {
       const updates = rows.map((r) =>
@@ -140,7 +139,7 @@ export function DetentionRulesCard() {
             ))}
             <Button
               onClick={handleSave}
-              disabled={saving || isDemoMode}
+              disabled={saving}
               className="gradient-gold text-primary-foreground"
             >
               {saving ? 'Saving…' : 'Save Detention Rules'}

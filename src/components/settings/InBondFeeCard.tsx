@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function InBondFeeCard() {
-  const { orgId, isDemoMode } = useAuth();
+  const { orgId } = useAuth();
   const qc = useQueryClient();
   const [fee, setFee] = useState<string>('100');
   const [saving, setSaving] = useState(false);
@@ -34,7 +34,7 @@ export function InBondFeeCard() {
   }, [data]);
 
   const handleSave = async () => {
-    if (isDemoMode || !orgId) return;
+    if (!orgId) return;
     const n = parseFloat(fee);
     if (!Number.isFinite(n) || n < 0) {
       toast.error('Enter a valid non-negative fee');
@@ -88,7 +88,7 @@ export function InBondFeeCard() {
               />
             </div>
             <div className="sm:col-span-2">
-              <Button onClick={handleSave} disabled={saving || isDemoMode} className="gradient-gold text-primary-foreground">
+              <Button onClick={handleSave} disabled={saving} className="gradient-gold text-primary-foreground">
                 {saving ? 'Saving…' : 'Save In-Bond Fee'}
               </Button>
             </div>

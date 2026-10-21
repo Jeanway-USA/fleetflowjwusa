@@ -18,7 +18,7 @@ interface StorageConfig {
 }
 
 export function StorageTab() {
-  const { orgId, isDemoMode } = useAuth();
+  const { orgId } = useAuth();
   const queryClient = useQueryClient();
   const [isConnecting, setIsConnecting] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
@@ -303,7 +303,7 @@ export function StorageTab() {
 
             <Button
               onClick={handleConnect}
-              disabled={isConnecting || isDemoMode}
+              disabled={isConnecting}
               className="w-full"
             >
               {isConnecting ? (

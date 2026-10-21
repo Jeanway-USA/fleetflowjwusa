@@ -20,7 +20,7 @@ import { PositionsTab } from '@/components/settings/positions/PositionsTab';
 import { PayPackagesTab } from '@/components/settings/pay-packages/PayPackagesTab';
 
 export default function Settings() {
-  const { canSimulateRoles, isDemoMode, hasPayrollAccess } = useAuth();
+  const { canSimulateRoles, hasPayrollAccess } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const hasAdminAccess = canSimulateRoles;
@@ -72,11 +72,6 @@ export default function Settings() {
     <>
       <PageHeader title="Settings" description="Manage users, roles, and system configuration" />
 
-      {isDemoMode && (
-        <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
-          <p className="text-sm font-medium">🔒 Settings are read-only in demo mode. Sign up for a real account to manage your organization.</p>
-        </div>
-      )}
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-6 w-full justify-start overflow-x-auto">

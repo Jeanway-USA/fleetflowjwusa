@@ -19,20 +19,19 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { isDemoMode, signOut } = useAuth();
+  const { signOut } = useAuth();
 
   return (
     <SidebarProvider>
-      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut}>
+      <DashboardLayoutInner signOut={signOut}>
         {children}
       </DashboardLayoutInner>
     </SidebarProvider>
   );
 }
 
-function DashboardLayoutInner({ children, isDemoMode, signOut }: {
+function DashboardLayoutInner({ children, signOut }: {
   children: ReactNode;
-  isDemoMode: boolean;
   signOut: () => Promise<void>;
 }) {
   const navigate = useNavigate();
@@ -98,24 +97,6 @@ function DashboardLayoutInner({ children, isDemoMode, signOut }: {
     <div className="min-h-screen flex w-full bg-background">
       <AppSidebar />
       <main className="flex-1 flex flex-col min-h-screen min-w-0">
-        {isDemoMode && (
-          <div className="bg-accent/20 border-b border-accent/40 px-4 py-2 flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="font-medium">Demo mode with sample data</span>
-            </div>
-            <Button
-              size="sm"
-              className="h-8"
-              onClick={async () => {
-                await signOut();
-                navigate('/');
-              }}
-            >
-              Exit demo
-            </Button>
-          </div>
-        )}
         <TopBar onReplayTour={() => tour.startTour()} hasTour={!!tourDef} />
 
         <div className="flex-1 px-3 pt-4 pb-tabbar sm:px-4 md:pb-6 lg:px-6 lg:pt-6">

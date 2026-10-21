@@ -9,7 +9,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { useDemoGuard } from '@/hooks/useDemoGuard';
 
 interface ConfirmArchiveDialogProps {
   open: boolean;
@@ -34,14 +33,12 @@ export function ConfirmArchiveDialog({
   warnings = [],
   isArchiving = false,
 }: ConfirmArchiveDialogProps) {
-  const { isDemoMode, guard } = useDemoGuard();
 
   const defaultDescription = itemName
     ? `Archive "${itemName}"? You can restore it from the Archive page.`
     : `Archive this ${entityLabel}? You can restore it from the Archive page.`;
 
   const handleConfirm = () => {
-    if (guard('Archiving items')) return;
     onConfirm();
   };
 
@@ -51,12 +48,10 @@ export function ConfirmArchiveDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{title || `Archive ${entityLabel}`}</AlertDialogTitle>
           <AlertDialogDescription>
-            {isDemoMode
-              ? 'Archiving is disabled in demo mode. Sign up for a real account to manage your data.'
-              : description || defaultDescription}
+            {description || defaultDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {warnings.length > 0 && !isDemoMode && (
+        {warnings.length > 0 && (
           <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
@@ -78,7 +73,7 @@ export function ConfirmArchiveDialog({
               e.preventDefault();
               handleConfirm();
             }}
-            disabled={isArchiving || isDemoMode}
+            disabled={isArchiving}
           >
             {isArchiving ? (
               <>

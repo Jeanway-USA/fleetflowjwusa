@@ -27,7 +27,7 @@ const DIM_LABEL: Record<Rule['dimension'], string> = {
 };
 
 export function OverDimensionRulesCard() {
-  const { orgId, isDemoMode } = useAuth();
+  const { orgId } = useAuth();
   const qc = useQueryClient();
   const [rows, setRows] = useState<Rule[]>([]);
   const [saving, setSaving] = useState(false);
@@ -61,7 +61,6 @@ export function OverDimensionRulesCard() {
   };
 
   const handleSave = async () => {
-    if (isDemoMode) return;
     setSaving(true);
     try {
       const results = await Promise.all(
@@ -161,7 +160,7 @@ export function OverDimensionRulesCard() {
             ))}
             <Button
               onClick={handleSave}
-              disabled={saving || isDemoMode}
+              disabled={saving}
               className="gradient-gold text-primary-foreground"
             >
               {saving ? 'Saving…' : 'Save Over-Dimension Rules'}
