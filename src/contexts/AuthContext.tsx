@@ -25,7 +25,6 @@ interface AuthContextType {
   logoUrl: string | null;
   bannerUrl: string | null;
   hidePromotions: boolean;
-  isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
   requiresOnboarding: boolean;
@@ -110,8 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data?.map(r => r.role) || [];
   };
 
-  const DEMO_EMAIL = 'demo@fleetflow-tms.com';
-  const isDemoMode = user?.email === DEMO_EMAIL;
 
   const fetchOrgData = async (userId: string) => {
     try {
@@ -475,7 +472,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       orgLoading,
       roles,
       simulatedRole,
-      isDemoMode,
       signIn,
       signUp,
       signOut,

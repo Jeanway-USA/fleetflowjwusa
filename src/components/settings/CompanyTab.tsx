@@ -18,7 +18,7 @@ import { OverDimensionRulesCard } from './OverDimensionRulesCard';
 import { InBondFeeCard } from './InBondFeeCard';
 
 export function CompanyTab() {
-  const { orgId, orgName, refreshOrgData, isDemoMode } = useAuth();
+  const { orgId, orgName, refreshOrgData } = useAuth();
   const { tmsMode, isLandstar, isIndependent } = useOrganizationMode();
   const queryClient = useQueryClient();
 
@@ -167,11 +167,10 @@ export function CompanyTab() {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Your Company Name"
-                disabled={isDemoMode}
               />
               <Button
                 onClick={handleSaveName}
-                disabled={isSavingName || isDemoMode || companyName.trim() === orgName}
+                disabled={isSavingName || companyName.trim() === orgName}
                 className="gradient-gold text-primary-foreground shrink-0"
               >
                 {isSavingName ? 'Saving...' : 'Save'}
@@ -188,7 +187,6 @@ export function CompanyTab() {
                     value={dotNumber}
                     onChange={(e) => setDotNumber(e.target.value)}
                     placeholder="1234567"
-                    disabled={isDemoMode}
                   />
                 </div>
                 <div className="space-y-2">
@@ -197,13 +195,12 @@ export function CompanyTab() {
                     value={mcNumber}
                     onChange={(e) => setMcNumber(e.target.value)}
                     placeholder="MC-123456"
-                    disabled={isDemoMode}
                   />
                 </div>
               </div>
               <Button
                 onClick={handleSaveAuthority}
-                disabled={isSavingAuthority || isDemoMode}
+                disabled={isSavingAuthority}
                 className="gradient-gold text-primary-foreground"
               >
                 {isSavingAuthority ? 'Saving...' : 'Save Authority Details'}
@@ -260,7 +257,6 @@ export function CompanyTab() {
               <Switch
                 checked={factoringEnabled}
                 onCheckedChange={setFactoringEnabled}
-                disabled={isDemoMode}
               />
             </div>
 
@@ -273,7 +269,6 @@ export function CompanyTab() {
                       value={factoringProvider}
                       onChange={(e) => setFactoringProvider(e.target.value)}
                       placeholder="e.g. RTS Financial, OTR Solutions"
-                      disabled={isDemoMode}
                     />
                   </div>
                   <div className="space-y-2">
@@ -286,7 +281,6 @@ export function CompanyTab() {
                       value={factoringFee}
                       onChange={(e) => setFactoringFee(e.target.value)}
                       placeholder="e.g. 3.0"
-                      disabled={isDemoMode}
                     />
                   </div>
                 </div>
@@ -297,7 +291,6 @@ export function CompanyTab() {
                     onChange={(e) => setFactoringRemitAddress(e.target.value)}
                     placeholder="This text will appear on all generated invoices..."
                     rows={3}
-                    disabled={isDemoMode}
                   />
                   <p className="text-xs text-muted-foreground">
                     This notice will be appended to all invoices when factoring is enabled.
@@ -308,7 +301,7 @@ export function CompanyTab() {
 
             <Button
               onClick={handleSaveFactoring}
-              disabled={isSavingFactoring || isDemoMode}
+              disabled={isSavingFactoring}
               className="gradient-gold text-primary-foreground"
             >
               {isSavingFactoring ? 'Saving...' : 'Save Factoring Settings'}

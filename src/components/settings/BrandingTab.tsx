@@ -61,7 +61,7 @@ function hexToHsl(hex: string): string {
 }
 
 export function BrandingTab() {
-  const { orgId, isDemoMode, refreshOrgData, primaryColor, logoUrl, bannerUrl } = useAuth();
+  const { orgId, refreshOrgData, primaryColor, logoUrl, bannerUrl } = useAuth();
   const [selectedColor, setSelectedColor] = useState(primaryColor || '45 80% 45%');
   const [isSavingColor, setIsSavingColor] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -179,7 +179,6 @@ export function BrandingTab() {
                     ? 'border-foreground ring-2 ring-foreground/20'
                     : 'border-border hover:border-foreground/30'
                 }`}
-                disabled={isDemoMode}
               >
                 <div
                   className="w-10 h-10 rounded-full border border-border"
@@ -197,7 +196,6 @@ export function BrandingTab() {
               type="color"
               value={hslToHex(selectedColor)}
               onChange={(e) => setSelectedColor(hexToHsl(e.target.value))}
-              disabled={isDemoMode}
               className="h-10 w-14 rounded-md border border-border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <span className="text-xs text-muted-foreground font-mono">{hslToHex(selectedColor)}</span>
@@ -236,7 +234,7 @@ export function BrandingTab() {
 
           <Button
             onClick={handleSaveColor}
-            disabled={isSavingColor || isDemoMode || selectedColor === primaryColor}
+            disabled={isSavingColor || selectedColor === primaryColor}
             className="gradient-gold text-primary-foreground"
           >
             {isSavingColor ? 'Saving...' : 'Apply Color'}
@@ -281,7 +279,7 @@ export function BrandingTab() {
                   variant="outline"
                   size="sm"
                   onClick={() => logoInputRef.current?.click()}
-                  disabled={isDemoMode || isUploadingLogo}
+                  disabled={isUploadingLogo}
                 >
                   <Upload className="h-4 w-4 mr-1" />
                   {isUploadingLogo ? 'Uploading...' : logoUrl ? 'Change' : 'Upload'}
@@ -291,7 +289,6 @@ export function BrandingTab() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRemoveAsset('logo')}
-                    disabled={isDemoMode}
                   >
                     <X className="h-4 w-4 mr-1" />
                     Remove
@@ -328,7 +325,7 @@ export function BrandingTab() {
                   variant="outline"
                   size="sm"
                   onClick={() => bannerInputRef.current?.click()}
-                  disabled={isDemoMode || isUploadingBanner}
+                  disabled={isUploadingBanner}
                 >
                   <Upload className="h-4 w-4 mr-1" />
                   {isUploadingBanner ? 'Uploading...' : bannerUrl ? 'Change' : 'Upload'}
@@ -338,7 +335,6 @@ export function BrandingTab() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRemoveAsset('banner')}
-                    disabled={isDemoMode}
                   >
                     <X className="h-4 w-4 mr-1" />
                     Remove

@@ -45,7 +45,7 @@ export function useOnboardingDefaults() {
 }
 
 export function OnboardingPreferencesCard() {
-  const { orgId, isDemoMode } = useAuth();
+  const { orgId } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading } = useOnboardingDefaults();
 
@@ -69,7 +69,7 @@ export function OnboardingPreferencesCard() {
     onError: (err: any) => toast.error(err.message || 'Failed to update preference'),
   });
 
-  const disabled = isDemoMode || mutation.isPending || isLoading || !orgId;
+  const disabled = mutation.isPending || isLoading || !orgId;
 
   return (
     <Card className="card-elevated">
