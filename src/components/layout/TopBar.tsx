@@ -46,7 +46,6 @@ const ROUTE_LABELS: Record<string, string> = {
   '/driver-stats': 'My Stats',
   '/driver/loads': 'My Loads',
   '/driver-settings': 'My Settings',
-  '/super-admin': 'Super Admin',
   '/archive': 'Archive',
   '/audit-trail': 'Audit Trail',
   '/admin/tax-hub': 'Tax Hub',

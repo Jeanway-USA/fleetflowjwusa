@@ -20,24 +20,21 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { isDemoMode, signOut, simulatedOrgId, simulatedOrgName, clearOrgSimulation } = useAuth();
+  const { isDemoMode, signOut } = useAuth();
 
   return (
     <SidebarProvider>
-      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut} simulatedOrgId={simulatedOrgId} simulatedOrgName={simulatedOrgName} clearOrgSimulation={clearOrgSimulation}>
+      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut}>
         {children}
       </DashboardLayoutInner>
     </SidebarProvider>
   );
 }
 
-function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, simulatedOrgName, clearOrgSimulation }: {
+function DashboardLayoutInner({ children, isDemoMode, signOut }: {
   children: ReactNode;
   isDemoMode: boolean;
   signOut: () => Promise<void>;
-  simulatedOrgId: string | null;
-  simulatedOrgName: string | null;
-  clearOrgSimulation: () => void;
 }) {
   const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
@@ -102,18 +99,6 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
     <div className="min-h-screen flex w-full bg-background">
       <AppSidebar />
       <main className="flex-1 flex flex-col min-h-screen min-w-0">
-        {simulatedOrgId && (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => { clearOrgSimulation(); navigate('/super-admin'); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { clearOrgSimulation(); navigate('/super-admin'); } }}
-            className="sticky top-0 z-50 bg-destructive text-destructive-foreground px-4 py-2 flex items-center justify-center gap-3 text-sm cursor-pointer hover:bg-destructive/90 transition-colors"
-          >
-            <ShieldAlert className="h-4 w-4" />
-            <span className="font-semibold">Viewing as {simulatedOrgName}. Tap to exit.</span>
-          </div>
-        )}
         {isDemoMode && (
           <div className="bg-accent/20 border-b border-accent/40 px-4 py-2 flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">

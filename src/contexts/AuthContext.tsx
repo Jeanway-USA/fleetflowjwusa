@@ -47,10 +47,6 @@ interface AuthContextType {
   hasSafetyAccess: boolean;
   refreshOrgData: () => Promise<void>;
   refreshRoles: () => Promise<void>;
-  simulatedOrgId: string | null;
-  simulatedOrgName: string | null;
-  clearOrgSimulation: () => Promise<void>;
-  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,13 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [hidePromotions, setHidePromotions] = useState(false);
   const [orgLoading, setOrgLoading] = useState(true);
   const [orgIsActive, setOrgIsActive] = useState(true);
-  const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(null);
-  const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(null);
-  const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(null);
   const [requiresOnboarding, setRequiresOnboarding] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const superAdminCheckedRef = useRef<string | null>(null);
 
   // Helpers that no-op after unmount to avoid setState-on-unmounted warnings
   // and clobbering of a remounted provider's state by the discarded mount.
@@ -102,9 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgIsActive(true);
     setRequiresOnboarding(false);
     setOnboardingCompleted(false);
-    setIsSuperAdmin(false);
     setSimulatedRole(null);
-    superAdminCheckedRef.current = null;
   }, []);
 
   const fetchUserRoles = async (userId: string): Promise<AppRole[]> => {
@@ -202,97 +191,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isMountedRef.current) setRolesLoading(false);
     }
   };
-
-  const clearOrgSimulation = useCallback(async () => {
-    try {
-      setOrgLoading(true);
-      await supabase.rpc('super_admin_stop_impersonation' as any);
-    } catch (err) {
-      console.warn('[Auth] stop impersonation failed:', err);
-    }
-    localStorage.removeItem('simulatedOrgId');
-    localStorage.removeItem('simulatedOrgName');
-    localStorage.removeItem('simulatedOrgTier');
-    setSimulatedOrgId(null);
-    setSimulatedOrgName(null);
-    setSimulatedOrgTier(null);
-    if (currentUserIdRef.current) {
-      await fetchOrgData(currentUserIdRef.current);
-    }
-    queryClient.removeQueries({ queryKey: ['w2_driver_sync_dashboard'] });
-    queryClient.removeQueries({ queryKey: ['w2_onboarding_status'] });
-    queryClient.invalidateQueries();
-    if (isMountedRef.current) setOrgLoading(false);
-  }, [queryClient]);
-
-  // Super admin check via server-side RPC (no hardcoded emails)
-  useEffect(() => {
-    const checkSuperAdmin = async () => {
-      if (!user) {
-        setIsSuperAdmin(false);
-        superAdminCheckedRef.current = null;
-        return;
-      }
-      if (superAdminCheckedRef.current === user.id) return;
-      superAdminCheckedRef.current = user.id;
-      const { data, error } = await supabase.rpc('is_super_admin');
-      if (!isMountedRef.current) return;
-      const isSA = !error && data === true;
-      setIsSuperAdmin(isSA);
-
-      // Hydrate active impersonation state from server so a refresh
-      // doesn't desync the banner from the actually-impersonated org.
-      if (isSA) {
-        const { data: stateRows } = await supabase.rpc('super_admin_impersonation_state' as any);
-        const row = Array.isArray(stateRows) ? stateRows[0] : null;
-        if (row?.impersonating_org_id) {
-          localStorage.setItem('simulatedOrgId', row.impersonating_org_id);
-          localStorage.setItem('simulatedOrgName', row.impersonating_org_name ?? '');
-          if (isMountedRef.current) {
-            setSimulatedOrgId(row.impersonating_org_id);
-            setSimulatedOrgName(row.impersonating_org_name ?? '');
-          }
-        } else {
-          localStorage.removeItem('simulatedOrgId');
-          localStorage.removeItem('simulatedOrgName');
-          localStorage.removeItem('simulatedOrgTier');
-          if (isMountedRef.current) {
-            setSimulatedOrgId(null);
-            setSimulatedOrgName(null);
-            setSimulatedOrgTier(null);
-          }
-        }
-      }
-    };
-    checkSuperAdmin();
-  }, [user]);
-
-  useEffect(() => {
-    const handler = async () => {
-      if (!isSuperAdmin) {
-        localStorage.removeItem('simulatedOrgId');
-        localStorage.removeItem('simulatedOrgName');
-        localStorage.removeItem('simulatedOrgTier');
-        setSimulatedOrgId(null);
-        setSimulatedOrgName(null);
-        setSimulatedOrgTier(null);
-        return;
-      }
-      setOrgLoading(true);
-      setSimulatedOrgId(localStorage.getItem('simulatedOrgId'));
-      setSimulatedOrgName(localStorage.getItem('simulatedOrgName'));
-      setSimulatedOrgTier(localStorage.getItem('simulatedOrgTier'));
-      queryClient.removeQueries({ queryKey: ['w2_driver_sync_dashboard'] });
-      queryClient.removeQueries({ queryKey: ['w2_onboarding_status'] });
-      if (currentUserIdRef.current) {
-        await fetchOrgData(currentUserIdRef.current);
-      }
-      await queryClient.invalidateQueries();
-      if (isMountedRef.current) setOrgLoading(false);
-    };
-    window.addEventListener('simulatedOrgChanged', handler);
-    return () => window.removeEventListener('simulatedOrgChanged', handler);
-  }, [isSuperAdmin, queryClient]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -601,10 +499,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hidePromotions,
       refreshOrgData,
       refreshRoles,
-      simulatedOrgId,
-      simulatedOrgName,
-      clearOrgSimulation,
-      isSuperAdmin,
       requiresOnboarding,
       onboardingCompleted,
     }}>
