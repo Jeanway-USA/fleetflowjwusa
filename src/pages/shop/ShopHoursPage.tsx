@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ShopNav } from '@/components/shop/ShopNav';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { ShopEmpty, useNow } from '@/components/shop/shared';
 import { useHoursData, useTimeReview } from '@/hooks/useShift';
 import { hoursCsv, paidShiftMinutes, payWeekLabel, payWeekStart, summarizeWeek, toHours, type WeekHours } from '@/lib/shop/hours';
@@ -78,23 +79,17 @@ export default function ShopHoursPage() {
 
   return (
     <div className="space-y-4">
-      <ShopNav />
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-condensed text-3xl font-bold">Mechanic hours</h1>
-          <p className="text-sm text-muted-foreground">Pay comes from the shift clock. Overtime is hours over 40 in a Monday to Sunday week, paid at 1.5 times. Lunch is paid, so it is never taken out.</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader title="Mechanic hours" description="Pay comes from the shift clock. Overtime is hours over 40 in a Monday to Sunday week, paid at 1.5 times. Lunch is paid, so it is never taken out.">
           <Button variant="outline" size="icon" aria-label="Previous week" onClick={() => setWeekStart(addDays(weekStart, -7))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="min-w-[210px] text-center text-sm font-semibold">{payWeekLabel(weekStart)}</div>
           <Button variant="outline" size="icon" aria-label="Next week" onClick={() => setWeekStart(addDays(weekStart, 7))}><ChevronRight className="h-4 w-4" /></Button>
           <Button variant="ghost" onClick={() => setWeekStart(payWeekStart(new Date()))}>This week</Button>
           <Button variant="outline" className="gap-2" disabled={rows.length === 0} onClick={exportCsv}><Download className="h-4 w-4" />Export</Button>
-        </div>
-      </div>
+        </PageHeader>
+      <ShopNav />
 
       {isLoading ? (
-        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-48 rounded-lg" />
       ) : data && !data.ready ? (
         <ShopEmpty title="The shift clock is not set up yet">Run the mechanic hours upgrade (docs/APPLY_MECHANIC.sql) and this report fills in.</ShopEmpty>
       ) : rows.length === 0 ? (
@@ -102,12 +97,12 @@ export default function ShopHoursPage() {
       ) : (
         <>
           {totals.review > 0 && (
-            <p className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+            <p className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               {totals.review} {totals.review === 1 ? 'entry was' : 'entries were'} stopped automatically after running too long. Check them below: hourly pay will not be made until they are checked.
             </p>
           )}
-          <div className="rounded-xl border">
+          <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -201,7 +196,7 @@ export default function ShopHoursPage() {
       )}
 
       {archived.length > 0 && (
-        <details className="rounded-xl border px-4 py-3 text-sm">
+        <details className="rounded-lg border px-4 py-3 text-sm">
           <summary className="cursor-pointer font-medium">Archived entries ({archived.length})</summary>
           <ul className="mt-3 space-y-2">
             {archived.map((s) => (

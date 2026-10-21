@@ -1192,7 +1192,7 @@ export default function DriverOnboarding() {
                       <span className="text-lg font-semibold">{label}</span>
                       <span
                         className={
-                          'rounded-full px-2 py-0.5 text-xs font-semibold ' +
+                          'rounded-md px-2 py-0.5 text-xs font-semibold ' +
                           (selected
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-muted text-muted-foreground')

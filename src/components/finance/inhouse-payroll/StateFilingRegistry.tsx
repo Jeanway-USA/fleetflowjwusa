@@ -130,12 +130,12 @@ export function StateFilingRegistry() {
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     <span className="font-semibold">{s.code}</span>
                     {!known && (
-                      <Badge variant="outline" className="text-[10px] gap-1">
+                      <Badge variant="outline" className="text-xs gap-1">
                         <AlertTriangle className="h-3 w-3" /> Generic
                       </Badge>
                     )}
                     {s.hasStateIncomeTax && (
-                      <Badge variant="secondary" className="text-[10px]">SIT</Badge>
+                      <Badge variant="secondary" className="text-xs">SIT</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-xs">

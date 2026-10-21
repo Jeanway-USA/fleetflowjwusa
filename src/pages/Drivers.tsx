@@ -1017,7 +1017,7 @@ export default function Drivers() {
                             {cfg.suffix}
                           </span>
                         </div>
-                        {helper && <p className="text-[11px] text-muted-foreground">{helper}</p>}
+                        {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
                       </>
                     );
                   })()}

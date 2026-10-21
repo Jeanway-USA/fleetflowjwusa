@@ -551,14 +551,14 @@ export function ReconciliationPreview({
                         <TableCell className="text-right font-mono text-xs">
                           {formatCurrency(m.expected_amount)}
                           {m.expected_gross_amount > 0 && m.landstar_split < 1 && (
-                            <div className="text-[10px] text-muted-foreground font-normal">
+                            <div className="text-xs text-muted-foreground font-normal">
                               {Math.round(m.landstar_split * 100)}% of {formatCurrency(m.expected_gross_amount)}
                             </div>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
                           {formatCurrency(m.actual_amount)}
-                          <div className="text-[10px] text-muted-foreground font-normal">
+                          <div className="text-xs text-muted-foreground font-normal">
                             {m.actual_source_label || '1099 revenue'}
                           </div>
                         </TableCell>
@@ -708,7 +708,7 @@ export function ReconciliationPreview({
           <div className="rounded-lg border p-3 space-y-1 border-dashed">
             <p className="text-xs text-muted-foreground">Advances Taken</p>
             <p className="text-lg font-mono font-semibold text-amber-600">{formatCurrency(advancesTotal)}</p>
-            <p className="text-[10px] text-muted-foreground">Non-P&L</p>
+            <p className="text-xs text-muted-foreground">Non-P&L</p>
           </div>
         </div>
 

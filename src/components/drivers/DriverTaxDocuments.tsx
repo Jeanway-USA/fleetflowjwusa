@@ -67,7 +67,7 @@ export function DriverTaxDocuments({ driver }: Props) {
         </div>
         <div>
           <h4 className="text-sm font-semibold text-foreground">Tax Documents (1099-NEC)</h4>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Upload signed 1099 PDFs. Only this driver and admins can access them.
           </p>
         </div>
@@ -83,7 +83,7 @@ export function DriverTaxDocuments({ driver }: Props) {
           {/* Upload form */}
           <div className="grid grid-cols-1 sm:grid-cols-[8rem_minmax(0,1fr)_auto] gap-2 items-end">
             <div className="space-y-1">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              <label className="text-xs uppercase tracking-wider text-muted-foreground">
                 Tax Year
               </label>
               <Select value={year} onValueChange={setYear}>
@@ -100,7 +100,7 @@ export function DriverTaxDocuments({ driver }: Props) {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              <label className="text-xs uppercase tracking-wider text-muted-foreground">
                 PDF File
               </label>
               <Input
@@ -126,7 +126,7 @@ export function DriverTaxDocuments({ driver }: Props) {
 
           {/* List */}
           <div className="border-t border-border pt-3">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
               Uploaded Documents
             </p>
             {isLoading ? (
@@ -146,7 +146,7 @@ export function DriverTaxDocuments({ driver }: Props) {
                       <p className="text-sm font-medium text-foreground">
                         1099-NEC · {doc.tax_year}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Uploaded {format(parseISO(doc.created_at), 'MMM d, yyyy')}
                       </p>
                     </div>

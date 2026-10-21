@@ -23,7 +23,7 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
 
   if (!shift) {
     return (
-      <div className={cn('flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4', className)}>
+      <div className={cn('flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4', className)}>
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Shift clock</p>
           <p className={cn('font-condensed font-bold leading-none', touch ? 'text-4xl' : 'text-2xl')}>Not clocked in</p>
@@ -41,7 +41,7 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
   const warn = state !== 'ok';
 
   return (
-    <div className={cn('rounded-2xl border p-4', onMeal ? 'border-orange-500/50 bg-orange-500/10' : 'border-emerald-500/40 bg-emerald-500/10', className)}>
+    <div className={cn('rounded-lg border p-4', onMeal ? 'border-orange-500/50 bg-orange-500/10' : 'border-emerald-500/40 bg-emerald-500/10', className)}>
       {warn && (
         <p className="mb-3 flex items-start gap-2 rounded-lg bg-red-500/15 px-3 py-2 text-sm font-medium text-red-300">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

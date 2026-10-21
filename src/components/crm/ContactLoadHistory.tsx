@@ -57,7 +57,7 @@ export function ContactLoadHistory({ contactId }: ContactLoadHistoryProps) {
                   {load.gross_revenue ? `$${load.gross_revenue.toLocaleString()}` : '—'}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={statusVariant(load.status)} className="text-[10px] capitalize">
+                  <Badge variant={statusVariant(load.status)} className="text-xs capitalize">
                     {load.status?.replace('_', ' ')}
                   </Badge>
                 </TableCell>

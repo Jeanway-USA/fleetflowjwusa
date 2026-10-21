@@ -1,10 +1,11 @@
 import { useState, lazy, Suspense } from 'react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
+import { StatStrip } from '@/components/shared/StatStrip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trophy, Target, DollarSign, Award } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { useDriverPerformanceData, PerformancePeriod } from '@/hooks/useDriverPerformanceData';
 import { ScoringMethodology } from '@/components/performance/ScoringMethodology';
 import { PerformanceLeaderboard } from '@/components/performance/PerformanceLeaderboard';
@@ -59,53 +60,16 @@ export default function DriverPerformance() {
         </Select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Drivers</CardTitle>
-            <Trophy className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold truncate">{drivers.length}</div>
-            <p className="text-xs text-muted-foreground truncate">Fleet average score: {fleetAverages.score.toFixed(0)}%</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Loads/Driver</CardTitle>
-            <Target className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold truncate">{fleetAverages.loads.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">Per selected period</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Revenue/Driver</CardTitle>
-            <DollarSign className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold text-success truncate">{formatCurrency(fleetAverages.revenue)}</div>
-            <p className="text-xs text-muted-foreground">Per selected period</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Top Performer</CardTitle>
-            <Award className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold truncate">
-              {driverMetrics[0]?.driver.first_name || '—'}
-            </div>
-            <p className="text-xs text-muted-foreground truncate">
-              Score: {driverMetrics[0]?.overallScore.toFixed(0) || 0}%
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Summary */}
+      <StatStrip
+        className="mb-6"
+        cells={[
+          { label: 'Active drivers', value: drivers.length, note: `Fleet average score: ${fleetAverages.score.toFixed(0)}%` },
+          { label: 'Avg loads per driver', value: fleetAverages.loads.toFixed(1), note: 'Per selected period' },
+          { label: 'Avg revenue per driver', value: formatCurrency(fleetAverages.revenue), note: 'Per selected period' },
+          { label: 'Top performer', value: driverMetrics[0]?.driver.first_name || '—', note: `Score: ${driverMetrics[0]?.overallScore.toFixed(0) || 0}%` },
+        ]}
+      />
 
       <Tabs defaultValue="leaderboard" className="w-full">
         <TabsList>

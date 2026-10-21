@@ -20,7 +20,7 @@ export function ClockBar({ detail, touch }: { detail: ShopJobDetail; touch?: boo
   const blocked = job.status === 'parts_ordered';
 
   if (job.status === 'completed') {
-    return <div className="rounded-2xl border bg-emerald-500/10 p-4 text-emerald-300">Finished. {formatMinutes(total)} logged.</div>;
+    return <div className="rounded-lg border bg-emerald-500/10 p-4 text-emerald-300">Finished. {formatMinutes(total)} logged.</div>;
   }
 
   const start = () => {
@@ -30,7 +30,7 @@ export function ClockBar({ detail, touch }: { detail: ShopJobDetail; touch?: boo
   };
 
   return (
-    <div className={cn('rounded-2xl border p-4', mine ? 'border-primary/50 bg-primary/10' : 'bg-card')}>
+    <div className={cn('rounded-lg border p-4', mine ? 'border-primary/50 bg-primary/10' : 'bg-card')}>
       {blocked && (
         <p className="mb-3 flex items-start gap-2 rounded-lg bg-orange-500/10 px-3 py-2 text-sm font-medium text-orange-300">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />

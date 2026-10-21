@@ -250,12 +250,12 @@ export function ActiveLoadsBoard() {
         <>
           <StatusBadge status={load.status} />
           {group === 'past_due' && load.delivery_date && (
-            <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
+            <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-destructive">
               Past due since {format(parseISO(load.delivery_date), 'MMM d')}
             </span>
           )}
           {load.has_statement_discrepancy && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
+            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-destructive">
               <ShieldAlert className="h-3 w-3" /> Statement mismatch
             </span>
           )}
@@ -455,7 +455,7 @@ export function ActiveLoadsBoard() {
                     <div className="max-h-40 overflow-y-auto pr-3">
                       {formatSpecialInstructions(selectedLoad.notes)}
                     </div>
-                    <p className="text-[10px] text-warning/60 mt-1 italic">Scroll for more ↓</p>
+                    <p className="text-xs text-warning/60 mt-1 italic">Scroll for more ↓</p>
                   </div>
                 )}
 

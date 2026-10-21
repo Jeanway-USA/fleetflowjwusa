@@ -299,7 +299,7 @@ export function DriverPayPackageSection({ driver, userId, suggestedPackageId }: 
           <OverrideDialog driverId={driverId} packageId={current.package_id} open={overrideOpen} onOpenChange={setOverrideOpen} />
         </div>
       )}
-      {!hasPayrollAccess && current && <Badge variant="outline" className="text-[10px]">Only owners and payroll admins can change this</Badge>}
+      {!hasPayrollAccess && current && <Badge variant="outline" className="text-xs">Only owners and payroll admins can change this</Badge>}
     </div>
     </>
   );

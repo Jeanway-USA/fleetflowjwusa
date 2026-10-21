@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -136,18 +137,7 @@ export default function DispatcherDashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="font-condensed text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">Dispatch</h1>
-          <p className="mt-0.5 text-[15px] text-muted-foreground">
-            {getGreeting()}, {displayName}. {format(new Date(), 'EEEE, MMMM d')}.
-          </p>
-        </div>
-        <Button onClick={() => navigate('/fleet-loads')} className="h-11 gap-2 sm:h-10">
-          <Plus className="h-4 w-4" />
-          New load
-        </Button>
-      </div>
+      <PageHeader title="Dispatch" description={`${getGreeting()}, ${displayName}. ${format(new Date(), 'EEEE, MMMM d')}.`} action={{ label: 'New load', onClick: () => navigate('/fleet-loads') }} />
 
       <div>
         <dl className="grid grid-cols-2 divide-x divide-y rounded-lg border bg-card lg:grid-cols-4 lg:divide-y-0">
@@ -171,7 +161,7 @@ export default function DispatcherDashboard() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto">
           {[
             ['command-center', 'Overview'],
             ['dispatch-board', 'Schedule and loads'],
@@ -180,7 +170,7 @@ export default function DispatcherDashboard() {
             <TabsTrigger
               key={value}
               value={value}
-              className="h-11 rounded-none border-b-2 border-transparent bg-transparent px-3 text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none sm:px-4"
+              className="h-11 shrink-0 px-4"
             >
               {label}
             </TabsTrigger>

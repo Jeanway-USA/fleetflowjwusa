@@ -79,7 +79,7 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
       <div className="flex items-center gap-2">
         <MapPin className="h-4 w-4 text-warning" />
         <h3 className="text-sm font-semibold">Intermediate Stops</h3>
-        <Badge variant="outline" className="ml-auto text-[10px]">
+        <Badge variant="outline" className="ml-auto text-xs">
           {completedCount}/{stops.length} completed
         </Badge>
       </div>
@@ -120,13 +120,13 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
                     Stop {stop.stop_number ?? idx + 1}
                   </span>
                   {stop.stop_type && (
-                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    <span className="text-xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                       {stop.stop_type}
                     </span>
                   )}
                   <Badge
                     variant={isCompleted ? 'default' : 'secondary'}
-                    className="text-[10px] capitalize"
+                    className="text-xs capitalize"
                   >
                     {status}
                   </Badge>
@@ -160,7 +160,7 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
                         {stop.remaining_hos !== null ? `${stop.remaining_hos} hr` : 'Not logged'}
                       </span>
                       {hosLow && (
-                        <span className="ml-1 text-[10px] uppercase font-bold">Low</span>
+                        <span className="ml-1 text-xs uppercase font-bold">Low</span>
                       )}
                     </div>
                   </div>

@@ -125,7 +125,7 @@ export function DriverStatusGrid() {
   };
 
   const chip = (label: string, cls: string) => (
-    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${cls}`}>{label}</span>
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${cls}`}>{label}</span>
   );
   const range = (w: HometimeWindow) => `${format(parseISO(`${w.start_date}T00:00:00`), 'MMM d')} to ${format(parseISO(`${w.end_date}T00:00:00`), 'MMM d')}`;
 

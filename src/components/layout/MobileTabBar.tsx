@@ -63,7 +63,7 @@ export function MobileTabBar() {
 
   const itemClass = (active: boolean) =>
     cn(
-      'relative flex flex-1 flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[56px] text-[11px] font-semibold tracking-wide transition-colors',
+      'relative flex flex-1 flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[56px] text-xs font-semibold tracking-wide transition-colors',
       active ? 'text-shell-foreground' : 'text-shell-muted active:text-shell-foreground',
     );
 

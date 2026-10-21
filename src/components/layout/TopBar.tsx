@@ -136,7 +136,7 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">Search drivers, trucks, loads…</span>
-          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium">
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-xs font-medium">
             ⌘K
           </kbd>
         </button>

@@ -162,9 +162,9 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
               <FileSignature className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="font-medium truncate">{friendly}</span>
               {t.builtin ? (
-                <Badge variant="outline" className="text-[10px] uppercase">Built-in</Badge>
+                <Badge variant="outline" className="text-xs uppercase">Built-in</Badge>
               ) : (
-                <Badge variant="outline" className="text-[10px] uppercase">
+                <Badge variant="outline" className="text-xs uppercase">
                   {t.applies_to === 'shared' ? 'All' : t.applies_to === 'w2' ? 'W-2' : '1099'}
                 </Badge>
               )}
@@ -355,10 +355,10 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
 
 function StatusPill({ status }: { status: ReviewStatus }) {
   if (status === 'approved') {
-    return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[10px]">Approved</Badge>;
+    return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs">Approved</Badge>;
   }
   if (status === 'revision_requested') {
-    return <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-[10px]">Revision requested</Badge>;
+    return <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-xs">Revision requested</Badge>;
   }
-  return <Badge variant="secondary" className="text-[10px]">Pending review</Badge>;
+  return <Badge variant="secondary" className="text-xs">Pending review</Badge>;
 }

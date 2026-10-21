@@ -182,9 +182,9 @@ export default function DriverStats() {
     return (
       <div className="mx-auto w-full max-w-2xl space-y-3 pb-6">
         {header}
-        <Skeleton className="h-11 w-full rounded-xl" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-11 w-full rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-lg" />
       </div>
     );
   }

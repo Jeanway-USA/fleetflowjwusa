@@ -26,7 +26,7 @@ export default function FloorJobPage() {
   const [blockOpen, setBlockOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
 
-  if (isLoading) return <div className="mx-auto max-w-4xl space-y-4"><Skeleton className="h-28 rounded-2xl" /><Skeleton className="h-72 rounded-2xl" /></div>;
+  if (isLoading) return <div className="mx-auto max-w-4xl space-y-4"><Skeleton className="h-28 rounded-lg" /><Skeleton className="h-72 rounded-lg" /></div>;
   if (error || !detail) {
     return (
       <div className="mx-auto max-w-4xl space-y-3">
@@ -51,7 +51,7 @@ export default function FloorJobPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4 pb-28">
       <Button asChild variant="ghost" className="-ml-3 h-14 w-fit text-base"><Link to="/shop/floor"><ArrowLeft className="mr-2 h-5 w-5" />All jobs</Link></Button>
 
-      <header className={cn('rounded-2xl border border-l-8 bg-card p-5', done ? 'border-l-emerald-500' : LANE_STYLE[lane].rail)}>
+      <header className={'rounded-lg border bg-card p-5'}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-condensed text-7xl font-bold leading-none">{job.unit}</p>
@@ -66,9 +66,9 @@ export default function FloorJobPage() {
 
       <ClockBar detail={detail} touch />
 
-      <div role="tablist" aria-label="Job sections" className="grid grid-cols-2 gap-1.5 rounded-2xl bg-muted p-1.5 md:grid-cols-4">
+      <div role="tablist" aria-label="Job sections" className="grid grid-cols-2 gap-1.5 rounded-md bg-muted p-1.5 md:grid-cols-4">
         {TABS.map((t) => (
-          <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={cn('min-h-[56px] rounded-xl px-3 text-base font-semibold transition-colors', tab === t.key ? 'bg-background shadow' : 'text-muted-foreground')}>
+          <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={cn('min-h-[56px] rounded-lg px-3 text-base font-semibold transition-colors', tab === t.key ? 'bg-background shadow' : 'text-muted-foreground')}>
             {t.label}
           </button>
         ))}
@@ -78,7 +78,7 @@ export default function FloorJobPage() {
         {tab === 'do' && <Tasks detail={detail} touch />}
         {tab === 'parts' && <PartsList detail={detail} touch onAdd={() => setPartsOpen(true)} />}
         {tab === 'notes' && <Activity detail={detail} touch />}
-        {tab === 'truck' && <div className="rounded-2xl border bg-card p-4"><TruckRecent truckId={job.truckId} excludeId={job.id} /></div>}
+        {tab === 'truck' && <div className="rounded-lg border bg-card p-4"><TruckRecent truckId={job.truckId} excludeId={job.id} /></div>}
       </div>
 
       {!done && (

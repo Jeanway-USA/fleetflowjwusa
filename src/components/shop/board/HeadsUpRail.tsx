@@ -16,7 +16,7 @@ import { jobTitle, money, type ShopJob } from '@/lib/shop/board';
 
 function Block({ icon: Icon, title, count, children, tone }: { icon: typeof Wrench; title: string; count?: number; children: React.ReactNode; tone?: string }) {
   return (
-    <section className="rounded-2xl border bg-card p-3.5">
+    <section className="rounded-lg border bg-card p-3.5">
       <header className="mb-2.5 flex items-center gap-2">
         <Icon className={cn('h-4 w-4', tone ?? 'text-muted-foreground')} />
         <h2 className="font-condensed text-lg font-bold leading-none">{title}</h2>
@@ -59,7 +59,7 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
                   Unit {r.trucks?.unit_number ?? '?'} <span className="font-normal capitalize text-muted-foreground">· {r.issue_type}</span>
                 </p>
                 <p className="line-clamp-2 text-xs text-muted-foreground">{r.description}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}{r.status === 'acknowledged' ? ' · seen' : ''}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}{r.status === 'acknowledged' ? ' · seen' : ''}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <Button size="sm" className="h-9" disabled={convert.isPending} onClick={() => convert.mutate(r, { onSuccess: () => toast.success('Job created from the report.'), onError: (e: any) => toast.error(e.message) })}>Make a job</Button>
                   <Button size="sm" variant="outline" className="h-9 gap-1" onClick={() => setThreadFor(threadFor === r.id ? null : r.id)}><MessageSquare className="h-3.5 w-3.5" />Reply</Button>
@@ -114,8 +114,8 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
 
       <Block icon={Wallet} title="Costs">
         <dl className="grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-xl bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Spent this month</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cost.data == null ? '—' : money(cost.data)}</dd></div>
-          <div className="rounded-xl bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Per mile, all time</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cpm.data == null ? '—' : `$${cpm.data.toFixed(3)}`}</dd></div>
+          <div className="rounded-lg bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Spent this month</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cost.data == null ? '—' : money(cost.data)}</dd></div>
+          <div className="rounded-lg bg-muted/50 p-2.5"><dt className="text-xs text-muted-foreground">Per mile, all time</dt><dd className="font-condensed text-2xl font-bold tabular-nums">{cpm.data == null ? '—' : `$${cpm.data.toFixed(3)}`}</dd></div>
         </dl>
       </Block>
 

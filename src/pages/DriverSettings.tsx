@@ -159,8 +159,8 @@ export default function DriverSettings() {
   if (isLoading) {
     return (
       <Page>
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       </Page>
     );
   }
@@ -189,7 +189,7 @@ export default function DriverSettings() {
               type="button"
               aria-pressed={theme === o.value}
               onClick={() => setTheme(o.value)}
-              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-6 ${theme === o.value ? 'border-carbon bg-carbon/20 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-secondary'}`}
+              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-lg border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-6 ${theme === o.value ? 'border-carbon bg-carbon/20 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-secondary'}`}
             >
               {o.icon}
               {o.label}

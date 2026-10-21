@@ -211,7 +211,7 @@ function SectionHeader({
       <div className="flex items-center gap-2">
         <h3 className="text-lg font-semibold">{title}</h3>
         {badge && (
-          <Badge variant="outline" className="uppercase tracking-wide text-[10px]">
+          <Badge variant="outline" className="uppercase tracking-wide text-xs">
             {badge}
           </Badge>
         )}

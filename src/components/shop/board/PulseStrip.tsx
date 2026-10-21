@@ -4,8 +4,8 @@ import { LANE_STYLE } from '@/components/shop/shared';
 
 function Pulse({ label, value, sub, tone, wall }: { label: string; value: string | number; sub?: string; tone?: string; wall?: boolean }) {
   return (
-    <div className="rounded-2xl border bg-card px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div className="min-w-0 px-4 py-3">
+      <p className="text-[13px] text-muted-foreground">{label}</p>
       <p className={cn('mt-1 font-condensed font-bold leading-none tabular-nums', wall ? 'text-6xl' : 'text-4xl', tone)}>{value}</p>
       {sub && <p className="mt-1.5 truncate text-xs text-muted-foreground">{sub}</p>}
     </div>
@@ -15,7 +15,7 @@ function Pulse({ label, value, sub, tone, wall }: { label: string; value: string
 /** The five numbers a shop lead checks first. */
 export function PulseStrip({ summary, fleetSize, doneToday, wall }: { summary: BoardSummary; fleetSize: number | null; doneToday: number; wall?: boolean }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 divide-border rounded-lg border bg-card [&>div]:border-b lg:grid-cols-5 lg:[&>div]:border-b-0 lg:[&>div:not(:last-child)]:border-r [&>div:nth-child(odd)]:border-r lg:[&>div:nth-child(odd)]:border-r">
       <Pulse
         wall={wall}
         label="Trucks in the shop"

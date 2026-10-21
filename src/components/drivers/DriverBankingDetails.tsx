@@ -300,7 +300,7 @@ export function DriverBankingDetails({ driverId }: Props) {
             <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
             Driver-provided attachment
             {ext && (
-              <Badge variant="outline" className="uppercase text-[10px]">
+              <Badge variant="outline" className="uppercase text-xs">
                 {ext}
               </Badge>
             )}

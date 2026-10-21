@@ -641,7 +641,7 @@ export function ActiveBatchTab() {
     missing.length > 0 && (
       <Badge
         variant="outline"
-        className="border-amber-500/60 text-amber-700 dark:text-amber-400 text-[11px]"
+        className="border-amber-500/60 text-amber-700 dark:text-amber-400 text-xs"
         title={`Missing signed form(s): ${missing.join(', ')}. Withholding uses defaults until collected.`}
       >
         Missing: {missing.join(', ')}

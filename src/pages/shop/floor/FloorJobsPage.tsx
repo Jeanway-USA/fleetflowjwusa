@@ -19,7 +19,7 @@ function Tile({ job, mine, onTake }: { job: ShopJob; mine: boolean; onTake: () =
   const lane = laneOf(job);
   const open = !job.assignedTo && !job.assignedName && lane === 'queue';
   return (
-    <div className={cn('flex flex-col rounded-2xl border border-l-8 bg-card p-5', LANE_STYLE[lane].rail)}>
+    <div className={'flex flex-col rounded-lg border bg-card p-5'}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-condensed text-6xl font-bold leading-none">{job.unit}</p>
@@ -81,9 +81,9 @@ export default function FloorJobsPage() {
     <div className="mx-auto max-w-6xl space-y-5">
       <ShiftClock touch />
       <div className="flex flex-wrap items-center gap-3">
-        <div role="tablist" aria-label="Which jobs" className="flex rounded-2xl bg-muted p-1.5">
+        <div role="tablist" aria-label="Which jobs" className="flex rounded-md bg-muted p-1.5">
           {SEGMENTS.map((s) => (
-            <button key={s.key} role="tab" aria-selected={view === s.key} onClick={() => setView(s.key)} className={cn('min-h-[52px] rounded-xl px-5 text-base font-semibold transition-colors', view === s.key ? 'bg-background shadow' : 'text-muted-foreground')}>
+            <button key={s.key} role="tab" aria-selected={view === s.key} onClick={() => setView(s.key)} className={cn('min-h-[52px] rounded-lg px-5 text-base font-semibold transition-colors', view === s.key ? 'bg-background shadow' : 'text-muted-foreground')}>
               {s.label}
             </button>
           ))}
@@ -96,7 +96,7 @@ export default function FloorJobsPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 lg:grid-cols-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}</div>
+        <div className="grid gap-4 lg:grid-cols-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-lg" />)}</div>
       ) : shown.length === 0 ? (
         <ShopEmpty title={view === 'mine' ? 'Nothing assigned to you' : 'Nothing here'}>{view === 'mine' ? 'Take a job from Up next, or ask the office to assign you one.' : 'When a truck comes in it shows up here.'}</ShopEmpty>
       ) : (

@@ -1566,7 +1566,7 @@ function MapboxCanvas({
         <div className="rounded-lg border border-border bg-background/90 backdrop-blur-sm shadow-lg p-3 space-y-3">
           <div className="flex items-center gap-2">
             <Layers className="h-3.5 w-3.5 text-primary" />
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
               Map Overlays
             </p>
           </div>
@@ -1661,7 +1661,7 @@ function MapboxCanvas({
                 <ChevronDown className="h-3 w-3" />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="pt-2 space-y-1.5 text-[11px]">
+            <CollapsibleContent className="pt-2 space-y-1.5 text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-1 rounded bg-[#22c55e]" /> Free flow
               </div>

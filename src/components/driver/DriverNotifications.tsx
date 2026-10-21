@@ -182,7 +182,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[min(22rem,calc(100vw-1rem))] rounded-xl p-0" align="end">
+      <PopoverContent className="w-[min(22rem,calc(100vw-1rem))] rounded-lg p-0" align="end">
         <div className="flex items-center justify-between p-3 border-b">
           <h4 className="font-semibold">Notifications</h4>
           <div className="flex items-center gap-1">

@@ -575,7 +575,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         {f.syntax}
                       </pre>
                       <div className="pt-1">
-                        <span className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                        <span className="block text-xs uppercase tracking-wide text-muted-foreground mb-1">
                           Renders as
                         </span>
                         <div className="rounded border bg-background px-3 py-2">{f.preview}</div>
