@@ -64,7 +64,7 @@ export async function fetchOutstandingTemplates(
       | 'shared'
       | 'w2'
       | '1099';
-    return a === 'shared' || a === audience;
+    return a === 'shared' || a === audience; // 'staff' documents belong to staff onboarding
   }) as OutstandingTemplate[];
 
   const { data: signed, error: sErr } = await supabase

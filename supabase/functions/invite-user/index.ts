@@ -389,9 +389,9 @@ Deno.serve(async (req) => {
     }
 
     // For driver invites, ensure a drivers row exists and is linked to the auth user
+    let linkedDriverId: string | null = null;
     if (targetUserId && role === 'driver' && orgId) {
       try {
-        let linkedDriverId: string | null = null;
 
         if (driver_id) {
           // Link the provided driver row to this auth user (only if currently unlinked)
@@ -450,6 +450,23 @@ Deno.serve(async (req) => {
       } catch (driverLinkErr) {
         console.error('Driver linking exception:', driverLinkErr);
       }
+    }
+
+    // Staff (anyone who is not a driver) get a staff record, so they can onboard and be paid.
+    if (targetUserId && role !== 'driver' && orgId) {
+      const { error: empErr } = await supabaseAdmin.rpc('ensure_employee', {
+        _org: orgId, _user: targetUserId, _email: email, _first: first_name || null, _last: last_name || null,
+      });
+      if (empErr) console.error('Staff record error:', empErr.message);
+    }
+
+    // Apply the saved hire plan (position, pay package, classification, area limit) now, for this new person.
+    // Existing accounts get theirs when they accept (the database does that); this covers brand-new accounts.
+    if (targetUserId && orgId) {
+      const { error: planErr } = await supabaseAdmin.rpc('apply_hire_plan_for', {
+        _org: orgId, _email: email, _user: targetUserId, _driver: linkedDriverId,
+      });
+      if (planErr) console.error('Hire plan error:', planErr.message);
     }
 
     // Send custom email via Resend

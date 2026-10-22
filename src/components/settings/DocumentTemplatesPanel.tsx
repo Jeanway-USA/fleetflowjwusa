@@ -39,7 +39,7 @@ const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: ReactNode; label: st
   { label: "Block quote", syntax: "> Notice text", preview: <blockquote className="text-sm border-l-2 border-primary pl-3 italic text-muted-foreground">Notice text</blockquote> },
 ];
 
-type TemplateAudience = 'shared' | 'w2' | '1099';
+type TemplateAudience = 'shared' | 'w2' | '1099' | 'staff';
 
 const SIGNER_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'driver', label: 'Driver' },
@@ -67,6 +67,7 @@ const AUDIENCE_LABELS: Record<TemplateAudience, string> = {
   shared: 'All drivers',
   w2: 'W-2 only',
   '1099': '1099 only',
+  staff: 'Staff (non-drivers)',
 };
 
 const VARIABLES: Array<{ token: string; description: string }> = [
@@ -445,7 +446,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                           Audience
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                          Choose which drivers see this template during onboarding.
+                          Choose who signs this template during onboarding: drivers (all, W-2 or 1099) or staff who are not drivers.
                         </p>
                         <Select
                           value={(draft.applies_to ?? 'shared') as string}
@@ -460,6 +461,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                             <SelectItem value="shared">All drivers</SelectItem>
                             <SelectItem value="w2">W-2 employees only</SelectItem>
                             <SelectItem value="1099">1099 contractors only</SelectItem>
+                            <SelectItem value="staff">Staff (dispatch, safety, payroll, shop, office)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

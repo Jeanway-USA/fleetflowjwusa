@@ -12,6 +12,7 @@ import { Helmet } from 'react-helmet-async';
 import { z } from 'zod';
 import textLogo from '@/assets/Text_Logo.png';
 import logoIcon from '@/assets/Logo.png';
+import { onboardingPath } from '@/lib/onboarding/path';
 
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -88,11 +89,12 @@ export default function AcceptInvite() {
       await Promise.all([refreshOrgData(), refreshRoles()]);
       const orgName = data.org_name as string | null;
       const requiresOnboarding = !!data.requires_onboarding;
+      const invitedRole = (data.role as string | undefined) ?? null;
       setAcceptState({ kind: 'success', orgName, requiresOnboarding });
       toast.success(orgName ? `You've joined ${orgName}` : "You've joined the organization");
 
       setTimeout(() => {
-        navigate(requiresOnboarding ? '/driver/onboarding' : '/', { replace: true });
+        navigate(requiresOnboarding ? onboardingPath(invitedRole === 'driver') : '/', { replace: true });
       }, 800);
     })();
   }, [inviteToken, sessionReady, navigate, refreshOrgData, refreshRoles]);

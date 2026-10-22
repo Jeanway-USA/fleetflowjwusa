@@ -79,7 +79,7 @@ const isSig = (s: string | null): s is string => !!s && s.startsWith('data:image
 const digitsOnly = (v: string) => v.replace(/\D/g, '');
 const nonEmpty = (v: string) => v.trim().length > 0;
 
-export function isContractorDocsValid(s: ContractorDocsState): boolean {
+export function isContractorDocsValid(s: ContractorDocsState, includeAgreement = true): boolean {
   // W-9
   if (!nonEmpty(s.w9_legalName)) return false;
   if (s.w9_taxClass === '') return false;
@@ -89,6 +89,8 @@ export function isContractorDocsValid(s: ContractorDocsState): boolean {
   if (!s.w9_certifyAccurate) return false;
   if (!s.w9_certifyBackupWithholding) return false;
   if (!isSig(s.w9_signature)) return false;
+
+  if (!includeAgreement) return true;
 
   // IOO
   if (!nonEmpty(s.ioo_legalName)) return false;
@@ -201,15 +203,18 @@ interface ContractorDocumentsProps {
   value: ContractorDocsState;
   onChange: (patch: Partial<ContractorDocsState>) => void;
   onValidityChange: (valid: boolean) => void;
+  /** The owner-operator agreement is for drivers with a truck. Staff contractors only fill in the W-9. */
+  showAgreement?: boolean;
 }
 
 export function ContractorDocuments({
   value,
   onChange,
   onValidityChange,
+  showAgreement = true,
 }: ContractorDocumentsProps) {
   useEffect(() => {
-    onValidityChange(isContractorDocsValid(value));
+    onValidityChange(isContractorDocsValid(value, showAgreement));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
@@ -353,127 +358,129 @@ export function ContractorDocuments({
       </DocCardShell>
 
       {/* ---------------- IOO Agreement ---------------- */}
-      <DocCardShell
-        Icon={FileText}
-        title="Independent Owner-Operator Agreement"
-        subtitle="Master agreement between you (Contractor) and the Carrier."
-      >
-        <div className="max-h-64 overflow-y-auto rounded-md border bg-white p-4 text-sm text-slate-900 font-serif leading-relaxed">
-          <p className="mb-2 font-semibold">1. Independent Contractor Status.</p>
-          <p className="mb-3">
-            Contractor is an independent business entity, not an employee of Carrier. Contractor
-            controls the means and methods of transportation services performed under this
-            Agreement, subject only to Carrier&apos;s obligations under 49 C.F.R. Part 376.
-          </p>
-          <p className="mb-2 font-semibold">2. Equipment &amp; Operations.</p>
-          <p className="mb-3">
-            Contractor shall provide, maintain, and operate the equipment identified in the
-            equipment schedule. Contractor is responsible for all operating expenses including
-            fuel, tolls, maintenance, permits, and highway use taxes unless otherwise agreed in
-            writing.
-          </p>
-          <p className="mb-2 font-semibold">3. Insurance &amp; Indemnity.</p>
-          <p className="mb-3">
-            Contractor shall maintain all insurance required by law and shall indemnify Carrier
-            against claims arising from Contractor&apos;s negligence, willful misconduct, or
-            breach of this Agreement.
-          </p>
-          <p className="mb-2 font-semibold">4. Compensation.</p>
-          <p className="mb-3">
-            Carrier shall compensate Contractor per load per the settlement schedule provided
-            separately. Contractor acknowledges no wages, benefits, or tax withholding will be
-            provided; income will be reported on IRS Form 1099-NEC.
-          </p>
-          <p className="mb-2 font-semibold">5. Termination.</p>
-          <p className="mb-3">
-            Either party may terminate this Agreement with written notice. Outstanding
-            settlements, escrow reconciliation, and equipment return shall be handled per Carrier
-            policy following termination.
-          </p>
-          <p className="mb-2 font-semibold">6. Compliance.</p>
-          <p>
-            Contractor shall comply with all applicable FMCSA, DOT, state, and federal
-            regulations, including hours-of-service, drug &amp; alcohol testing, and safety
-            requirements.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field id="ioo_legalName" label="Contractor legal name">
-            <Input
-              id="ioo_legalName"
-              value={v.ioo_legalName}
-              onChange={(e) => set({ ioo_legalName: e.target.value })}
-            />
-          </Field>
-          <Field id="ioo_businessName" label="Business / DBA" hint="Optional">
-            <Input
-              id="ioo_businessName"
-              value={v.ioo_businessName}
-              onChange={(e) => set({ ioo_businessName: e.target.value })}
-            />
-          </Field>
-          <Field id="ioo_mcNumber" label="MC number">
-            <Input
-              id="ioo_mcNumber"
-              value={v.ioo_mcNumber}
-              onChange={(e) => set({ ioo_mcNumber: e.target.value })}
-            />
-          </Field>
-          <Field id="ioo_dotNumber" label="DOT number">
-            <Input
-              id="ioo_dotNumber"
-              value={v.ioo_dotNumber}
-              onChange={(e) => set({ ioo_dotNumber: e.target.value })}
-            />
-          </Field>
-          <Field id="ioo_effectiveDate" label="Effective date">
-            <Input
-              id="ioo_effectiveDate"
-              type="date"
-              value={v.ioo_effectiveDate}
-              onChange={(e) => set({ ioo_effectiveDate: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        <div className="space-y-2">
-          <label
-            htmlFor="ioo_terms"
-            className="flex items-start gap-2 rounded-md border p-2 cursor-pointer hover:bg-accent/40"
-          >
-            <Checkbox
-              id="ioo_terms"
-              checked={v.ioo_agreeTerms}
-              onCheckedChange={(c) => set({ ioo_agreeTerms: c === true })}
-              className="mt-0.5"
-            />
-            <span className="text-sm">
-              I have read and agree to the terms of this Independent Owner-Operator Agreement.
-            </span>
-          </label>
-          <label
-            htmlFor="ioo_ic"
-            className="flex items-start gap-2 rounded-md border p-2 cursor-pointer hover:bg-accent/40"
-          >
-            <Checkbox
-              id="ioo_ic"
-              checked={v.ioo_ackIcStatus}
-              onCheckedChange={(c) => set({ ioo_ackIcStatus: c === true })}
-              className="mt-0.5"
-            />
-            <span className="text-sm">
-              I acknowledge my status as an independent contractor and not an employee of Carrier.
-            </span>
-          </label>
-        </div>
-
-        <SignatureField
-          label="Contractor signature"
-          value={v.ioo_signature}
-          onChange={(s) => set({ ioo_signature: s })}
-        />
-      </DocCardShell>
+      {showAgreement && (
+        <DocCardShell
+          Icon={FileText}
+          title="Independent Owner-Operator Agreement"
+          subtitle="Master agreement between you (Contractor) and the Carrier."
+        >
+          <div className="max-h-64 overflow-y-auto rounded-md border bg-white p-4 text-sm text-slate-900 font-serif leading-relaxed">
+            <p className="mb-2 font-semibold">1. Independent Contractor Status.</p>
+            <p className="mb-3">
+              Contractor is an independent business entity, not an employee of Carrier. Contractor
+              controls the means and methods of transportation services performed under this
+              Agreement, subject only to Carrier&apos;s obligations under 49 C.F.R. Part 376.
+            </p>
+            <p className="mb-2 font-semibold">2. Equipment &amp; Operations.</p>
+            <p className="mb-3">
+              Contractor shall provide, maintain, and operate the equipment identified in the
+              equipment schedule. Contractor is responsible for all operating expenses including
+              fuel, tolls, maintenance, permits, and highway use taxes unless otherwise agreed in
+              writing.
+            </p>
+            <p className="mb-2 font-semibold">3. Insurance &amp; Indemnity.</p>
+            <p className="mb-3">
+              Contractor shall maintain all insurance required by law and shall indemnify Carrier
+              against claims arising from Contractor&apos;s negligence, willful misconduct, or
+              breach of this Agreement.
+            </p>
+            <p className="mb-2 font-semibold">4. Compensation.</p>
+            <p className="mb-3">
+              Carrier shall compensate Contractor per load per the settlement schedule provided
+              separately. Contractor acknowledges no wages, benefits, or tax withholding will be
+              provided; income will be reported on IRS Form 1099-NEC.
+            </p>
+            <p className="mb-2 font-semibold">5. Termination.</p>
+            <p className="mb-3">
+              Either party may terminate this Agreement with written notice. Outstanding
+              settlements, escrow reconciliation, and equipment return shall be handled per Carrier
+              policy following termination.
+            </p>
+            <p className="mb-2 font-semibold">6. Compliance.</p>
+            <p>
+              Contractor shall comply with all applicable FMCSA, DOT, state, and federal
+              regulations, including hours-of-service, drug &amp; alcohol testing, and safety
+              requirements.
+            </p>
+          </div>
+  
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field id="ioo_legalName" label="Contractor legal name">
+              <Input
+                id="ioo_legalName"
+                value={v.ioo_legalName}
+                onChange={(e) => set({ ioo_legalName: e.target.value })}
+              />
+            </Field>
+            <Field id="ioo_businessName" label="Business / DBA" hint="Optional">
+              <Input
+                id="ioo_businessName"
+                value={v.ioo_businessName}
+                onChange={(e) => set({ ioo_businessName: e.target.value })}
+              />
+            </Field>
+            <Field id="ioo_mcNumber" label="MC number">
+              <Input
+                id="ioo_mcNumber"
+                value={v.ioo_mcNumber}
+                onChange={(e) => set({ ioo_mcNumber: e.target.value })}
+              />
+            </Field>
+            <Field id="ioo_dotNumber" label="DOT number">
+              <Input
+                id="ioo_dotNumber"
+                value={v.ioo_dotNumber}
+                onChange={(e) => set({ ioo_dotNumber: e.target.value })}
+              />
+            </Field>
+            <Field id="ioo_effectiveDate" label="Effective date">
+              <Input
+                id="ioo_effectiveDate"
+                type="date"
+                value={v.ioo_effectiveDate}
+                onChange={(e) => set({ ioo_effectiveDate: e.target.value })}
+              />
+            </Field>
+          </div>
+  
+          <div className="space-y-2">
+            <label
+              htmlFor="ioo_terms"
+              className="flex items-start gap-2 rounded-md border p-2 cursor-pointer hover:bg-accent/40"
+            >
+              <Checkbox
+                id="ioo_terms"
+                checked={v.ioo_agreeTerms}
+                onCheckedChange={(c) => set({ ioo_agreeTerms: c === true })}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                I have read and agree to the terms of this Independent Owner-Operator Agreement.
+              </span>
+            </label>
+            <label
+              htmlFor="ioo_ic"
+              className="flex items-start gap-2 rounded-md border p-2 cursor-pointer hover:bg-accent/40"
+            >
+              <Checkbox
+                id="ioo_ic"
+                checked={v.ioo_ackIcStatus}
+                onCheckedChange={(c) => set({ ioo_ackIcStatus: c === true })}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                I acknowledge my status as an independent contractor and not an employee of Carrier.
+              </span>
+            </label>
+          </div>
+  
+          <SignatureField
+            label="Contractor signature"
+            value={v.ioo_signature}
+            onChange={(s) => set({ ioo_signature: s })}
+          />
+        </DocCardShell>
+      )}
     </div>
   );
 }
