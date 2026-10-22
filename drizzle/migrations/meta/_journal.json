@@ -50,6 +50,13 @@
       "when": 1792354871409,
       "tag": "0006_mechanic_shift_clock_hourly_pay_uploaded",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792632191210,
+      "tag": "0007_onboarding_all_staff_and_hire_plan_fixes",
+      "breakpoints": true
     }
   ]
 }
