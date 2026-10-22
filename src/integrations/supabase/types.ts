@@ -2949,6 +2949,89 @@ export type Database = {
           },
         ]
       }
+      employee_w9_info: {
+        Row: {
+          address: string
+          business_name: string | null
+          certify_accurate: boolean
+          certify_backup_withholding: boolean
+          created_at: string
+          employee_id: string
+          id: string
+          legal_name: string
+          org_id: string
+          signed_at: string
+          tax_class: string
+          tin_encrypted: string | null
+          tin_last4: string | null
+          tin_type: string
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          business_name?: string | null
+          certify_accurate?: boolean
+          certify_backup_withholding?: boolean
+          created_at?: string
+          employee_id: string
+          id?: string
+          legal_name: string
+          org_id: string
+          signed_at?: string
+          tax_class: string
+          tin_encrypted?: string | null
+          tin_last4?: string | null
+          tin_type: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          business_name?: string | null
+          certify_accurate?: boolean
+          certify_backup_withholding?: boolean
+          created_at?: string
+          employee_id?: string
+          id?: string
+          legal_name?: string
+          org_id?: string
+          signed_at?: string
+          tax_class?: string
+          tin_encrypted?: string | null
+          tin_last4?: string | null
+          tin_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_w9_info_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_w9_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_w9_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "employee_w9_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           address: string | null
@@ -8493,6 +8576,7 @@ export type Database = {
       holds_position: { Args: { _position_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      my_employee_type: { Args: never; Returns: string }
       parse_legacy_time: { Args: { _t: string }; Returns: string }
       post_due_truck_loan_payments: {
         Args: { p_today?: string; p_truck_id?: string }
@@ -8544,6 +8628,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reset_driver_onboarding: {
+        Args: { _driver_id: string }
+        Returns: undefined
+      }
+      reset_staff_onboarding: { Args: { _user_id: string }; Returns: undefined }
       restore_record: {
         Args: { _id: string; _table: string }
         Returns: undefined
@@ -9120,6 +9209,20 @@ export type Database = {
           _multiple_jobs: boolean
           _other_income: number
           _step_2c_checkbox: boolean
+        }
+        Returns: string
+      }
+      upsert_employee_w9: {
+        Args: {
+          _address: string
+          _business_name: string
+          _certify_accurate: boolean
+          _certify_backup_withholding: boolean
+          _employee_id: string
+          _legal_name: string
+          _tax_class: string
+          _tin: string
+          _tin_type: string
         }
         Returns: string
       }
