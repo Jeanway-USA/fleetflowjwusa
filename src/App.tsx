@@ -162,7 +162,7 @@ const App = () => {
                     } />
 
                     <Route path="/staff/onboarding" element={
-                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'maintenance']}>
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'maintenance']} bare>
                         <StaffOnboarding />
                       </ProtectedRoute>
                     } />

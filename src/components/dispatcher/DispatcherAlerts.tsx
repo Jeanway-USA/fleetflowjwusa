@@ -169,7 +169,7 @@ export function DispatcherAlerts() {
 
       // Fetch drivers with expiring credentials
       const { data: drivers } = await supabase
-        .from('drivers')
+        .from('drivers_public_view')
         .select('id, first_name, last_name, license_expiry, medical_card_expiry, hazmat_expiry')
         .is('deleted_at', null)
         .eq('status', 'active');
