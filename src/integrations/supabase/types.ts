@@ -8089,8 +8089,8 @@ export type Database = {
           first_name: string | null
           has_twic: boolean | null
           hazmat_expiry: string | null
-          hos_last_updated: string | null
           hire_date: string | null
+          hos_last_updated: string | null
           id: string | null
           last_name: string | null
           license_expiry: string | null
@@ -8105,15 +8105,21 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           email?: string | null
           endorsements?: string[] | null
           first_name?: string | null
           has_twic?: boolean | null
+          hazmat_expiry?: string | null
           hire_date?: string | null
+          hos_last_updated?: string | null
           id?: string | null
           last_name?: string | null
+          license_expiry?: string | null
+          medical_card_expiry?: string | null
           org_id?: string | null
           phone?: string | null
+          remaining_drive_hours?: number | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -8121,15 +8127,21 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           email?: string | null
           endorsements?: string[] | null
           first_name?: string | null
           has_twic?: boolean | null
+          hazmat_expiry?: string | null
           hire_date?: string | null
+          hos_last_updated?: string | null
           id?: string | null
           last_name?: string | null
+          license_expiry?: string | null
+          medical_card_expiry?: string | null
           org_id?: string | null
           phone?: string | null
+          remaining_drive_hours?: number | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
