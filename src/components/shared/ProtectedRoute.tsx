@@ -48,7 +48,8 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature, bare }
   // they see — it must never block their navigation.
   const hasAccess = actuallyIsOwner || (allowedRoles.some(role => hasRole(role)) && allowsFeature(requiredFeature));
 
-  const showAccessDeniedToast = authenticated && !stillLoading && !hasAccess;
+  const mustOnboard = requiresOnboarding && !onboardingCompleted;
+  const showAccessDeniedToast = authenticated && !stillLoading && !hasAccess && !mustOnboard;
 
   // Fire access-denied toast exactly once per pathname.
   useEffect(() => {
@@ -74,18 +75,18 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature, bare }
     return <Navigate to="/account-deactivated" replace />;
   }
 
-  if (!hasAccess) {
-    return <Navigate to={getRoleHomePath(roles, subscriptionTier)} replace />;
-  }
-
-
   // Anyone with outstanding onboarding must finish first: drivers in the driver flow, everyone else in staff onboarding.
-  if (requiresOnboarding && !onboardingCompleted) {
+  if (mustOnboard) {
     const target = onboardingPath(hasRole('driver'));
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith(target)) {
       return <Navigate to={target} replace />;
     }
   }
+
+  if (!hasAccess) {
+    return <Navigate to={getRoleHomePath(roles, subscriptionTier)} replace />;
+  }
+
 
   const content = requiredFeature ? (
     <TierGate requiredFeature={requiredFeature}>{children}</TierGate>

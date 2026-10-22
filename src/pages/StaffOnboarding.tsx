@@ -58,6 +58,22 @@ const digits = (v: string) => v.replace(/\D/g, '');
 const profileValid = (p: ProfileForm) =>
   digits(p.phone).length >= 10 && p.address.trim().length > 4 && p.emergencyName.trim().length > 0 && digits(p.emergencyPhone).length >= 10;
 
+/** Onboarding stands alone: no menu to wander off to, just the company name and a way to sign out. */
+function Shell({ children }: { children: React.ReactNode }) {
+  const { signOut, orgName } = useAuth();
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="flex h-14 items-center justify-between border-b border-shell-border bg-shell px-4 text-shell-foreground">
+        <span className="font-condensed text-xl font-bold">{orgName ?? 'FleetFlow'}</span>
+        <Button type="button" variant="ghost" className="h-11 text-shell-foreground hover:bg-shell-active hover:text-shell-foreground" onClick={() => void signOut()}>
+          Sign out
+        </Button>
+      </header>
+      {children}
+    </div>
+  );
+}
+
 const STEPS = ['Your details', 'Tax forms', 'Documents'] as const;
 
 export default function StaffOnboarding() {
@@ -312,21 +328,22 @@ export default function StaffOnboarding() {
   };
 
   if (staffLoading) {
-    return <div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <Shell><div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div></Shell>;
   }
   if (staffError || !staff) {
     return (
-      <div className="mx-auto max-w-xl p-4">
+      <Shell><div className="mx-auto max-w-xl p-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>We couldn't open your onboarding</AlertTitle>
           <AlertDescription>{(staffError as Error | null)?.message ?? 'Please ask the office to check your invitation.'}</AlertDescription>
         </Alert>
-      </div>
+      </div></Shell>
     );
   }
 
   return (
+    <Shell>
     <div className="mx-auto w-full max-w-3xl space-y-5 p-4 pb-24 sm:p-6">
       <header>
         <h1 className="font-condensed text-[28px] font-bold leading-tight sm:text-[32px]">Welcome{staff.first_name ? `, ${staff.first_name}` : ''}</h1>
@@ -412,5 +429,6 @@ export default function StaffOnboarding() {
         </div>
       </div>
     </div>
+    </Shell>
   );
 }

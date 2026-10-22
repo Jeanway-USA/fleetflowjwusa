@@ -53,7 +53,7 @@ export function DriverStatusGrid() {
     staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data: driversData, error: driversError } = await supabase
-        .from('drivers')
+        .from('drivers_public_view')
         .select('id, first_name, last_name, phone, status, license_expiry, medical_card_expiry, hazmat_expiry, remaining_drive_hours, hos_last_updated')
         .is('deleted_at', null)
         .eq('status', 'active')
