@@ -2404,6 +2404,7 @@ export type Database = {
           assigned_work_address_id: string | null
           avatar_url: string | null
           base_salary_per_period: number
+          classification_set_by_office: boolean
           created_at: string
           credentials_review_status: Database["public"]["Enums"]["onboarding_review_status"]
           credentials_reviewed_at: string | null
@@ -2451,6 +2452,7 @@ export type Database = {
           assigned_work_address_id?: string | null
           avatar_url?: string | null
           base_salary_per_period?: number
+          classification_set_by_office?: boolean
           created_at?: string
           credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
           credentials_reviewed_at?: string | null
@@ -2498,6 +2500,7 @@ export type Database = {
           assigned_work_address_id?: string | null
           avatar_url?: string | null
           base_salary_per_period?: number
+          classification_set_by_office?: boolean
           created_at?: string
           credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
           credentials_reviewed_at?: string | null
@@ -2557,6 +2560,473 @@ export type Database = {
           },
           {
             foreignKeyName: "drivers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_banking_info: {
+        Row: {
+          account_number_encrypted: string | null
+          account_number_last4: string | null
+          account_type: string | null
+          bank_name: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          org_id: string
+          routing_number_encrypted: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_number_encrypted?: string | null
+          account_number_last4?: string | null
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          org_id: string
+          routing_number_encrypted?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_number_encrypted?: string | null
+          account_number_last4?: string | null
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          org_id?: string
+          routing_number_encrypted?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_banking_info_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_banking_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_banking_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "employee_banking_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_i9_info: {
+        Row: {
+          address: string
+          alien_number: string | null
+          attested_at: string
+          citizenship: string
+          created_at: string
+          dob: string
+          email: string
+          employee_id: string
+          full_name: string
+          id: string
+          org_id: string
+          other_last_names: string | null
+          phone: string
+          ssn_encrypted: string | null
+          ssn_last4: string | null
+          updated_at: string
+          work_auth_doc_number: string | null
+          work_auth_expiry: string | null
+        }
+        Insert: {
+          address: string
+          alien_number?: string | null
+          attested_at?: string
+          citizenship: string
+          created_at?: string
+          dob: string
+          email: string
+          employee_id: string
+          full_name: string
+          id?: string
+          org_id: string
+          other_last_names?: string | null
+          phone: string
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          updated_at?: string
+          work_auth_doc_number?: string | null
+          work_auth_expiry?: string | null
+        }
+        Update: {
+          address?: string
+          alien_number?: string | null
+          attested_at?: string
+          citizenship?: string
+          created_at?: string
+          dob?: string
+          email?: string
+          employee_id?: string
+          full_name?: string
+          id?: string
+          org_id?: string
+          other_last_names?: string | null
+          phone?: string
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          updated_at?: string
+          work_auth_doc_number?: string | null
+          work_auth_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_i9_info_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_i9_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_i9_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "employee_i9_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_signed_documents: {
+        Row: {
+          address: string | null
+          admin_file_path: string | null
+          attachment_file_path: string | null
+          created_at: string
+          document_type: string
+          employee_id: string
+          file_path: string
+          id: string
+          org_id: string
+          signature_data_url: string | null
+          signed_at: string
+          template_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          admin_file_path?: string | null
+          attachment_file_path?: string | null
+          created_at?: string
+          document_type: string
+          employee_id: string
+          file_path: string
+          id?: string
+          org_id: string
+          signature_data_url?: string | null
+          signed_at?: string
+          template_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          admin_file_path?: string | null
+          attachment_file_path?: string | null
+          created_at?: string
+          document_type?: string
+          employee_id?: string
+          file_path?: string
+          id?: string
+          org_id?: string
+          signature_data_url?: string | null
+          signed_at?: string
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_signed_documents_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_signed_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_signed_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "employee_signed_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_state_tax_info: {
+        Row: {
+          additional_withholding: number
+          allowances: number
+          created_at: string
+          employee_id: string
+          exempt: boolean
+          filing_status: string
+          id: string
+          org_id: string
+          residence_state: string
+          signed_at: string | null
+          updated_at: string
+          work_state: string
+        }
+        Insert: {
+          additional_withholding?: number
+          allowances?: number
+          created_at?: string
+          employee_id: string
+          exempt?: boolean
+          filing_status?: string
+          id?: string
+          org_id: string
+          residence_state: string
+          signed_at?: string | null
+          updated_at?: string
+          work_state: string
+        }
+        Update: {
+          additional_withholding?: number
+          allowances?: number
+          created_at?: string
+          employee_id?: string
+          exempt?: boolean
+          filing_status?: string
+          id?: string
+          org_id?: string
+          residence_state?: string
+          signed_at?: string | null
+          updated_at?: string
+          work_state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_state_tax_info_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_state_tax_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_state_tax_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "employee_state_tax_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_w4_info: {
+        Row: {
+          created_at: string
+          deductions: number
+          dependents_amount: number
+          employee_id: string
+          extra_withholding: number
+          filing_status: string
+          id: string
+          multiple_jobs: boolean
+          org_id: string
+          other_income: number
+          step_2c_checkbox: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deductions?: number
+          dependents_amount?: number
+          employee_id: string
+          extra_withholding?: number
+          filing_status?: string
+          id?: string
+          multiple_jobs?: boolean
+          org_id: string
+          other_income?: number
+          step_2c_checkbox?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deductions?: number
+          dependents_amount?: number
+          employee_id?: string
+          extra_withholding?: number
+          filing_status?: string
+          id?: string
+          multiple_jobs?: boolean
+          org_id?: string
+          other_income?: number
+          step_2c_checkbox?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_w4_info_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_w4_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_w4_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "employee_w4_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          address: string | null
+          archived_at: string | null
+          created_at: string
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
+          employment_type: string
+          first_name: string | null
+          hire_date: string | null
+          id: string
+          last_name: string | null
+          org_id: string
+          phone: string | null
+          status: string
+          tax_state: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          archived_at?: string | null
+          created_at?: string
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          employment_type?: string
+          first_name?: string | null
+          hire_date?: string | null
+          id?: string
+          last_name?: string | null
+          org_id: string
+          phone?: string | null
+          status?: string
+          tax_state?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          archived_at?: string | null
+          created_at?: string
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          employment_type?: string
+          first_name?: string | null
+          hire_date?: string | null
+          id?: string
+          last_name?: string | null
+          org_id?: string
+          phone?: string | null
+          status?: string
+          tax_state?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "employees_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "super_admin_organizations"
@@ -3308,6 +3778,7 @@ export type Database = {
           created_by: string | null
           effective_start: string
           email: string
+          employment_type: string | null
           id: string
           limit_to_areas: boolean
           org_id: string
@@ -3322,6 +3793,7 @@ export type Database = {
           created_by?: string | null
           effective_start?: string
           email: string
+          employment_type?: string | null
           id?: string
           limit_to_areas?: boolean
           org_id: string
@@ -3336,6 +3808,7 @@ export type Database = {
           created_by?: string | null
           effective_start?: string
           email?: string
+          employment_type?: string | null
           id?: string
           limit_to_areas?: boolean
           org_id?: string
@@ -5318,6 +5791,7 @@ export type Database = {
           archived_by: string | null
           created_at: string
           created_by: string | null
+          default_employment_type: string | null
           default_pay_package_id: string | null
           default_permissions: Json
           default_role: string | null
@@ -5338,6 +5812,7 @@ export type Database = {
           archived_by?: string | null
           created_at?: string
           created_by?: string | null
+          default_employment_type?: string | null
           default_pay_package_id?: string | null
           default_permissions?: Json
           default_role?: string | null
@@ -5358,6 +5833,7 @@ export type Database = {
           archived_by?: string | null
           created_at?: string
           created_by?: string | null
+          default_employment_type?: string | null
           default_pay_package_id?: string | null
           default_permissions?: Json
           default_role?: string | null
@@ -7753,6 +8229,10 @@ export type Database = {
     }
     Functions: {
       _pay_package_snapshot: { Args: { _package_id: string }; Returns: Json }
+      apply_hire_plan_for: {
+        Args: { _driver?: string; _email: string; _org: string; _user: string }
+        Returns: boolean
+      }
       archive_record: {
         Args: { _id: string; _table: string }
         Returns: undefined
@@ -7819,6 +8299,7 @@ export type Database = {
       can_view_position: { Args: { _position_id: string }; Returns: boolean }
       can_view_shop: { Args: { _uid: string }; Returns: boolean }
       can_work_shop: { Args: { _uid: string }; Returns: boolean }
+      complete_my_staff_onboarding: { Args: never; Returns: boolean }
       create_audit_log: {
         Args: {
           p_action: string
@@ -7837,6 +8318,18 @@ export type Database = {
             Returns: string
           }
       current_org_has_feature: { Args: { _feature: string }; Returns: boolean }
+      employee_write_org: { Args: { _employee_id: string }; Returns: string }
+      ensure_employee: {
+        Args: {
+          _email: string
+          _first: string
+          _last: string
+          _org: string
+          _user: string
+        }
+        Returns: string
+      }
+      ensure_my_employee: { Args: never; Returns: string }
       generate_driver_settlements: {
         Args: {
           _driver_ids: string[]
@@ -7930,6 +8423,7 @@ export type Database = {
           tin_type: string
         }[]
       }
+      get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_public_load_by_tracking: {
         Args: { _tracking_id: string }
         Returns: Json
@@ -8054,6 +8548,16 @@ export type Database = {
         Args: { _id: string; _table: string }
         Returns: undefined
       }
+      save_my_employee_profile: {
+        Args: {
+          _address: string
+          _emergency_name: string
+          _emergency_phone: string
+          _emergency_relationship: string
+          _phone: string
+        }
+        Returns: string
+      }
       save_pay_package: {
         Args: {
           _components: Json
@@ -8143,6 +8647,7 @@ export type Database = {
           archived_by: string | null
           created_at: string
           created_by: string | null
+          default_employment_type: string | null
           default_pay_package_id: string | null
           default_permissions: Json
           default_role: string | null
@@ -8563,6 +9068,58 @@ export type Database = {
           _tax_class: string
           _tin: string
           _tin_type: string
+        }
+        Returns: string
+      }
+      upsert_employee_banking: {
+        Args: {
+          _account_number: string
+          _account_type: string
+          _bank_name: string
+          _employee_id: string
+          _routing_number: string
+        }
+        Returns: string
+      }
+      upsert_employee_i9: {
+        Args: {
+          _address: string
+          _alien_number: string
+          _citizenship: string
+          _dob: string
+          _email: string
+          _employee_id: string
+          _full_name: string
+          _other_last_names: string
+          _phone: string
+          _ssn: string
+          _work_auth_doc_number: string
+          _work_auth_expiry: string
+        }
+        Returns: string
+      }
+      upsert_employee_state_tax: {
+        Args: {
+          _additional_withholding: number
+          _allowances: number
+          _employee_id: string
+          _exempt: boolean
+          _filing_status: string
+          _residence_state: string
+          _work_state: string
+        }
+        Returns: string
+      }
+      upsert_employee_w4: {
+        Args: {
+          _deductions: number
+          _dependents_amount: number
+          _employee_id: string
+          _extra_withholding: number
+          _filing_status: string
+          _multiple_jobs: boolean
+          _other_income: number
+          _step_2c_checkbox: boolean
         }
         Returns: string
       }
