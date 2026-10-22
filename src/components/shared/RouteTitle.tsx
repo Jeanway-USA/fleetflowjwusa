@@ -10,6 +10,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/driver-dashboard': 'Driver Dashboard',
   '/driver/loads': 'My Loads',
   '/driver/onboarding': 'Driver Onboarding',
+  '/staff/onboarding': 'Staff Onboarding',
   '/driver-performance': 'Driver Performance',
   '/driver-settings': 'Driver Settings',
   '/driver-stats': 'Driver Stats',

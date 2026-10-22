@@ -91,6 +91,22 @@ Deno.serve(async (req) => {
       return json({ error: 'This invitation was sent to a different email address', reason: 'email_mismatch' }, 403);
     }
 
+    // Accepting replaces every role this account holds (one active company per account). That must never quietly
+    // strip someone who owns a different company, so stop and say so instead.
+    const { data: ownedElsewhere } = await admin
+      .from('user_roles')
+      .select('org_id')
+      .eq('user_id', userId)
+      .eq('role', 'owner')
+      .neq('org_id', invite.org_id)
+      .limit(1);
+    if (ownedElsewhere && ownedElsewhere.length > 0) {
+      return json({
+        error: 'This account owns another company, so it cannot join a second one. Use a different email address for this invitation.',
+        reason: 'owns_other_org',
+      }, 409);
+    }
+
     // 1. Switch user's profile to the new org and reset onboarding state.
     const { error: profileErr } = await admin
       .from('profiles')
@@ -127,6 +143,41 @@ Deno.serve(async (req) => {
         .eq('id', invite.driver_id)
         .eq('org_id', invite.org_id);
       if (driverErr) console.error('driver link failed:', driverErr.message);
+    }
+
+    // 3b. Make sure the person has a record to onboard against. Drivers get a drivers row (found by email or
+    // created); everyone else gets a staff record. The hire plan (applied when the invitation is marked
+    // accepted below) needs this record to exist first.
+    const { data: nameRow } = await admin.from('profiles').select('first_name, last_name').eq('user_id', userId).maybeSingle();
+    if (invite.role === 'driver' && !invite.driver_id) {
+      const { data: existingDriver } = await admin
+        .from('drivers')
+        .select('id, user_id')
+        .eq('org_id', invite.org_id)
+        .ilike('email', invite.email)
+        .maybeSingle();
+      if (existingDriver) {
+        if (!existingDriver.user_id) {
+          await admin.from('drivers').update({ user_id: userId }).eq('id', existingDriver.id);
+        }
+      } else {
+        const { error: drvInsErr } = await admin.from('drivers').insert({
+          org_id: invite.org_id,
+          user_id: userId,
+          first_name: nameRow?.first_name || invite.email.split('@')[0],
+          last_name: nameRow?.last_name || '',
+          email: invite.email,
+          status: 'active',
+          pay_type: 'percentage',
+          pay_rate: 0,
+        });
+        if (drvInsErr) console.error('driver create failed:', drvInsErr.message);
+      }
+    } else if (invite.role !== 'driver') {
+      const { error: empErr } = await admin.rpc('ensure_employee', {
+        _org: invite.org_id, _user: userId, _email: invite.email, _first: nameRow?.first_name ?? null, _last: nameRow?.last_name ?? null,
+      });
+      if (empErr) console.error('staff record failed:', empErr.message);
     }
 
     // 4. Mark invitation accepted.

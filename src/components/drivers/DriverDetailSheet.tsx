@@ -99,28 +99,12 @@ export function DriverDetailSheet({
   const reonboardMutation = useMutation({
     mutationFn: async () => {
       if (!driver?.user_id) throw new Error('Driver has no linked account yet');
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ onboarding_completed: false })
-        .eq('user_id', driver.user_id);
-      if (profileError) throw new Error(`Profile reset failed: ${profileError.message}`);
-
-      const { error: docsError } = await supabase
-        .from('driver_signed_documents')
-        .delete()
-        .eq('driver_id', driver.id)
-        .eq('org_id', driver.org_id);
-      if (docsError) throw new Error(`Clearing signed documents failed: ${docsError.message}`);
-
-      const { error: driverError } = await supabase
-        .from('drivers')
-        .update({ direct_deposit_attachment_url: null })
-        .eq('id', driver.id);
-      if (driverError) throw new Error(`Driver record reset failed: ${driverError.message}`);
+      // Asks the driver to redo onboarding. Nothing they signed is deleted: it is marked for revision and stays on file.
+      const { error } = await supabase.rpc('reset_driver_onboarding' as never, { _driver_id: driver.id } as never);
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      toast.success('Driver onboarding has been reset.');
+      toast.success('The driver has been asked to complete onboarding again.');
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
       queryClient.invalidateQueries({ queryKey: ['signed-documents', driver.id] });
       setConfirmReonboardOpen(false);
@@ -389,8 +373,8 @@ export function DriverDetailSheet({
                           <AlertDialogHeader>
                             <AlertDialogTitle>Force re-onboarding?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure? This will lock the driver out of their dashboard until
-                              they re-sign all documents for this organization.
+                              This will hold the driver at onboarding until they complete it again. Nothing
+                              they signed before is deleted: it stays on file and is marked for revision.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

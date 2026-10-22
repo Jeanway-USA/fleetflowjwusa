@@ -40,6 +40,8 @@ export async function savePosition(orgId: string, id: string | null, draft: Posi
     onboarding_checklist: draft.onboarding_checklist,
     requires_onboarding: draft.requires_onboarding,
     sort_order: draft.sort_order,
+    // Only sent when the editor knows about it, so saving still works before the newer column exists.
+    ...(draft.default_employment_type !== undefined ? { default_employment_type: draft.default_employment_type } : {}),
   };
   if (id) {
     const { data, error } = await db.from('positions').update(row).eq('id', id).select('*').single();
@@ -113,6 +115,8 @@ export async function createHirePlan(plan: {
   start: string;
   limitToAreas: boolean;
   areas: string[];
+  /** W-2 or 1099, chosen by the office. Applied to the driver record when the person joins. */
+  employmentType?: 'w2' | '1099' | 'lease_purchase' | null;
 }) {
   const { error } = await db.from('hire_plans').insert({
     org_id: plan.orgId,
@@ -122,7 +126,8 @@ export async function createHirePlan(plan: {
     effective_start: plan.start,
     limit_to_areas: plan.limitToAreas,
     areas: plan.areas,
-  });
+    employment_type: plan.employmentType ?? null,
+  } as never);
   fail(error);
 }
 

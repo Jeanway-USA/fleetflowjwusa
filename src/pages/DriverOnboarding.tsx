@@ -124,6 +124,18 @@ export default function DriverOnboarding() {
     },
   });
 
+  // Once the office has set W-2 or 1099 for this driver, the driver no longer picks it.
+  // Read on its own, so a driver can still onboard if this newer column is not there yet.
+  const { data: classificationLocked = false } = useQuery({
+    queryKey: ['driver-classification-lock', driverRow?.id],
+    enabled: !!driverRow?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('drivers').select('classification_set_by_office' as never).eq('id', driverRow!.id).maybeSingle();
+      if (error) return false;
+      return !!(data as { classification_set_by_office?: boolean } | null)?.classification_set_by_office;
+    },
+  });
+
   // Hydrate employmentType from persisted drivers.employment_type on first load
   useEffect(() => {
     if (employmentType !== null) return;
@@ -159,7 +171,8 @@ export default function DriverOnboarding() {
         if (audience === 'shared') return true;
         if (audience === 'w2') return employmentType === 'W-2';
         if (audience === '1099') return employmentType === '1099';
-        return true;
+        return false; // staff documents are for the staff onboarding flow
+
       });
     },
   });
@@ -934,8 +947,8 @@ export default function DriverOnboarding() {
       if (!payload) return;
       // Merge employment_type from the initial step so downstream systems
       // (payroll, settlements, DriverDetailSheet) stay in sync.
-      const mappedEmploymentType =
-        employmentType === 'W-2' ? 'w2_company'
+      const mappedEmploymentType = classificationLocked ? null
+        : employmentType === 'W-2' ? 'w2_company'
         : employmentType === '1099' ? '1099_contractor'
         : null;
       const fullPayload = mappedEmploymentType
@@ -1141,14 +1154,26 @@ export default function DriverOnboarding() {
           <CardTitle>{title}</CardTitle>
           <CardDescription>
             {isEmploymentStep
-              ? 'How will you be working with us? This determines how your pay and taxes are handled.'
+              ? classificationLocked
+                ? 'The company has set how you will be working with us. This decides how your pay and taxes are handled.'
+                : 'How will you be working with us? This determines how your pay and taxes are handled.'
               : isCredentialsStep
               ? 'Confirm your CDL, medical card, and TWIC details before reviewing onboarding documents.'
               : 'Review and sign the shared documents, plus the ones specific to your employment type.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isEmploymentStep ? (
+          {isEmploymentStep && classificationLocked ? (
+            <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-4">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+              <div>
+                <p className="font-semibold">
+                  {employmentType === 'W-2' ? 'Company Driver (W-2)' : (driverRow as { employment_type?: string | null } | null | undefined)?.employment_type === 'lease_purchase' ? 'Lease Purchase (1099)' : 'Independent Contractor (1099)'}
+                </p>
+                <p className="text-sm text-muted-foreground">Set by the company. If this looks wrong, tell the office before you continue.</p>
+              </div>
+            </div>
+          ) : isEmploymentStep ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {([
                 {

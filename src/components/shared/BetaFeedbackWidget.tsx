@@ -137,7 +137,7 @@ export function BetaFeedbackWidget() {
 
   if (!user) return null;
   if (hidePromotions) return null;
-  if (pathname.startsWith('/driver/onboarding') || pathname === '/onboarding') return null;
+  if (pathname.startsWith('/driver/onboarding') || pathname.startsWith('/staff/onboarding') || pathname === '/onboarding') return null;
 
   const includeScreenshot = form.watch('include_screenshot');
 

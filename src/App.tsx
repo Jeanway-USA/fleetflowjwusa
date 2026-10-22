@@ -68,6 +68,7 @@ const TaxHub = lazy(() => import("./pages/admin/TaxHub"));
 const DocumentsSigning = lazy(() => import("./pages/DocumentsSigning"));
 const DocumentSigningWorkspace = lazy(() => import("./pages/DocumentSigningWorkspace"));
 const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
+const StaffOnboarding = lazy(() => import("./pages/StaffOnboarding"));
 const SettlementPrint = lazy(() => import("./pages/SettlementPrint"));
 const AuditTrail = lazy(() => import("./pages/AuditTrail"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
@@ -157,6 +158,12 @@ const App = () => {
                     <Route path="/driver/onboarding" element={
                       <ProtectedRoute allowedRoles={['driver']}>
                         <DriverOnboarding />
+                      </ProtectedRoute>
+                    } />
+
+                    <Route path="/staff/onboarding" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'maintenance']}>
+                        <StaffOnboarding />
                       </ProtectedRoute>
                     } />
 

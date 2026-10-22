@@ -17,10 +17,12 @@ import { usePayPackages } from '@/hooks/usePayPackages';
 import { useSavePosition } from '@/hooks/usePositions';
 import {
   APP_ROLE_LABELS,
+  EMPLOYMENT_CHOICE_LABELS,
   BUILTIN_DOCUMENTS,
   PERMISSION_AREAS,
   type AppRoleKey,
   type ChecklistItem,
+  type EmploymentChoice,
   type Position,
   type RequiredDocument,
 } from '@/lib/positions/types';
@@ -53,6 +55,7 @@ export function PositionEditor({ open, onOpenChange, position }: Props) {
   const [role, setRole] = useState<string>(NONE);
   const [packageId, setPackageId] = useState<string>(NONE);
   const [requiresOnboarding, setRequiresOnboarding] = useState(false);
+  const [employmentType, setEmploymentType] = useState<string>(NONE);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [docs, setDocs] = useState<RequiredDocument[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -64,6 +67,7 @@ export function PositionEditor({ open, onOpenChange, position }: Props) {
     setRole(position?.default_role ?? NONE);
     setPackageId(position?.default_pay_package_id ?? NONE);
     setRequiresOnboarding(position?.requires_onboarding ?? false);
+    setEmploymentType(position?.default_employment_type ?? NONE);
     setPermissions(position?.default_permissions ?? []);
     setDocs(position?.required_documents ?? []);
     setChecklist(position?.onboarding_checklist ?? []);
@@ -108,6 +112,7 @@ export function PositionEditor({ open, onOpenChange, position }: Props) {
           required_documents: docs,
           onboarding_checklist: items,
           requires_onboarding: requiresOnboarding,
+          default_employment_type: employmentType !== NONE ? (employmentType as EmploymentChoice) : position && 'default_employment_type' in position ? null : undefined,
           sort_order: position?.sort_order ?? 100,
         },
       });
@@ -148,6 +153,16 @@ export function PositionEditor({ open, onOpenChange, position }: Props) {
                 {usablePackages.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}{p.archived_at ? ' (archived)' : ''}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </FormSection>
+
+          <FormSection title="W-2 or 1099" description="Suggested when someone is invited into this position. You confirm it for each person; they never choose it themselves.">
+            <Select value={employmentType} onValueChange={setEmploymentType}>
+              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>No suggestion</SelectItem>
+                {(Object.keys(EMPLOYMENT_CHOICE_LABELS) as EmploymentChoice[]).map((k) => <SelectItem key={k} value={k}>{EMPLOYMENT_CHOICE_LABELS[k]}</SelectItem>)}
               </SelectContent>
             </Select>
           </FormSection>

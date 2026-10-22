@@ -167,7 +167,8 @@ export default function Drivers() {
         .from('document_templates')
         .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId!)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .neq('applies_to', 'staff'); // staff documents are not part of driver onboarding
       if (error) throw error;
       return count ?? 0;
     },

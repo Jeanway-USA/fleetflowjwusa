@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { onboardingPath } from '@/lib/onboarding/path';
 
 import { getRoleHomePath } from '@/lib/role-home';
 
@@ -32,8 +33,8 @@ export function RoleBasedRedirect() {
   if (!orgId) return <Navigate to="/onboarding" replace />;
   if (!orgIsActive) return <Navigate to="/account-deactivated" replace />;
 
-  if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
-    return <Navigate to="/driver/onboarding" replace />;
+  if (requiresOnboarding && !onboardingCompleted) {
+    return <Navigate to={onboardingPath(hasRole('driver'))} replace />;
   }
 
   return <Navigate to={getRoleHomePath(roles, subscriptionTier)} replace />;

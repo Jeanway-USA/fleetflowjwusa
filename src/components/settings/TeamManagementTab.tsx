@@ -19,10 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { Briefcase, UserPlus, Pencil, KeyRound, Trash2, MoreHorizontal } from 'lucide-react';
+import { Briefcase, ClipboardCheck, UserPlus, Pencil, KeyRound, Trash2, MoreHorizontal } from 'lucide-react';
 import { usePositions } from '@/hooks/usePositions';
 import { usePayPackages } from '@/hooks/usePayPackages';
 import { createHirePlan } from '@/lib/positions/api';
+import { StaffOnboardingDialog } from '@/components/settings/StaffOnboardingDialog';
 import { suggestFromPosition } from '@/lib/positions/defaults';
 import { DriverPositionSection } from '@/components/drivers/DriverPositionSection';
 import { DriverPayPackageSection } from '@/components/drivers/DriverPayPackageSection';
@@ -85,12 +86,15 @@ export function TeamManagementTab() {
   const [invitePositionId, setInvitePositionId] = useState('');
   const [invitePackageId, setInvitePackageId] = useState('');
   const [inviteLimitAreas, setInviteLimitAreas] = useState(false);
+  const [inviteEmploymentType, setInviteEmploymentType] = useState<'w2' | '1099' | 'lease_purchase'>('w2');
   const { data: payPackages = [] } = usePayPackages();
   const [peopleUser, setPeopleUser] = useState<UserWithRole | null>(null);
+  const [onboardingUser, setOnboardingUser] = useState<UserWithRole | null>(null);
   const [peopleSuggestedPackage, setPeopleSuggestedPackage] = useState<string | null>(null);
   const invitePosition = positions.find((p) => p.id === invitePositionId) ?? null;
 
-  const onboardingApplies = inviteRole === 'driver' || inviteRole === 'dispatcher';
+  // Every role can be onboarded now: drivers in the driver flow, everyone else in staff onboarding.
+  const onboardingApplies = true;
 
   // Auto-default the checkbox whenever role changes or sheet opens
   useEffect(() => {
@@ -99,7 +103,7 @@ export function TeamManagementTab() {
     if (invitePosition) setInviteRequiresOnboarding(invitePosition.requires_onboarding);
     else if (inviteRole === 'driver') setInviteRequiresOnboarding(defaults.driver);
     else if (inviteRole === 'dispatcher') setInviteRequiresOnboarding(defaults.dispatcher);
-    else setInviteRequiresOnboarding(false);
+    else setInviteRequiresOnboarding(inviteRole !== 'owner');
   }, [inviteRole, onboardingDefaults, inviteOpen, invitePosition]);
 
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -199,6 +203,24 @@ export function TeamManagementTab() {
 
     setIsInviting(true);
     try {
+      // The plan (position, pay package, classification, limits) is saved first: the invitation applies it straight away
+      // for a brand-new person, and when they accept for someone who already has an account.
+      if (orgId && (invitePosition || invitePackageId || inviteRole === 'driver' || inviteEmploymentType !== 'w2')) {
+        try {
+          await createHirePlan({
+            orgId,
+            email: inviteEmail,
+            positionId: invitePosition?.id ?? null,
+            payPackageId: invitePackageId || null,
+            start: todayLocal(),
+            limitToAreas: inviteLimitAreas,
+            areas: invitePosition?.default_permissions ?? [],
+            employmentType: inviteRole === 'driver' ? inviteEmploymentType : inviteEmploymentType === 'w2' ? 'w2' : '1099',
+          });
+        } catch (planError: any) {
+          throw new Error('The position and pay package could not be saved, so no invitation was sent: ' + planError.message);
+        }
+      }
       const response = await invokeWithAuth<{ error?: string }>('invite-user', {
         body: {
           email: inviteEmail,
@@ -213,21 +235,6 @@ export function TeamManagementTab() {
       if (response.data?.error) throw new Error(response.data.error);
 
       toast.success(`Invitation sent to ${inviteEmail}`);
-      if (orgId && (invitePosition || invitePackageId)) {
-        try {
-          await createHirePlan({
-            orgId,
-            email: inviteEmail,
-            positionId: invitePosition?.id ?? null,
-            payPackageId: invitePackageId || null,
-            start: todayLocal(),
-            limitToAreas: inviteLimitAreas,
-            areas: invitePosition?.default_permissions ?? [],
-          });
-        } catch (planError: any) {
-          toast.error(`Invitation sent, but the position and pay package were not saved: ${planError.message}. Set them from their profile once they join.`);
-        }
-      }
       setInviteOpen(false);
       setInviteEmail('');
       setInviteFirstName('');
@@ -236,6 +243,7 @@ export function TeamManagementTab() {
       setInvitePositionId('');
       setInvitePackageId('');
       setInviteLimitAreas(false);
+      setInviteEmploymentType('w2');
       queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
     } catch (error: any) {
       toast.error(error.message || 'Failed to send invitation');
@@ -354,6 +362,7 @@ export function TeamManagementTab() {
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => openEditDialog(row)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
             {hasPayrollAccess && <DropdownMenuItem onClick={() => { setPeopleSuggestedPackage(null); setPeopleUser(row); }}><Briefcase className="mr-2 h-4 w-4" /> Position & pay</DropdownMenuItem>}
+            {hasPayrollAccess && row.role !== 'driver' && <DropdownMenuItem onClick={() => setOnboardingUser(row)}><ClipboardCheck className="mr-2 h-4 w-4" /> Onboarding</DropdownMenuItem>}
             <DropdownMenuItem onClick={() => { setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}><KeyRound className="mr-2 h-4 w-4" /> Force password reset</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => { setUserToDelete(row); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> Remove</DropdownMenuItem>
@@ -415,6 +424,8 @@ export function TeamManagementTab() {
                     setInvitePositionId(id);
                     const pos = positions.find((p) => p.id === id);
                     if (pos?.default_role) setInviteRole(pos.default_role as AppRole);
+                    const suggestedType = (pos as { default_employment_type?: 'w2' | '1099' | 'lease_purchase' | null } | undefined)?.default_employment_type;
+                    if (suggestedType) setInviteEmploymentType(suggestedType);
                     const usable = new Set(payPackages.filter((p) => !p.archived_at && p.is_active).map((p) => p.id));
                     setInvitePackageId(pos ? suggestFromPosition(pos, usable).payPackageId ?? '' : '');
                   }}
@@ -439,7 +450,7 @@ export function TeamManagementTab() {
                       Limit them to this position's areas
                     </label>
                     <p className="text-xs text-muted-foreground">
-                      Role, onboarding and pay package are suggested from the position and can all be changed. The position, package and limit are applied automatically when they accept.
+                      Role, onboarding and pay package are suggested from the position and can all be changed. The position, package, classification and limit are applied when the invitation goes out (or when they accept, if they already have an account).
                     </p>
                   </>
                 )}
@@ -460,6 +471,28 @@ export function TeamManagementTab() {
               </Select>
               <p className="text-xs text-muted-foreground">The user will be assigned this role when they accept the invitation</p>
             </div>
+            <div className="space-y-2">
+              <Label>How they are paid and taxed</Label>
+              {inviteRole === 'driver' ? (
+                <Select value={inviteEmploymentType} onValueChange={(v) => setInviteEmploymentType(v as 'w2' | '1099' | 'lease_purchase')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="w2">Company driver (W-2 employee)</SelectItem>
+                    <SelectItem value="1099">Owner-operator (1099 contractor)</SelectItem>
+                    <SelectItem value="lease_purchase">Lease purchase (1099 contractor)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select value={inviteEmploymentType === 'w2' ? 'w2' : '1099'} onValueChange={(v) => setInviteEmploymentType(v as 'w2' | '1099')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="w2">Employee (W-2)</SelectItem>
+                    <SelectItem value="1099">Contractor (1099)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">You decide this, not the person. It decides which tax forms they fill in.</p>
+            </div>
             <div className="flex items-start gap-3 rounded-lg border border-border p-4">
               <Checkbox
                 id="invite-requires-onboarding"
@@ -474,8 +507,8 @@ export function TeamManagementTab() {
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   {onboardingApplies
-                    ? "Defaults to your organization's preferences for this role. You can override for this invite."
-                    : 'Onboarding requirements only apply to drivers and dispatchers.'}
+                    ? 'Drivers fill in their driver profile and forms. Everyone else fills in their details, tax forms and your staff documents.'
+                    : ''}
                 </p>
               </div>
             </div>
@@ -609,6 +642,13 @@ export function TeamManagementTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <StaffOnboardingDialog
+        open={!!onboardingUser}
+        onOpenChange={(v) => !v && setOnboardingUser(null)}
+        userId={onboardingUser?.user_id ?? null}
+        name={onboardingUser ? `${onboardingUser.first_name ?? ''} ${onboardingUser.last_name ?? ''}`.trim() || onboardingUser.email : ''}
+      />
 
       <Dialog open={!!peopleUser} onOpenChange={(v) => !v && setPeopleUser(null)}>
         <DialogContent className="flex max-h-[90vh] max-w-xl flex-col">

@@ -3,6 +3,14 @@
  * Picking one only suggests these defaults; every one stays editable for the person.
  */
 
+export type EmploymentChoice = 'w2' | '1099' | 'lease_purchase';
+
+export const EMPLOYMENT_CHOICE_LABELS: Record<EmploymentChoice, string> = {
+  w2: 'W-2 employee',
+  '1099': '1099 contractor',
+  lease_purchase: 'Lease purchase (1099)',
+};
+
 export type AppRoleKey = 'owner' | 'payroll_admin' | 'dispatcher' | 'safety' | 'driver' | 'maintenance';
 
 export const APP_ROLE_LABELS: Record<AppRoleKey, string> = {
@@ -62,6 +70,8 @@ export interface Position {
   required_documents: RequiredDocument[];
   onboarding_checklist: ChecklistItem[];
   requires_onboarding: boolean;
+  /** What the position suggests for W-2 or 1099. The office still confirms it for each person. */
+  default_employment_type?: EmploymentChoice | null;
   sort_order: number;
   archived_at?: string | null;
   created_at?: string;

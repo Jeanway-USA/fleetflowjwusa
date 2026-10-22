@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getRoleHomePath } from '@/lib/role-home';
 import type { Database } from '@/integrations/supabase/types';
+import { onboardingPath } from '@/lib/onboarding/path';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -78,10 +79,11 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature, bare }
   }
 
 
-  // Drivers with outstanding onboarding must finish first.
-  if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
-    if (typeof window !== 'undefined' && window.location.pathname !== '/driver/onboarding') {
-      return <Navigate to="/driver/onboarding" replace />;
+  // Anyone with outstanding onboarding must finish first: drivers in the driver flow, everyone else in staff onboarding.
+  if (requiresOnboarding && !onboardingCompleted) {
+    const target = onboardingPath(hasRole('driver'));
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith(target)) {
+      return <Navigate to={target} replace />;
     }
   }
 

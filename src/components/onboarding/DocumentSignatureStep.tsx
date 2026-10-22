@@ -115,7 +115,7 @@ export function computeTemplateValidity(
   return true;
 }
 
-const EMPTY_TEMPLATE_STATE: TemplateState = {
+export const EMPTY_TEMPLATE_STATE: TemplateState = {
   driverAddress: '',
   signature: null,
   cdlNumber: '',
@@ -132,7 +132,7 @@ const EMPTY_TEMPLATE_STATE: TemplateState = {
 // Subcomponents
 // ---------------------------------------------------------------------------
 
-function TemplateBlock({
+export function TemplateBlock({
   template,
   tState,
   onPatch,
