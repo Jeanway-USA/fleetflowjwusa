@@ -4,10 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { SaveBar } from '@/components/settings/SaveBar';
 
 export function InBondFeeCard() {
   const { orgId } = useAuth();
@@ -33,66 +33,53 @@ export function InBondFeeCard() {
     if (typeof data === 'string') setFee(data);
   }, [data]);
 
+  const saved = typeof data === 'string' ? data : '100';
+  const dirty = fee.trim() !== saved.trim();
+
   const handleSave = async () => {
     if (!orgId) return;
     const n = parseFloat(fee);
     if (!Number.isFinite(n) || n < 0) {
-      toast.error('Enter a valid non-negative fee');
+      toast.error('Enter a fee of zero or more');
       return;
     }
     setSaving(true);
     try {
       const { error } = await supabase
         .from('company_settings')
-        .upsert(
-          { org_id: orgId, setting_key: 'in_bond_fee', setting_value: String(n) },
-          { onConflict: 'org_id,setting_key' }
-        );
+        .upsert({ org_id: orgId, setting_key: 'in_bond_fee', setting_value: String(n) }, { onConflict: 'org_id,setting_key' });
       if (error) throw error;
-      toast.success('In-Bond fee saved');
-      qc.invalidateQueries({ queryKey: ['company_settings'] });
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to save In-Bond fee');
+      toast.success('In-bond fee saved');
+      await qc.invalidateQueries({ queryKey: ['company_settings'] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save the in-bond fee');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Card className="bg-card border border-border rounded-lg">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-primary" />
-          In-Bond (Landstar Rule 480)
+          In-bond (Landstar Rule 480)
         </CardTitle>
         <CardDescription>
-          Flat fee added as a <strong>Company</strong> accessorial (not driver pay) whenever a load is flagged
-          In-Bond / international and a CF 7512 number is on file.
+          A flat fee added as a Company accessorial (not driver pay) whenever a load is flagged in-bond or international and a CF 7512 number is on file.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="p-0">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="px-6 pb-6 text-sm text-muted-foreground">Loading…</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-            <div className="space-y-1 sm:col-span-1">
-              <Label htmlFor="in_bond_fee">Default Fee ($)</Label>
-              <Input
-                id="in_bond_fee"
-                type="number"
-                min={0}
-                step="0.01"
-                value={fee}
-                onChange={(e) => setFee(e.target.value)}
-                className="pl-4 sm:pl-3 h-12"
-              />
+          <>
+            <div className="max-w-xs space-y-1.5 px-6 pb-4">
+              <Label htmlFor="in_bond_fee">Default fee ($)</Label>
+              <Input id="in_bond_fee" type="number" inputMode="decimal" min={0} step="0.01" value={fee} onChange={(e) => setFee(e.target.value)} className="h-10 tabular-nums" />
             </div>
-            <div className="sm:col-span-2">
-              <Button onClick={handleSave} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                {saving ? 'Saving…' : 'Save In-Bond Fee'}
-              </Button>
-            </div>
-          </div>
+            <SaveBar changes={dirty ? 1 : 0} saving={saving} onSave={handleSave} onDiscard={() => setFee(saved)} />
+          </>
         )}
       </CardContent>
     </Card>

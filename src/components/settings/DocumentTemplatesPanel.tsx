@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Loader2, Plus, Save } from "lucide-react";
+import { Archive, ArchiveRestore, Copy, Loader2, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: ReactNode; label: string }> = [
   { label: "Large header", syntax: "# Driver Agreement", preview: <h1 className="text-xl font-bold leading-tight">Driver Agreement</h1> },
@@ -56,6 +66,8 @@ interface DocumentTemplate {
   name: string | null;
   content: string;
   is_active: boolean;
+  /** Set when the template is archived: hidden from the list, never asked for, restorable. */
+  archived_at?: string | null;
   applies_to: TemplateAudience;
   signatory_roles: string[] | null;
   version: number;
@@ -191,6 +203,8 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
   const [createOpen, setCreateOpen] = useState(false);
   const [newType, setNewType] = useState("");
   const [newName, setNewName] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["document_templates", orgId],
@@ -206,11 +220,16 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
     },
   });
 
+  const archivedCount = templates.filter((t) => !!t.archived_at).length;
+  const visibleTemplates = useMemo(
+    () => (showArchived ? templates : templates.filter((t) => !t.archived_at)),
+    [templates, showArchived],
+  );
+
   useEffect(() => {
-    if (!selectedId && templates.length > 0) {
-      setSelectedId(templates[0].id);
-    }
-  }, [templates, selectedId]);
+    const stillVisible = visibleTemplates.some((t) => t.id === selectedId);
+    if (!stillVisible) setSelectedId(visibleTemplates[0]?.id ?? null);
+  }, [visibleTemplates, selectedId]);
 
   useEffect(() => {
     const current = templates.find((t) => t.id === selectedId);
@@ -251,7 +270,27 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
       queryClient.invalidateQueries({ queryKey: ["document_templates", orgId] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Failed to save template");
+      const clash = /uniq_document_templates_active_per_type|duplicate key/i.test(err.message);
+      toast.error(clash ? "Another template of this document type is already active. Turn that one off (or archive it) first." : err.message || "Failed to save template");
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: async (archive: boolean) => {
+      if (!selectedId) throw new Error("No template selected");
+      // Archiving also switches the template off so nobody is asked to sign it. Nothing is deleted, and signed copies stay on file.
+      const patch = archive ? { is_active: false, archived_at: new Date().toISOString() } : { archived_at: null };
+      const { error } = await supabase.from("document_templates").update(patch as never).eq("id", selectedId);
+      if (error) throw error;
+      return archive;
+    },
+    onSuccess: (archived) => {
+      setArchiveOpen(false);
+      toast.success(archived ? "Template archived. It is no longer asked for, and you can restore it any time." : "Template restored. Turn it on under Active when you want it used again.");
+      queryClient.invalidateQueries({ queryKey: ["document_templates", orgId] });
+    },
+    onError: (err: Error) => {
+      toast.error(/archived_at/.test(err.message) ? "Archiving needs the latest database update (docs/APPLY_TEMPLATE_ARCHIVE.sql)." : err.message || "Could not update the template");
     },
   });
 
@@ -336,7 +375,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Document Templates</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Manage editable contracts and forms sent to drivers during onboarding.
+              Contracts and forms that drivers and staff sign during onboarding.
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)} className="h-12">
@@ -360,7 +399,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
             <CardHeader>
               <CardTitle>Editor</CardTitle>
               <CardDescription>
-                Pick a template, edit its content (markdown supported), then save.
+                Pick a template, edit its content (markdown supported), then save. Archive one you no longer use.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -368,9 +407,12 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : templates.length === 0 ? (
+              ) : visibleTemplates.length === 0 ? (
                 <div className="text-center py-12 text-sm text-muted-foreground">
-                  No templates yet. Create your first one to get started.
+                  {templates.length === 0 ? "No templates yet. Create your first one to get started." : "Every template is archived. Create a new one, or show the archived ones to restore one."}
+                  {templates.length > 0 && !showArchived && (
+                    <div className="mt-3"><Button variant="outline" className="h-11" onClick={() => setShowArchived(true)}>Show archived templates ({archivedCount})</Button></div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -384,19 +426,34 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         <SelectValue placeholder="Select a template" />
                       </SelectTrigger>
                       <SelectContent>
-                        {templates.map((t) => {
+                        {visibleTemplates.map((t) => {
                           const audience = (t.applies_to ?? 'shared') as TemplateAudience;
                           return (
                             <SelectItem key={t.id} value={t.id}>
                               {t.name ? `${t.name} · ${t.document_type}` : t.document_type}
                               {" — "}{AUDIENCE_LABELS[audience]}
-                              {!t.is_active && " (inactive)"}
+                              {t.archived_at ? " (archived)" : !t.is_active && " (inactive)"}
                             </SelectItem>
                           );
                         })}
                       </SelectContent>
                     </Select>
+                    {archivedCount > 0 && (
+                      <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground">
+                        <Switch checked={showArchived} onCheckedChange={setShowArchived} />
+                        Show archived templates ({archivedCount})
+                      </label>
+                    )}
                   </div>
+
+                  {selected?.archived_at && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/40 p-3 text-sm">
+                      <span>This template is archived. It is hidden and nobody is asked to sign it.</span>
+                      <Button variant="outline" className="h-11" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(false)}>
+                        <ArchiveRestore className="mr-2 h-4 w-4" />Restore
+                      </Button>
+                    </div>
+                  )}
 
                   {selected && (
                     <>
@@ -486,7 +543,13 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         />
                       </div>
 
-                      <div className="flex justify-end">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {!selected.archived_at && (
+                          <Button variant="outline" className="h-12" onClick={() => setArchiveOpen(true)} disabled={archiveMutation.isPending}>
+                            <Archive className="h-4 w-4 mr-2" />
+                            Archive
+                          </Button>
+                        )}
                         <Button
                           onClick={() => saveMutation.mutate()}
                           disabled={saveMutation.isPending}
@@ -590,6 +653,21 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It is switched off and hidden, so no one is asked to sign it from now on. Copies people already signed stay on file, and you can restore the template any time from "Show archived templates".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={() => archiveMutation.mutate(true)}>Archive</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

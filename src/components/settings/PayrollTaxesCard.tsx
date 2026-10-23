@@ -173,7 +173,7 @@ export function PayrollTaxesCard() {
         </CardHeader>
         <CardContent className="space-y-5">
           <section>
-            <div className="text-xs uppercase text-muted-foreground mb-2">Pay Frequency</div>
+            <div className="mb-2 text-[13px] font-medium text-muted-foreground">Pay frequency</div>
             <Select value={form.pay_frequency} onValueChange={(v) => update('pay_frequency', v)}>
               <SelectTrigger className="max-w-xs">
                 <SelectValue />
@@ -189,7 +189,7 @@ export function PayrollTaxesCard() {
           </section>
 
           <section>
-            <div className="text-xs uppercase text-muted-foreground mb-2">
+            <div className="mb-2 text-[13px] font-medium text-muted-foreground">
               Default Tax State (used when a driver has no Tax State set)
             </div>
             <Select
@@ -210,7 +210,7 @@ export function PayrollTaxesCard() {
           </section>
 
           <section>
-            <div className="text-xs uppercase text-muted-foreground mb-2">FICA — Social Security</div>
+            <div className="mb-2 text-[13px] font-medium text-muted-foreground">FICA — Social Security</div>
             <div className="grid grid-cols-2 gap-3 max-w-xl">
               <div>
                 <Label>Rate (employee & employer each)</Label>
@@ -234,7 +234,7 @@ export function PayrollTaxesCard() {
           </section>
 
           <section>
-            <div className="text-xs uppercase text-muted-foreground mb-2">FICA — Medicare</div>
+            <div className="mb-2 text-[13px] font-medium text-muted-foreground">FICA — Medicare</div>
             <div className="grid grid-cols-3 gap-3 max-w-3xl">
               <div>
                 <Label>Rate</Label>
@@ -291,7 +291,7 @@ export function PayrollTaxesCard() {
             <>
               <div className="border rounded-md overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+                  <thead className="bg-muted/50 text-[13px] text-muted-foreground">
                     <tr>
                       <th className="text-left px-3 py-2 w-16">State</th>
                       <th className="text-right px-3 py-2 w-32">SUTA Rate</th>

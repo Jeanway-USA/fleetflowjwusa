@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Palette, ImageIcon, Upload, X } from 'lucide-react';
+import { ImageIcon, Upload, X } from 'lucide-react';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 const COLOR_PRESETS = [
@@ -18,52 +18,8 @@ const COLOR_PRESETS = [
   { name: 'Teal', hsl: '180 60% 40%', dark: '180 60% 45%' },
 ];
 
-function hslToHex(hslStr: string): string {
-  const parts = hslStr.trim().split(/\s+/);
-  if (parts.length !== 3) return '#b8860b';
-  const h = parseFloat(parts[0]) / 360;
-  const s = parseFloat(parts[1]) / 100;
-  const l = parseFloat(parts[2]) / 100;
-  const hue2rgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1; if (t > 1) t -= 1;
-    if (t < 1/6) return p + (q - p) * 6 * t;
-    if (t < 1/2) return q;
-    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-    return p;
-  };
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  const r = Math.round(hue2rgb(p, q, h + 1/3) * 255);
-  const g = Math.round(hue2rgb(p, q, h) * 255);
-  const b = Math.round(hue2rgb(p, q, h - 1/3) * 255);
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-}
-
-function hexToHsl(hex: string): string {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return '45 80% 45%';
-  const r = parseInt(result[1], 16) / 255;
-  const g = parseInt(result[2], 16) / 255;
-  const b = parseInt(result[3], 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      case b: h = ((r - g) / d + 4) / 6; break;
-    }
-  }
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-}
-
 export function BrandingTab() {
-  const { orgId, refreshOrgData, primaryColor, logoUrl, bannerUrl } = useAuth();
-  const [selectedColor, setSelectedColor] = useState(primaryColor || '45 80% 45%');
-  const [isSavingColor, setIsSavingColor] = useState(false);
+  const { orgId, refreshOrgData, logoUrl, bannerUrl } = useAuth();
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -71,24 +27,6 @@ export function BrandingTab() {
 
   const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
-
-  const handleSaveColor = async () => {
-    if (!orgId) return;
-    setIsSavingColor(true);
-    try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({ primary_color: selectedColor })
-        .eq('id', orgId);
-      if (error) throw error;
-      await refreshOrgData();
-      toast.success('Color scheme updated');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update color');
-    } finally {
-      setIsSavingColor(false);
-    }
-  };
 
   const validateFile = (file: File): boolean => {
     if (!file.type.startsWith('image/')) {
@@ -159,89 +97,6 @@ export function BrandingTab() {
 
   return (
     <div className="space-y-6">
-      {/* Color Scheme */}
-      <Card className="bg-card border border-border rounded-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5 text-primary" />
-            Color Scheme
-          </CardTitle>
-          <CardDescription>Choose a primary accent color for your TMS</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-            {COLOR_PRESETS.map((preset) => (
-              <button
-                key={preset.name}
-                onClick={() => setSelectedColor(preset.hsl)}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
-                  selectedColor === preset.hsl
-                    ? 'border-foreground ring-2 ring-foreground/20'
-                    : 'border-border hover:border-foreground/30'
-                }`}
-              >
-                <div
-                  className="w-10 h-10 rounded-full border border-border"
-                  style={{ backgroundColor: `hsl(${preset.hsl})` }}
-                />
-                <span className="text-xs font-medium">{preset.name}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Custom color picker */}
-          <div className="flex items-center gap-3">
-            <Label className="text-sm whitespace-nowrap">Custom Color</Label>
-            <input
-              type="color"
-              value={hslToHex(selectedColor)}
-              onChange={(e) => setSelectedColor(hexToHsl(e.target.value))}
-              className="h-10 w-14 rounded-md border border-border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <span className="text-xs text-muted-foreground font-mono">{hslToHex(selectedColor)}</span>
-          </div>
-
-          {/* Live preview */}
-          <div className="p-4 rounded-lg border border-border bg-muted/30">
-            <p className="text-sm text-muted-foreground mb-2">Preview</p>
-            <div className="flex items-center gap-3">
-              <div
-                className="h-8 px-4 rounded-md flex items-center text-sm font-medium"
-                style={{
-                  backgroundColor: `hsl(${selectedColor})`,
-                  color: 'white',
-                }}
-              >
-                Primary Button
-              </div>
-              <div
-                className="h-8 px-4 rounded-md flex items-center text-sm font-medium border"
-                style={{
-                  borderColor: `hsl(${selectedColor})`,
-                  color: `hsl(${selectedColor})`,
-                }}
-              >
-                Outline Button
-              </div>
-              <span
-                className="text-sm font-semibold"
-                style={{ color: `hsl(${selectedColor})` }}
-              >
-                Accent Text
-              </span>
-            </div>
-          </div>
-
-          <Button
-            onClick={handleSaveColor}
-            disabled={isSavingColor || selectedColor === primaryColor}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {isSavingColor ? 'Saving...' : 'Apply Color'}
-          </Button>
-        </CardContent>
-      </Card>
-
       {/* Logo & Banner */}
       <Card className="bg-card border border-border rounded-lg">
         <CardHeader>

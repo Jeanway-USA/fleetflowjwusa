@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { SaveBar } from '@/components/settings/SaveBar';
 import { Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,6 +15,14 @@ interface DetentionRule {
   hourly_rate: number;
   max_charge_per_day: number;
 }
+
+type Field = 'free_time_minutes' | 'hourly_rate' | 'max_charge_per_day';
+
+const FIELDS: Array<{ key: Field; label: string; step?: string; whole?: boolean }> = [
+  { key: 'free_time_minutes', label: 'Free time (min)', whole: true },
+  { key: 'hourly_rate', label: '$ per hour', step: '0.01' },
+  { key: 'max_charge_per_day', label: 'Cap per 24h ($, 0 = none)', step: '0.01' },
+];
 
 export function DetentionRulesCard() {
   const { orgId } = useAuth();
@@ -40,111 +47,93 @@ export function DetentionRulesCard() {
     setRows(data);
   }, [data]);
 
-  const update = (idx: number, field: keyof DetentionRule, value: number) => {
-    const next = [...rows];
-    next[idx] = { ...next[idx], [field]: value };
-    setRows(next);
+  // Only the rows that were actually changed are saved, and the button says how many.
+  const changed = useMemo(
+    () => rows.filter((r) => {
+      const was = data.find((d) => d.id === r.id);
+      return !!was && FIELDS.some((f) => Number(was[f.key]) !== Number(r[f.key]));
+    }),
+    [rows, data],
+  );
+
+  const update = (id: string, field: Field, raw: string) => {
+    const value = raw === '' ? 0 : Number(raw);
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: Number.isFinite(value) ? value : 0 } : r)));
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updates = rows.map((r) =>
-        supabase
-          .from('detention_rules')
-          .update({
-            free_time_minutes: Math.max(0, Math.floor(r.free_time_minutes || 0)),
-            hourly_rate: Math.max(0, Number(r.hourly_rate) || 0),
-            max_charge_per_day: Math.max(0, Number(r.max_charge_per_day) || 0),
-          })
-          .eq('id', r.id)
+      const results = await Promise.all(
+        changed.map((r) =>
+          supabase
+            .from('detention_rules')
+            .update({
+              free_time_minutes: Math.max(0, Math.floor(r.free_time_minutes || 0)),
+              hourly_rate: Math.max(0, Number(r.hourly_rate) || 0),
+              max_charge_per_day: Math.max(0, Number(r.max_charge_per_day) || 0),
+            })
+            .eq('id', r.id),
+        ),
       );
-      const results = await Promise.all(updates);
       const err = results.find((r) => r.error)?.error;
       if (err) throw err;
-      toast.success('Detention rules saved');
-      qc.invalidateQueries({ queryKey: ['detention_rules'] });
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to save detention rules');
+      toast.success(`Saved ${changed.length} ${changed.length === 1 ? 'trailer type' : 'trailer types'}`);
+      await qc.invalidateQueries({ queryKey: ['detention_rules'] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save detention rules');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Card className="bg-card border border-border rounded-lg">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5 text-primary" />
-          Detention &amp; Free Time
+          Detention and free time
         </CardTitle>
         <CardDescription>
-          Per-trailer-type free time (minutes) and hourly rate ($/hr). The clock starts when a load
-          status changes to <strong>At Pickup</strong>, <strong>At Delivery</strong>, <strong>Loading</strong>,
-          or <strong>Unloading</strong>. Once free time elapses, dispatcher receives an alert.
+          Free time and the hourly rate for each trailer type. The clock starts when a load reaches At Pickup, At Delivery, Loading or Unloading,
+          and dispatch is alerted once free time runs out.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="p-0">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="px-6 pb-6 text-sm text-muted-foreground">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No detention rules configured.</p>
+          <p className="px-6 pb-6 text-sm text-muted-foreground">No detention rules are set up.</p>
         ) : (
-          <div className="space-y-3">
-            <div className="hidden sm:grid grid-cols-12 gap-3 text-xs font-medium text-muted-foreground px-1">
-              <div className="col-span-4">Trailer Type</div>
-              <div className="col-span-3">Free Time (min)</div>
-              <div className="col-span-2">$/Hr</div>
-              <div className="col-span-3">Max $/24h (cap)</div>
+          <>
+            <div className="hidden grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] gap-3 border-y border-border bg-muted/40 px-6 py-2 text-[13px] text-muted-foreground sm:grid">
+              <span>Trailer type</span>
+              {FIELDS.map((f) => <span key={f.key}>{f.label}</span>)}
             </div>
-            {rows.map((r, idx) => (
-              <div key={r.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 rounded-lg bg-muted/40">
-                <div className="sm:col-span-4">
-                  <Label className="sm:hidden text-xs">Trailer Type</Label>
-                  <div className="font-medium pt-1">{r.trailer_type}</div>
-                </div>
-                <div className="sm:col-span-3 space-y-1">
-                  <Label className="sm:hidden text-xs">Free Time (min)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={r.free_time_minutes}
-                    onChange={(e) => update(idx, 'free_time_minutes', parseInt(e.target.value || '0', 10))}
-                    className="pl-4 sm:pl-3 h-12"
-                  />
-                </div>
-                <div className="sm:col-span-2 space-y-1">
-                  <Label className="sm:hidden text-xs">$/Hr</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={r.hourly_rate}
-                    onChange={(e) => update(idx, 'hourly_rate', parseFloat(e.target.value || '0'))}
-                    className="pl-4 sm:pl-3 h-12"
-                  />
-                </div>
-                <div className="sm:col-span-3 space-y-1">
-                  <Label className="sm:hidden text-xs">Max $/24h (0 = no cap)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={r.max_charge_per_day}
-                    onChange={(e) => update(idx, 'max_charge_per_day', parseFloat(e.target.value || '0'))}
-                    className="pl-4 sm:pl-3 h-12"
-                  />
-                </div>
-              </div>
-            ))}
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {saving ? 'Saving…' : 'Save Detention Rules'}
-            </Button>
-          </div>
+            <ul className="divide-y divide-border">
+              {rows.map((r) => (
+                <li key={r.id} className="grid gap-x-3 gap-y-2 px-6 py-2 sm:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] sm:items-center">
+                  <span className="font-medium">{r.trailer_type}</span>
+                  {FIELDS.map((f) => (
+                    <label key={f.key} className="block">
+                      <span className="mb-1 block text-[13px] text-muted-foreground sm:hidden">{f.label}</span>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step={f.step}
+                        aria-label={`${r.trailer_type}: ${f.label}`}
+                        value={r[f.key]}
+                        onChange={(e) => update(r.id, f.key, e.target.value)}
+                        className="h-10 tabular-nums"
+                      />
+                    </label>
+                  ))}
+                </li>
+              ))}
+            </ul>
+            <SaveBar changes={changed.length} saving={saving} onSave={handleSave} onDiscard={() => setRows(data)} noun="trailer type" />
+          </>
         )}
       </CardContent>
     </Card>

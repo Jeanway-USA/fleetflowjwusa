@@ -1,15 +1,18 @@
+import { useMemo, type ComponentType } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Briefcase, Building2, FileText, HardDrive, Scale, Moon, Palette, Percent, Receipt, Sun, Users, Wallet } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText, Percent, Wallet, Briefcase, Receipt } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { CompanyTab } from '@/components/settings/CompanyTab';
 import { BrandingTab } from '@/components/settings/BrandingTab';
-import { BillingTab } from '@/components/settings/BillingTab';
 import { StorageTab } from '@/components/settings/StorageTab';
+import { DetentionRulesCard } from '@/components/settings/DetentionRulesCard';
+import { OverDimensionRulesCard } from '@/components/settings/OverDimensionRulesCard';
+import { InBondFeeCard } from '@/components/settings/InBondFeeCard';
 import { TeamManagementTab } from '@/components/settings/TeamManagementTab';
 import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPreferencesCard';
 import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
@@ -19,231 +22,169 @@ import { StaffPayTab } from '@/components/settings/pay-packages/StaffPayTab';
 import { PositionsTab } from '@/components/settings/positions/PositionsTab';
 import { PayPackagesTab } from '@/components/settings/pay-packages/PayPackagesTab';
 
-export default function Settings() {
-  const { canSimulateRoles, hasPayrollAccess } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+type Group = 'Company' | 'People' | 'Pay' | 'You';
 
-  const hasAdminAccess = canSimulateRoles;
+interface Section {
+  id: string;
+  label: string;
+  group: Group;
+  icon: ComponentType<{ className?: string }>;
+  render: () => JSX.Element;
+}
 
-  // Access denied for non-owners (but still show personal settings)
-  if (!hasAdminAccess) {
-    return (
-      <>
-        <PageHeader title="Settings" description="Manage your preferences" />
-        <div className="max-w-2xl space-y-6">
-          <Card className="bg-card border border-border rounded-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {theme === 'dark' ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
-                Appearance
-              </CardTitle>
-              <CardDescription>Customize how the app looks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label htmlFor="theme-toggle" className="font-medium">Dark Mode</Label>
-                  <p className="text-sm text-muted-foreground">Toggle between light and dark themes</p>
-                </div>
-                <Switch id="theme-toggle" checked={theme === 'dark'} onCheckedChange={toggleTheme} />
+const GROUPS: Group[] = ['People', 'Company', 'Pay', 'You'];
+
+/** Pick light or dark. The same two choices the top bar toggle makes, shown as they will look. */
+function AppearanceSection() {
+  const { theme, setTheme } = useTheme();
+  const choices = [
+    { value: 'light' as const, label: 'Light', Icon: Sun, page: 'bg-white border-gray-200', bar: 'bg-gray-200' },
+    { value: 'dark' as const, label: 'Dark', Icon: Moon, page: 'bg-zinc-900 border-zinc-700', bar: 'bg-zinc-700' },
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Theme</CardTitle>
+        <CardDescription>Applies to this device and this login only.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div role="radiogroup" aria-label="Theme" className="grid max-w-md grid-cols-2 gap-3">
+          {choices.map(({ value, label, Icon, page, bar }) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={theme === value}
+              onClick={() => setTheme(value)}
+              className={cn(
+                'rounded-lg border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                theme === value ? 'border-primary' : 'border-border hover:border-primary/50',
+              )}
+            >
+              <div className={cn('mb-2 rounded-md border p-3', page)}>
+                <div className="mb-2 h-2 w-12 rounded bg-carbon" />
+                <div className={cn('mb-1 h-2 w-20 rounded', bar)} />
+                <div className={cn('h-2 w-16 rounded', bar)} />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border border-border rounded-lg">
-            <CardContent className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold">Admin Settings Restricted</h3>
-                <p className="text-muted-foreground text-sm">Contact an owner for user management access.</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <PayPackagesTab />
-          {hasPayrollAccess && <PositionsTab />}
-          <StaffPayTab />
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4" />
+                {label}
+              </span>
+            </button>
+          ))}
         </div>
-      </>
-    );
-  }
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function Settings() {
+  const { canSimulateRoles: isOwner, hasPayrollAccess } = useAuth();
+  const [params, setParams] = useSearchParams();
+
+  // Everything a person may open. The owner sees it all; others see their own look, plus pay if they run payroll.
+  const sections = useMemo<Section[]>(() => {
+    const all: Section[] = [
+      { id: 'company', label: 'Company', group: 'Company', icon: Building2, render: () => <CompanyTab /> },
+      { id: 'landstar-rules', label: 'Landstar rules', group: 'Company', icon: Scale, render: () => (
+          <div className="space-y-6">
+            <DetentionRulesCard />
+            <OverDimensionRulesCard />
+            <InBondFeeCard />
+          </div>
+        ) },
+      { id: 'branding', label: 'Branding', group: 'Company', icon: Palette, render: () => <BrandingTab /> },
+      { id: 'storage', label: 'Storage', group: 'Company', icon: HardDrive, render: () => <StorageTab /> },
+      { id: 'team', label: 'Team', group: 'People', icon: Users, render: () => <TeamManagementTab /> },
+      { id: 'positions', label: 'Positions', group: 'People', icon: Briefcase, render: () => <PositionsTab /> },
+      {
+        id: 'onboarding',
+        label: 'Onboarding & documents',
+        group: 'People',
+        icon: FileText,
+        render: () => (
+          <div className="space-y-6">
+            <OnboardingPreferencesCard />
+            <DocumentTemplatesPanel />
+            <AuditLogPanel />
+          </div>
+        ),
+      },
+      { id: 'pay-packages', label: 'Pay packages', group: 'Pay', icon: Wallet, render: () => <PayPackagesTab /> },
+      { id: 'staff-pay', label: 'Staff pay', group: 'Pay', icon: Receipt, render: () => <StaffPayTab /> },
+      { id: 'payroll-taxes', label: 'Payroll taxes', group: 'Pay', icon: Percent, render: () => <PayrollTaxesCard /> },
+      { id: 'appearance', label: 'Appearance', group: 'You', icon: Sun, render: () => <AppearanceSection /> },
+    ];
+    if (isOwner) return all;
+    return all.filter((s) => s.id === 'appearance' || s.id === 'pay-packages' || s.id === 'staff-pay' || (s.id === 'positions' && hasPayrollAccess));
+  }, [isOwner, hasPayrollAccess]);
+
+  // The address remembers the section, so a reload or a shared link lands where you were.
+  const requested = params.get('tab');
+  const grouped = GROUPS.map((g) => ({ group: g, items: sections.filter((s) => s.group === g) })).filter((g) => g.items.length > 0);
+  const current = sections.find((s) => s.id === requested) ?? grouped[0].items[0];
+  const choose = (id: string) => setParams({ tab: id }, { replace: true });
 
   return (
     <>
-      <PageHeader title="Settings" description="Manage users, roles, and system configuration" />
+      <PageHeader
+        title="Settings"
+        description={isOwner ? 'Company, people, pay and how the app looks.' : 'Your preferences. Company settings are managed by the owner.'}
+      />
 
+      <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+        {/* Phone: one dropdown. Desk: the grouped list. */}
+        <div className="md:hidden">
+          <Select value={current.id} onValueChange={choose}>
+            <SelectTrigger className="h-12" aria-label="Settings section">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {grouped.map(({ group, items }) => (
+                <SelectGroup key={group}>
+                  <SelectLabel>{group}</SelectLabel>
+                  {items.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="mb-6 w-full justify-start overflow-x-auto">
-          <TabsTrigger value="general" className="flex items-center gap-2">
-            <SettingsIcon className="h-4 w-4" />
-            General
-          </TabsTrigger>
-          <TabsTrigger value="onboarding" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Onboarding & Documents
-          </TabsTrigger>
-          <TabsTrigger value="compensation" className="flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            Compensation
-          </TabsTrigger>
-        </TabsList>
+        <nav aria-label="Settings sections" className="hidden self-start md:sticky md:top-4 md:block">
+          <div className="space-y-5">
+            {grouped.map(({ group, items }) => (
+              <div key={group}>
+                <p className="mb-1 px-3 text-[13px] font-semibold text-muted-foreground">{group}</p>
+                <ul className="space-y-0.5">
+                  {items.map((s) => {
+                    const active = s.id === current.id;
+                    return (
+                      <li key={s.id}>
+                        <button
+                          type="button"
+                          onClick={() => choose(s.id)}
+                          aria-current={active ? 'page' : undefined}
+                          className={cn(
+                            'flex min-h-11 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            active ? 'bg-muted font-semibold text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                          )}
+                        >
+                          <s.icon className={cn('h-4 w-4 shrink-0', active && 'text-primary')} />
+                          <span className="truncate">{s.label}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </nav>
 
-        <TabsContent value="general" className="w-full">
-          <Tabs defaultValue="users" className="w-full">
-            <TabsList className="mb-6 w-full justify-start overflow-x-auto">
-              <TabsTrigger value="users" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Team
-              </TabsTrigger>
-              <TabsTrigger value="company" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Company
-              </TabsTrigger>
-              <TabsTrigger value="branding" className="flex items-center gap-2">
-                <Palette className="h-4 w-4" />
-                Branding
-              </TabsTrigger>
-              <TabsTrigger value="appearance" className="flex items-center gap-2">
-                <Sun className="h-4 w-4" />
-                Appearance
-              </TabsTrigger>
-              <TabsTrigger value="billing" className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Billing
-              </TabsTrigger>
-              <TabsTrigger value="storage" className="flex items-center gap-2">
-                <HardDrive className="h-4 w-4" />
-                Storage
-              </TabsTrigger>
-              <TabsTrigger value="payroll" className="flex items-center gap-2">
-                <Percent className="h-4 w-4" />
-                Payroll
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="users" className="space-y-6">
-              <TeamManagementTab />
-            </TabsContent>
-
-            <TabsContent value="appearance" className="space-y-6">
-              <Card className="bg-card border border-border rounded-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    {theme === 'dark' ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
-                    Theme
-                  </CardTitle>
-                  <CardDescription>Choose your preferred color scheme</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label htmlFor="theme-switch" className="font-medium">Dark Mode</Label>
-                      <p className="text-sm text-muted-foreground">Toggle between light and dark themes</p>
-                    </div>
-                    <Switch id="theme-switch" checked={theme === 'dark'} onCheckedChange={toggleTheme} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-4">
-                    <button
-                      onClick={() => theme !== 'light' && toggleTheme()}
-                      className={`p-4 rounded-lg border-2 transition-all ${theme === 'light' ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
-                    >
-                      <div className="bg-white rounded-md p-3 mb-2 border">
-                        <div className="h-2 w-12 bg-amber-500 rounded mb-2" />
-                        <div className="h-2 w-20 bg-gray-200 rounded mb-1" />
-                        <div className="h-2 w-16 bg-gray-200 rounded" />
-                      </div>
-                      <span className="text-sm font-medium">Light</span>
-                    </button>
-                    <button
-                      onClick={() => theme !== 'dark' && toggleTheme()}
-                      className={`p-4 rounded-lg border-2 transition-all ${theme === 'dark' ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
-                    >
-                      <div className="bg-zinc-900 rounded-md p-3 mb-2 border border-zinc-700">
-                        <div className="h-2 w-12 bg-amber-500 rounded mb-2" />
-                        <div className="h-2 w-20 bg-zinc-700 rounded mb-1" />
-                        <div className="h-2 w-16 bg-zinc-700 rounded" />
-                      </div>
-                      <span className="text-sm font-medium">Dark</span>
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="company">
-              <CompanyTab />
-            </TabsContent>
-
-            <TabsContent value="branding">
-              <BrandingTab />
-            </TabsContent>
-
-            <TabsContent value="billing">
-              <BillingTab />
-            </TabsContent>
-
-            <TabsContent value="storage">
-              <StorageTab />
-            </TabsContent>
-
-            <TabsContent value="payroll" className="space-y-6">
-              <PayrollTaxesCard />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-
-        <TabsContent value="compensation" className="space-y-6">
-          <Tabs defaultValue="pay-packages" className="w-full">
-            <TabsList className="mb-6 w-full justify-start overflow-x-auto">
-              <TabsTrigger value="pay-packages" className="flex items-center gap-2">
-                <Wallet className="h-4 w-4" />
-                Pay Packages
-              </TabsTrigger>
-              <TabsTrigger value="positions" className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
-                Positions
-              </TabsTrigger>
-              <TabsTrigger value="staff-pay" className="flex items-center gap-2">
-                <Receipt className="h-4 w-4" />
-                Staff Pay
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="pay-packages">
-              <PayPackagesTab />
-            </TabsContent>
-            <TabsContent value="positions">
-              <PositionsTab />
-            </TabsContent>
-            <TabsContent value="staff-pay">
-              <StaffPayTab />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-
-        <TabsContent value="onboarding" className="space-y-6">
-          <Card className="bg-card border border-border rounded-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Onboarding & Documents
-              </CardTitle>
-              <CardDescription>
-                Manage automated documents and new hire flows for your organization. Configure document templates,
-                track driver onboarding status, and enforce required signatures before drivers become active.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <OnboardingPreferencesCard />
-
-          <DocumentTemplatesPanel />
-
-          <AuditLogPanel />
-
-        </TabsContent>
-      </Tabs>
+        <div className="min-w-0 space-y-6">{current.render()}</div>
+      </div>
     </>
   );
 }

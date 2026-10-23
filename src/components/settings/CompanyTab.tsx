@@ -12,10 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
-import { Building2, Landmark, Banknote } from 'lucide-react';
-import { DetentionRulesCard } from './DetentionRulesCard';
-import { OverDimensionRulesCard } from './OverDimensionRulesCard';
-import { InBondFeeCard } from './InBondFeeCard';
+import { Building2, Banknote } from 'lucide-react';
 
 export function CompanyTab() {
   const { orgId, orgName, refreshOrgData } = useAuth();
@@ -130,34 +127,17 @@ export function CompanyTab() {
 
   return (
     <div className="space-y-6">
-      {/* TMS Mode Badge */}
-      <Card className="bg-card border border-border rounded-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Landmark className="h-5 w-5 text-primary" />
-            TMS Mode
-          </CardTitle>
-          <CardDescription>Your organization's operating mode</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Badge variant={isLandstar ? 'default' : 'secondary'} className="text-sm px-3 py-1">
-            {isLandstar ? 'Landstar BCO' : 'Independent Owner-Operator'}
-          </Badge>
-          <p className="text-xs text-muted-foreground mt-2">
-            {isLandstar
-              ? 'Operating under Landstar\'s authority. DOT/MC numbers are managed by Landstar.'
-              : 'Operating under your own DOT/MC authority.'}
-          </p>
-        </CardContent>
-      </Card>
-
       <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
             Company Information
           </CardTitle>
-          <CardDescription>Update your company details</CardDescription>
+          <CardDescription className="flex flex-wrap items-center gap-2">
+            Your company details.
+            <Badge variant={isLandstar ? 'default' : 'secondary'}>{isLandstar ? 'Landstar BCO' : 'Independent owner-operator'}</Badge>
+            <span>{isLandstar ? "Operating under Landstar's authority, so DOT and MC numbers are managed by Landstar." : 'Operating under your own DOT and MC authority.'}</span>
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -310,9 +290,6 @@ export function CompanyTab() {
         </Card>
       )}
 
-      <DetentionRulesCard />
-      <OverDimensionRulesCard />
-      <InBondFeeCard />
     </div>
   );
 }

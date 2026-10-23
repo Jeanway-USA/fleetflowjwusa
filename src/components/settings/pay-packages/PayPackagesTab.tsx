@@ -128,22 +128,22 @@ export function PayPackagesTab() {
                   <div className="flex flex-wrap gap-1">
                     {hasPayrollAccess ? (
                       <>
-                        <Button variant="outline" className="min-h-[44px]" onClick={() => setEditing(p)} disabled={!!p.archived_at}>
+                        <Button variant="outline" className="min-h-11 md:h-9 md:min-h-0" onClick={() => setEditing(p)} disabled={!!p.archived_at}>
                           <Pencil className="mr-1.5 h-4 w-4" />Edit
                         </Button>
-                        <Button variant="outline" className="min-h-[44px]" onClick={() => setCopyOf(p)}>
+                        <Button variant="outline" className="min-h-11 md:h-9 md:min-h-0" onClick={() => setCopyOf(p)}>
                           <Copy className="mr-1.5 h-4 w-4" />Duplicate
                         </Button>
-                        <Button variant="outline" className="min-h-[44px]" onClick={() => setHistory(p)}>
+                        <Button variant="outline" className="min-h-11 md:h-9 md:min-h-0" onClick={() => setHistory(p)}>
                           <History className="mr-1.5 h-4 w-4" />History
                         </Button>
-                        <Button variant="ghost" className="min-h-[44px]" onClick={() => toggleArchive(p)}>
+                        <Button variant="ghost" className="min-h-11 md:h-9 md:min-h-0" onClick={() => toggleArchive(p)}>
                           {p.archived_at ? <RotateCcw className="mr-1.5 h-4 w-4" /> : <Archive className="mr-1.5 h-4 w-4" />}
                           {p.archived_at ? 'Restore' : 'Archive'}
                         </Button>
                       </>
                     ) : (
-                      <Button variant="outline" className="min-h-[44px]" onClick={() => setViewing(p)}>
+                      <Button variant="outline" className="min-h-11 md:h-9 md:min-h-0" onClick={() => setViewing(p)}>
                         <Eye className="mr-1.5 h-4 w-4" />View
                       </Button>
                     )}

@@ -322,7 +322,8 @@ export function StorageTab() {
         </Card>
       )}
 
-      {/* Info Card */}
+      {/* Setup steps: only useful before Drive is connected */}
+      {!isConnected && (
       <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="text-base">How it works</CardTitle>
@@ -343,11 +344,12 @@ export function StorageTab() {
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">4.</span>
-              All new uploads go directly to Google Drive — reducing platform storage usage
+              All new uploads go directly to Google Drive
             </li>
           </ul>
         </CardContent>
       </Card>
+      )}
 
       {/* Disconnect Dialog */}
       <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
