@@ -8,14 +8,26 @@ import { Switch } from '@/components/ui/switch';
 import { UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
-export const ONBOARDING_PREF_KEYS = {
-  driver: 'require_onboarding_driver',
-  dispatcher: 'require_onboarding_dispatcher',
-} as const;
+/** Roles that can be invited and onboarded. Owners are not listed: an owner sets themself up. */
+export const ONBOARDING_ROLES = [
+  { role: 'driver', label: 'Drivers', where: 'Driver profile, credentials and forms' },
+  { role: 'dispatcher', label: 'Dispatchers', where: 'Staff onboarding: details, tax forms and your staff documents' },
+  { role: 'safety', label: 'Safety managers', where: 'Staff onboarding' },
+  { role: 'payroll_admin', label: 'Payroll admins', where: 'Staff onboarding' },
+  { role: 'maintenance', label: 'Maintenance staff', where: 'Staff onboarding' },
+] as const;
 
-export const ONBOARDING_PREF_DEFAULTS = {
+export type OnboardingRole = (typeof ONBOARDING_ROLES)[number]['role'];
+
+const keyFor = (role: OnboardingRole) => `require_onboarding_${role}`;
+
+/** Until someone changes it, every role is asked to onboard. */
+export const ONBOARDING_PREF_DEFAULTS: Record<OnboardingRole, boolean> = {
   driver: true,
-  dispatcher: false,
+  dispatcher: true,
+  safety: true,
+  payroll_admin: true,
+  maintenance: true,
 };
 
 export function useOnboardingDefaults() {
@@ -24,22 +36,20 @@ export function useOnboardingDefaults() {
     queryKey: ['onboarding-defaults', orgId],
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
+    queryFn: async (): Promise<Record<OnboardingRole, boolean>> => {
       const { data, error } = await supabase
         .from('company_settings')
         .select('setting_key, setting_value')
         .eq('org_id', orgId!)
-        .in('setting_key', [ONBOARDING_PREF_KEYS.driver, ONBOARDING_PREF_KEYS.dispatcher]);
+        .in('setting_key', ONBOARDING_ROLES.map((r) => keyFor(r.role)));
       if (error) throw error;
-      const map = new Map(data.map(r => [r.setting_key, r.setting_value]));
-      return {
-        driver: map.has(ONBOARDING_PREF_KEYS.driver)
-          ? map.get(ONBOARDING_PREF_KEYS.driver) === 'true'
-          : ONBOARDING_PREF_DEFAULTS.driver,
-        dispatcher: map.has(ONBOARDING_PREF_KEYS.dispatcher)
-          ? map.get(ONBOARDING_PREF_KEYS.dispatcher) === 'true'
-          : ONBOARDING_PREF_DEFAULTS.dispatcher,
-      };
+      const stored = new Map(data.map((r) => [r.setting_key, r.setting_value]));
+      const out = { ...ONBOARDING_PREF_DEFAULTS };
+      for (const { role } of ONBOARDING_ROLES) {
+        const v = stored.get(keyFor(role));
+        if (v !== undefined) out[role] = v === 'true';
+      }
+      return out;
     },
   });
 }
@@ -52,75 +62,53 @@ export function OnboardingPreferencesCard() {
   const values = useMemo(() => data ?? ONBOARDING_PREF_DEFAULTS, [data]);
 
   const mutation = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
+    mutationFn: async ({ role, value }: { role: OnboardingRole; value: boolean }) => {
       if (!orgId) throw new Error('Missing organization');
       const { error } = await supabase
         .from('company_settings')
         .upsert(
-          { org_id: orgId, setting_key: key, setting_value: value ? 'true' : 'false' },
-          { onConflict: 'org_id,setting_key' }
+          { org_id: orgId, setting_key: keyFor(role), setting_value: value ? 'true' : 'false' },
+          { onConflict: 'org_id,setting_key' },
         );
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['onboarding-defaults', orgId] });
-      toast.success('Preference updated');
+      toast.success('Saved');
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to update preference'),
+    onError: (err: Error) => toast.error(err.message || 'Failed to update preference'),
   });
 
   const disabled = mutation.isPending || isLoading || !orgId;
 
   return (
-    <Card className="bg-card border border-border rounded-lg">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <UserCheck className="h-5 w-5 text-primary" />
-          Global Invite Preferences
+          Who must onboard
         </CardTitle>
         <CardDescription>
-          Set default onboarding requirements for new invitations. These defaults pre-fill the Invite User
-          modal based on the role being invited and can be overridden per invite.
+          The starting choice when you invite someone in each role. You can change it for any single invitation, and a position can suggest its own.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
-          <div className="space-y-1">
-            <Label htmlFor="require-onboarding-driver" className="font-medium">
-              Require onboarding for new Drivers by default
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              New driver invites will be marked as requiring onboarding before activation.
-            </p>
-          </div>
-          <Switch
-            id="require-onboarding-driver"
-            checked={values.driver}
-            disabled={disabled}
-            onCheckedChange={(checked) =>
-              mutation.mutate({ key: ONBOARDING_PREF_KEYS.driver, value: checked })
-            }
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
-          <div className="space-y-1">
-            <Label htmlFor="require-onboarding-dispatcher" className="font-medium">
-              Require onboarding for new Dispatchers by default
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              New dispatcher invites will be marked as requiring onboarding before activation.
-            </p>
-          </div>
-          <Switch
-            id="require-onboarding-dispatcher"
-            checked={values.dispatcher}
-            disabled={disabled}
-            onCheckedChange={(checked) =>
-              mutation.mutate({ key: ONBOARDING_PREF_KEYS.dispatcher, value: checked })
-            }
-          />
-        </div>
+      <CardContent className="p-0">
+        <ul className="divide-y divide-border border-t border-border">
+          {ONBOARDING_ROLES.map(({ role, label, where }) => (
+            <li key={role} className="flex min-h-14 items-center justify-between gap-4 px-6 py-3">
+              <div className="min-w-0">
+                <Label htmlFor={`require-onboarding-${role}`} className="font-medium">{label}</Label>
+                <p className="text-sm text-muted-foreground">{where}</p>
+              </div>
+              <Switch
+                id={`require-onboarding-${role}`}
+                checked={values[role]}
+                disabled={disabled}
+                onCheckedChange={(checked) => mutation.mutate({ role, value: checked })}
+              />
+            </li>
+          ))}
+        </ul>
       </CardContent>
     </Card>
   );

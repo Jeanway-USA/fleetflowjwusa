@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Roster, type RosterEntry } from '@/components/fleet/Roster';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { Briefcase, ClipboardCheck, UserPlus, Pencil, KeyRound, Trash2, MoreHorizontal } from 'lucide-react';
+import { Briefcase, ClipboardCheck, UserPlus, Pencil, KeyRound, UserX, UserCheck, MoreHorizontal } from 'lucide-react';
 import { usePositions } from '@/hooks/usePositions';
 import { usePayPackages } from '@/hooks/usePayPackages';
 import { createHirePlan } from '@/lib/positions/api';
@@ -40,6 +41,12 @@ interface UserWithRole {
   last_name: string | null;
   role: AppRole | null;
   role_id: string | null;
+  /** Still has to finish onboarding. */
+  onboardingPending: boolean;
+  /** Their current position, if one is set. */
+  position: string | null;
+  /** Switched off by an owner: cannot sign in, everything they did stays. */
+  deactivated: boolean;
 }
 
 const roleLabels: Record<AppRole, string> = {
@@ -69,7 +76,7 @@ export function TeamManagementTab() {
   // Sheet / Dialog state
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showDeactivated, setShowDeactivated] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
 
@@ -101,9 +108,7 @@ export function TeamManagementTab() {
     const defaults = onboardingDefaults ?? ONBOARDING_PREF_DEFAULTS;
     // A chosen position suggests onboarding; the checkbox below can still be changed.
     if (invitePosition) setInviteRequiresOnboarding(invitePosition.requires_onboarding);
-    else if (inviteRole === 'driver') setInviteRequiresOnboarding(defaults.driver);
-    else if (inviteRole === 'dispatcher') setInviteRequiresOnboarding(defaults.dispatcher);
-    else setInviteRequiresOnboarding(inviteRole !== 'owner');
+    else setInviteRequiresOnboarding(inviteRole === 'owner' ? false : (defaults as Record<string, boolean>)[inviteRole] ?? true);
   }, [inviteRole, onboardingDefaults, inviteOpen, invitePosition]);
 
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -115,8 +120,8 @@ export function TeamManagementTab() {
   const [editRole, setEditRole] = useState<AppRole>('driver');
   const [isEditing, setIsEditing] = useState(false);
 
-  const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [userToDeactivate, setUserToDeactivate] = useState<UserWithRole | null>(null);
+  const [isDeactivating, setIsDeactivating] = useState(false);
 
   const [userToResetPassword, setUserToResetPassword] = useState<UserWithRole | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
@@ -140,6 +145,18 @@ export function TeamManagementTab() {
         .eq('org_id', orgId);
       if (rolesError) throw rolesError;
 
+      // Their position, newest first. Not every viewer can read these, so a failure just leaves the column empty.
+      const positionByUser = new Map<string, string>();
+      const { data: assignments } = await supabase
+        .from('position_assignments')
+        .select('user_id, effective_start, positions(name)')
+        .not('user_id', 'is', null)
+        .is('effective_end', null)
+        .order('effective_start', { ascending: false });
+      for (const a of (assignments ?? []) as Array<{ user_id: string | null; positions: { name: string } | null }>) {
+        if (a.user_id && a.positions?.name && !positionByUser.has(a.user_id)) positionByUser.set(a.user_id, a.positions.name);
+      }
+
       return profiles.map(p => {
         const userRole = roles.find(r => r.user_id === p.user_id);
         return {
@@ -150,6 +167,9 @@ export function TeamManagementTab() {
           last_name: p.last_name,
           role: userRole?.role || null,
           role_id: userRole?.id || null,
+          onboardingPending: !!p.requires_onboarding && !p.onboarding_completed,
+          position: positionByUser.get(p.user_id) ?? null,
+          deactivated: !!(p as { deactivated_at?: string | null }).deactivated_at,
         };
       }) as UserWithRole[];
     },
@@ -284,23 +304,21 @@ export function TeamManagementTab() {
     }
   };
 
-  const handleDeleteUser = async () => {
-    if (!userToDelete) return;
-    setIsDeleting(true);
+  const setUserActive = async (target: UserWithRole, active: boolean) => {
+    setIsDeactivating(true);
     try {
-      const response = await invokeWithAuth<{ error?: string }>('delete-user', { body: { userId: userToDelete.user_id } });
-      if (response.sessionExpired) return;
-      if (response.error) throw new Error(response.error.message || 'Failed to delete user');
-      if (response.data?.error) throw new Error(response.data.error);
-
-      toast.success('User deleted successfully');
-      setDeleteDialogOpen(false);
-      setUserToDelete(null);
+      const { error } = await supabase.rpc((active ? 'reactivate_user' : 'deactivate_user') as never, { _user_id: target.user_id } as never);
+      if (error) {
+        const missing = /deactivate_user|reactivate_user|deactivated_at/.test(error.message);
+        throw new Error(missing ? 'This needs the latest database update (docs/APPLY_DEACTIVATE_USERS.sql).' : error.message);
+      }
+      toast.success(active ? 'Reactivated. They can sign in again.' : 'Deactivated. They are signed out and cannot sign in. Their records are kept.');
+      setUserToDeactivate(null);
       queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete user');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update that person');
     } finally {
-      setIsDeleting(false);
+      setIsDeactivating(false);
     }
   };
 
@@ -330,13 +348,14 @@ export function TeamManagementTab() {
     setEditDialogOpen(true);
   }, []);
 
-  const entries: RosterEntry[] = usersWithRoles.map((row) => {
+  const deactivatedCount = usersWithRoles.filter((u) => u.deactivated).length;
+  const entries: RosterEntry[] = usersWithRoles.filter((u) => showDeactivated || !u.deactivated).map((row) => {
     const isActive = !!row.first_name;
     const name = row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : row.email;
     return {
       id: row.user_id,
       title: name,
-      subtitle: row.email,
+      subtitle: row.position ? `${row.email} · ${row.position}` : row.email,
       facts: [],
       chips: (
         <>
@@ -347,9 +366,15 @@ export function TeamManagementTab() {
               Assign role
             </Button>
           )}
-          <Badge variant={isActive ? 'default' : 'outline'} className={isActive ? 'bg-emerald-600/15 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-800' : ''}>
-            {isActive ? 'Active' : 'Invited'}
-          </Badge>
+          {row.deactivated ? (
+            <Badge variant="outline" className="text-muted-foreground">Deactivated</Badge>
+          ) : row.onboardingPending ? (
+            <Badge variant="outline" className="border-warning/50 bg-warning/15 text-warning">Onboarding pending</Badge>
+          ) : (
+            <Badge variant={isActive ? 'default' : 'outline'} className={isActive ? 'bg-success/15 text-success border-success/30' : ''}>
+              {isActive ? 'Active' : 'Invited'}
+            </Badge>
+          )}
         </>
       ),
       menu: row.user_id === user?.id ? undefined : (
@@ -360,12 +385,16 @@ export function TeamManagementTab() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(row)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+            {row.deactivated ? (
+              <DropdownMenuItem onClick={() => void setUserActive(row, true)}><UserCheck className="mr-2 h-4 w-4" /> Reactivate</DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => openEditDialog(row)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+            )}
             {hasPayrollAccess && <DropdownMenuItem onClick={() => { setPeopleSuggestedPackage(null); setPeopleUser(row); }}><Briefcase className="mr-2 h-4 w-4" /> Position & pay</DropdownMenuItem>}
             {hasPayrollAccess && row.role !== 'driver' && <DropdownMenuItem onClick={() => setOnboardingUser(row)}><ClipboardCheck className="mr-2 h-4 w-4" /> Onboarding</DropdownMenuItem>}
             <DropdownMenuItem onClick={() => { setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}><KeyRound className="mr-2 h-4 w-4" /> Force password reset</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => { setUserToDelete(row); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> Remove</DropdownMenuItem>
+            {!row.deactivated && <DropdownMenuItem className="text-destructive" onClick={() => setUserToDeactivate(row)}><UserX className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -388,7 +417,15 @@ export function TeamManagementTab() {
       {isLoading ? (
         <div className="py-12 text-center text-muted-foreground">Loading...</div>
       ) : (
+        <>
+        {deactivatedCount > 0 && (
+          <label className="flex min-h-11 items-center gap-2 px-1 text-sm text-muted-foreground">
+            <Switch checked={showDeactivated} onCheckedChange={setShowDeactivated} />
+            Show deactivated people ({deactivatedCount})
+          </label>
+        )}
         <Roster entries={entries} empty="No team members yet. Invite someone to get started." />
+        </>
       )}
 
       {/* ── Invite Sheet ── */}
@@ -600,25 +637,22 @@ export function TeamManagementTab() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Confirmation ── */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* ── Deactivate Confirmation ── */}
+      <AlertDialog open={!!userToDeactivate} onOpenChange={(v) => !v && setUserToDeactivate(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete User Account</AlertDialogTitle>
+            <AlertDialogTitle>Deactivate this person?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the account for{' '}
               <span className="font-semibold">
-                {userToDelete?.first_name && userToDelete?.last_name
-                  ? `${userToDelete.first_name} ${userToDelete.last_name}`
-                  : userToDelete?.email}
-              </span>
-              ? This action cannot be undone.
+                {userToDeactivate?.first_name && userToDeactivate?.last_name ? `${userToDeactivate.first_name} ${userToDeactivate.last_name}` : userToDeactivate?.email}
+              </span>{' '}
+              will be signed out and cannot sign in again until you reactivate them. Their loads, pay records, signed documents and history all stay. A driver is marked inactive.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete User'}
+            <AlertDialogCancel disabled={isDeactivating}>Keep active</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); if (userToDeactivate) void setUserActive(userToDeactivate, false); }} disabled={isDeactivating}>
+              {isDeactivating ? 'Deactivating…' : 'Deactivate'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

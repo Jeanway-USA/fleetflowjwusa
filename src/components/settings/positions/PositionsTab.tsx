@@ -73,7 +73,7 @@ export function PositionsTab() {
         </div>
         {hasPayrollAccess && (
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="min-h-[44px]" onClick={() => setBulkOpen(true)}>
+            <Button variant="outline" className="min-h-11 md:h-9 md:min-h-0" onClick={() => setBulkOpen(true)}>
               <Users className="mr-1.5 h-4 w-4" />Assign to many drivers
             </Button>
             <Button className="min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setCreating(true)}>
@@ -105,8 +105,8 @@ export function PositionsTab() {
               </div>
               {hasPayrollAccess && (
                 <div className="flex flex-wrap gap-1">
-                  <Button variant="outline" className="min-h-[44px]" onClick={() => setEditing(p)} disabled={!!p.archived_at}><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>
-                  <Button variant="ghost" className="min-h-[44px]" onClick={() => toggleArchive(p)}>
+                  <Button variant="outline" className="min-h-11 md:h-9 md:min-h-0" onClick={() => setEditing(p)} disabled={!!p.archived_at}><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>
+                  <Button variant="ghost" className="min-h-11 md:h-9 md:min-h-0" onClick={() => toggleArchive(p)}>
                     {p.archived_at ? <RotateCcw className="mr-1.5 h-4 w-4" /> : <Archive className="mr-1.5 h-4 w-4" />}
                     {p.archived_at ? 'Restore' : 'Archive'}
                   </Button>
