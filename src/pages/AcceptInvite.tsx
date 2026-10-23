@@ -145,7 +145,7 @@ export default function AcceptInvite() {
             <CardContent>
               <Button
                 onClick={() => navigate(`/auth?redirect=${encodeURIComponent(redirectTo)}`)}
-                className="w-full gradient-gold text-primary-foreground hover:opacity-90"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
               >
                 Sign In
               </Button>
@@ -239,7 +239,7 @@ export default function AcceptInvite() {
               <p className="text-muted-foreground">Your password has been set. Sign in to access your account.</p>
               <Button
                 onClick={() => navigate('/auth')}
-                className="w-full gradient-gold text-primary-foreground hover:opacity-90"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
               >
                 Continue to Sign In
               </Button>
@@ -300,7 +300,7 @@ export default function AcceptInvite() {
             </div>
             <Button
               type="submit"
-              className="w-full gradient-gold text-primary-foreground hover:opacity-90"
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
               disabled={loading}
             >
               {loading ? (

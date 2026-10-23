@@ -95,7 +95,7 @@ export default function ResetPassword() {
                 </p>
                 <Button 
                   onClick={() => navigate('/auth')}
-                  className="w-full gradient-gold text-primary-foreground hover:opacity-90"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
                 >
                   Continue to Sign In
                 </Button>
@@ -180,7 +180,7 @@ export default function ResetPassword() {
               </div>
               <Button 
                 type="submit" 
-                className="w-full gradient-gold text-primary-foreground hover:opacity-90"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
                 disabled={loading}
               >
                 {loading ? (

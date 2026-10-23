@@ -493,13 +493,13 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
                     <Plus className="h-4 w-4 mr-2" />
                     Create New Load
                   </Button>
-                  <Button onClick={() => handleUseData(true)} className="gradient-gold text-primary-foreground">
+                  <Button onClick={() => handleUseData(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Update Existing Load
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => handleUseData(false)} className="gradient-gold text-primary-foreground">
+                <Button onClick={() => handleUseData(false)} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <FileText className="h-4 w-4 mr-2" />
                   Use This Data
                 </Button>

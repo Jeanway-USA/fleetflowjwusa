@@ -10,7 +10,7 @@ import { DialogContent } from '@/components/ui/dialog';
  * can switch light and dark and every piece follows.
  */
 
-/** A card. 12px corners, a hairline edge, no shadow: it sits on the page rather than floating over it. */
+/** A card. The same 8px corners and hairline edge as the rest of the app, no shadow. */
 export function Panel({ className, ...props }: React.HTMLAttributes<HTMLElement> & { as?: React.ElementType }) {
   return <section className={cn('overflow-hidden rounded-lg border border-border bg-card text-card-foreground', className)} {...props} />;
 }
@@ -19,7 +19,7 @@ export function Panel({ className, ...props }: React.HTMLAttributes<HTMLElement>
 export function PanelHead({ title, aside, className }: { title: React.ReactNode; aside?: React.ReactNode; className?: string }) {
   return (
     <div className={cn('flex min-h-12 items-center justify-between gap-3 px-4 pt-3', className)}>
-      <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
+      <h2 className="font-condensed text-xl font-bold leading-tight text-foreground">{title}</h2>
       {aside && <div className="min-w-0 text-sm text-muted-foreground">{aside}</div>}
     </div>
   );
@@ -95,7 +95,7 @@ export interface DBtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
   asChild?: boolean;
 }
 
-/** The driver app's button: 10px corners, 44px minimum, 52px for the main action. */
+/** The driver app's button: the app's button corners, 44px minimum, 52px for the main action. */
 export const DBtn = React.forwardRef<HTMLButtonElement, DBtnProps>(({ className, tone, size, asChild, ...props }, ref) => {
   const Comp = asChild ? Slot : 'button';
   return <Comp ref={ref} className={cn(btn({ tone, size }), className)} {...props} />;

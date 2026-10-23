@@ -147,7 +147,7 @@ function OverrideDialog({ driverId, packageId, open, onOpenChange }: { driverId:
         </div>
         <DialogFooter>
           <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={() => onOpenChange(false)} disabled={create.isPending}>Cancel</Button>
-          <LoadingButton loading={create.isPending} disabled={create.isPending} onClick={submit} className="min-h-[44px] w-full gradient-gold text-primary-foreground sm:w-auto">Save override</LoadingButton>
+          <LoadingButton loading={create.isPending} disabled={create.isPending} onClick={submit} className="min-h-[44px] w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">Save override</LoadingButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

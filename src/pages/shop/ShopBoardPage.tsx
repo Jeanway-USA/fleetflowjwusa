@@ -71,7 +71,7 @@ export default function ShopBoardPage() {
           <Button variant="outline" className="h-11 gap-2" onClick={() => setLogOpen(true)}>
             <NotebookPen className="h-4 w-4" />Log work done
           </Button>
-          <Button className="h-11 gap-2 gradient-gold text-primary-foreground" onClick={() => setNewOpen(true)}>
+          <Button className="h-11 gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setNewOpen(true)}>
             <Plus className="h-4 w-4" />New job
           </Button>
         </div>

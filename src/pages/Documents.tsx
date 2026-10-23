@@ -182,7 +182,7 @@ export default function Documents() {
       )}
 
       <div className="space-y-6">
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-primary" />
@@ -215,7 +215,7 @@ export default function Documents() {
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="gradient-gold text-primary-foreground"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {uploading ? 'Uploading...' : 'Choose File'}
@@ -224,7 +224,7 @@ export default function Documents() {
           </CardContent>
         </Card>
 
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">

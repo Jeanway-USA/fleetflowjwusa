@@ -36,7 +36,7 @@ export function TierGate({ requiredFeature, children, fallback }: TierGateProps)
             This feature is not included in your <span className="font-medium capitalize">{tier.replace('_', ' ')}</span> plan.
             Upgrade to access it.
           </p>
-          <Button onClick={() => navigate('/pricing')} className="gradient-gold text-primary-foreground">
+          <Button onClick={() => navigate('/pricing')} className="bg-primary text-primary-foreground hover:bg-primary/90">
             View Plans
           </Button>
         </CardContent>

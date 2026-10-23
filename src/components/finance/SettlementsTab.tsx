@@ -520,7 +520,7 @@ export function SettlementsTab() {
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : settlements.length === 0 ? (
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No settlements yet</p>
@@ -530,7 +530,7 @@ export function SettlementsTab() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <Table>
             <TableHeader>
               <TableRow>
@@ -758,7 +758,7 @@ export function SettlementsTab() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createMutation.isPending || updateMutation.isPending}>
+              <LoadingButton type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" loading={createMutation.isPending || updateMutation.isPending}>
                 {editingSettlement ? 'Save Changes' : 'Create Settlement'}
               </LoadingButton>
             </DialogFooter>

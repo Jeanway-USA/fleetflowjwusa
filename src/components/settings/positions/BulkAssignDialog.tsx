@@ -155,7 +155,7 @@ export function BulkAssignDialog({ open, onOpenChange }: Props) {
         </div>
         <DialogFooter>
           <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <LoadingButton loading={busy} disabled={busy} onClick={apply} className="min-h-[44px] w-full gradient-gold text-primary-foreground sm:w-auto">Apply to {picked.size || ''} driver{picked.size === 1 ? '' : 's'}</LoadingButton>
+          <LoadingButton loading={busy} disabled={busy} onClick={apply} className="min-h-[44px] w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">Apply to {picked.size || ''} driver{picked.size === 1 ? '' : 's'}</LoadingButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

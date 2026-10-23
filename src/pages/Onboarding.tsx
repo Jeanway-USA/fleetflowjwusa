@@ -406,7 +406,7 @@ export default function Onboarding() {
                 </div>
 
                 <Button
-                  className="w-full gradient-gold text-primary-foreground hover:opacity-90"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
                   onClick={handleStep1}
                   disabled={loading}
                 >
@@ -499,7 +499,7 @@ export default function Onboarding() {
                     <SkipForward className="mr-2 h-4 w-4" /> Skip
                   </Button>
                   <Button
-                    className="flex-1 gradient-gold text-primary-foreground hover:opacity-90"
+                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
                     onClick={() => handleStep2(false)}
                     disabled={loading}
                   >
@@ -575,7 +575,7 @@ export default function Onboarding() {
                     <SkipForward className="mr-2 h-4 w-4" /> Skip
                   </Button>
                   <Button
-                    className="flex-1 gradient-gold text-primary-foreground hover:opacity-90"
+                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90"
                     onClick={() => handleStep3(false)}
                     disabled={loading}
                   >

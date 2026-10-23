@@ -50,7 +50,7 @@ export function ClockBar({ detail, touch }: { detail: ShopJobDetail; touch?: boo
             <Pause className="h-6 w-6" />Pause
           </LoadingButton>
         ) : (
-          <Button className={cn('gap-2 gradient-gold text-primary-foreground', touch ? 'h-20 min-w-[200px] text-xl' : 'h-12 min-w-[150px]')} disabled={actions.startJob.isPending || actions.unblock.isPending} onClick={start}>
+          <Button className={cn('gap-2 bg-primary text-primary-foreground hover:bg-primary/90', touch ? 'h-20 min-w-[200px] text-xl' : 'h-12 min-w-[150px]')} disabled={actions.startJob.isPending || actions.unblock.isPending} onClick={start}>
             <Play className="h-6 w-6" />{detail.time.length > 0 || blocked ? 'Resume work' : 'Start work'}
           </Button>
         )}

@@ -125,7 +125,7 @@ export function BillingTab() {
   return (
     <div className="space-y-6">
       {/* Current Plan */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" />
@@ -196,7 +196,7 @@ export function BillingTab() {
       </Card>
 
       {/* Complimentary / Trial Status */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {isComplimentary ? (
@@ -273,7 +273,7 @@ export function BillingTab() {
       </Card>
 
       {/* Account Info */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle>Account Details</CardTitle>
         </CardHeader>

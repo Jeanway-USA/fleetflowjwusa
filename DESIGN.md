@@ -144,7 +144,7 @@ A restrained brand palette: black, white, two golds, one gray, plus functional r
 
 **Display/Title Font:** Barlow Condensed (fallback Barlow, system-ui). `h1` to `h3` default to it.
 **Body Font:** Barlow (self-hosted woff2, weights 400 to 700).
-**Mono:** JetBrains Mono is declared in `tailwind.config.ts` (`font-mono`, used for small counts) but no font file is bundled, so it falls back to the system monospace.
+**Mono:** the system monospace (`font-mono`, used for small counts). No mono font file is bundled.
 
 **Character:** A condensed, working-vehicle voice for titles and money, a plain humanist sans for reading. Tabular numerals wherever figures line up (tables, inputs, `.figure`).
 
@@ -173,7 +173,7 @@ Phone: `PageHeader` stacks and its action button goes full width at 44px; tab st
 
 ## Elevation & Depth
 
-Flat. Depth comes from the hairline border and the page/card tone step, not shadows. Cards, panels, stat strips, tab strips and buttons carry no shadow. Allowed: the active tab or segment (`shadow-sm`, to read as raised in its well), dialogs (`shadow-lg` over an 80% black overlay) and Leaflet popups. Gradients and glows are retired: `.gradient-gold`, `.glow-gold` and `.text-gradient-gold` are legacy aliases that resolve to flat dark gold, and `.card-elevated` (a 1px, 4% shadow) is legacy; none are for new work.
+Flat. Depth comes from the hairline border and the page/card tone step, not shadows. Cards, panels, stat strips, tab strips and buttons carry no shadow. Allowed: the active tab or segment (`shadow-sm`, to read as raised in its well), dialogs (`shadow-lg` over an 80% black overlay) and Leaflet popups. Gradients and glows are gone: the old `.gradient-gold`, `.glow-gold`, `.text-gradient-gold` and `.card-elevated` classes have been removed. A primary action is `bg-primary text-primary-foreground`, and a card is `Card` or `bg-card border border-border rounded-lg`.
 
 ## Shapes
 
@@ -202,16 +202,16 @@ Headline figures for a page or tab in one ruled box, cells divided by hairlines:
 Sortable, filterable, virtualized table: 48px standard or 32px compact rows, CSV export, column chooser, mobile column hiding, and `EmptyState` for no data. Use for any list beyond a handful of records.
 
 ### EmptyState
-Centered title, optional description and action; `variant="filtered"` for no results. For a one-line empty message inside a card, use Panel's `empty` prop instead.
+Centered condensed title, optional description and action over a square-cornered icon tile; `variant="filtered"` for no results. For a one-line empty message inside a card, use Panel's `empty` prop instead.
 
 ### StatusBadge and StateMark
-`StatusBadge` maps a status word to a tinted signal (success, warning, error, info, neutral): 12px semibold uppercase tag. `StateMark` is the logbook symbol plus label for load states. The word is always shown; color only backs it up.
+`StatusBadge` maps a status word to a tinted signal (success, warning, error, info, neutral): 13px semibold sentence-case tag. `StateMark` is the logbook symbol plus label for load states. The word is always shown; color only backs it up.
 
 ### Inputs and Dialogs
-Input: 48px phone / 40px desk, `rounded-md`, input-colored edge, 16px text on phones. Dialog: centered `rounded-lg` card on desk, 95vw wide on phones, max 85vh, scrolling body, title `text-lg` semibold.
+Input: 48px phone / 40px desk, `rounded-md`, input-colored edge, 16px text on phones. Dialog: centered `rounded-lg` card on desk, 95vw wide on phones, max 85vh, scrolling body, title condensed 20px bold, like every panel title.
 
 ### Driver app (`components/driver/ui/driver-ui.tsx`)
-The same look at phone sizing. Parts: `Panel` (the same hairline card), `PanelHead` (15px semibold title plus aside), `HeadLink`, `Stat` / `StatRow`, `Chip`, `DBtn`, `Tile`, `Bar`, `Row`, `Segmented`, `Note`, `SheetContent`.
+The same look at phone sizing. Parts: `Panel` (the same hairline card), `PanelHead` (condensed 20px title plus aside), `HeadLink`, `Stat` / `StatRow`, `Chip`, `DBtn`, `Tile`, `Bar`, `Row`, `Segmented`, `Note`, `SheetContent`.
 - `DBtn`: 44px minimum (`md`, `sm`), 52px `lg` for the main action. The `primary` tone is carbon gold and is the only gold button; other tones are outline, ghost and danger.
 - One strong load card runs the trip: the next stop in 36px condensed, a stops timeline (green behind, one gold dot ahead, hollow after), a full-width gold action. Everything else is a quiet card.
 - Gold only for the next-stop marker and the main action.
@@ -235,7 +235,7 @@ The same look at phone sizing. Parts: `Panel` (the same hairline card), `PanelHe
 - **Do** make offline and queued state visible to the user.
 
 ### Don't:
-- **Don't** use shadows, gradients, glows or `.card-elevated` on new work.
+- **Don't** use shadows, gradients or glows.
 - **Don't** add colored side rails (left border stripes) to cards, rows or alerts.
 - **Don't** use pills for buttons, tabs or segments.
 - **Don't** put a bell or notification control in a page header; the top bar owns it.
@@ -247,5 +247,4 @@ The same look at phone sizing. Parts: `Panel` (the same hairline card), `PanelHe
 - **Print documents** (EOW report, `.print-report`): black on white; uppercase headers and sizes under 12px are allowed.
 - **Bottom sheet:** `SheetContent` rounds its top corners at 16px (`rounded-t-2xl`) on phones, the only container radius beyond 6px.
 - **Maps:** Leaflet markers and popups keep their own markup; popups use the card tokens with a soft shadow.
-- **Status tags:** `StatusBadge` is a rounded-full uppercase tag. It is a label, not a button, and is not a pattern for new buttons or chips.
 - **Charts** use the `--chart-1` to `--chart-5` series (dark gold, black, gold, gray, red).

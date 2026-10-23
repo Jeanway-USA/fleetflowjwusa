@@ -456,7 +456,7 @@ export function GenerateSettlementsDialog({
             loading={busy}
             disabled={busy || selected.size === 0}
             onClick={() => generate.mutate()}
-            className="w-full sm:w-auto gradient-gold text-primary-foreground"
+            className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
           >
             Generate
           </LoadingButton>

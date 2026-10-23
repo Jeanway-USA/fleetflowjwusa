@@ -356,7 +356,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
                   <Button
                     onClick={processDocuments}
                     disabled={isProcessing || stagedFiles.length === 0}
-                    className="gradient-gold text-primary-foreground"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Process {stagedFiles.length} Document{stagedFiles.length !== 1 ? 's' : ''}

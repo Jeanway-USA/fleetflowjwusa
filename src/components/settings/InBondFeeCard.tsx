@@ -59,7 +59,7 @@ export function InBondFeeCard() {
   };
 
   return (
-    <Card className="card-elevated">
+    <Card className="bg-card border border-border rounded-lg">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-primary" />
@@ -88,7 +88,7 @@ export function InBondFeeCard() {
               />
             </div>
             <div className="sm:col-span-2">
-              <Button onClick={handleSave} disabled={saving} className="gradient-gold text-primary-foreground">
+              <Button onClick={handleSave} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {saving ? 'Saving…' : 'Save In-Bond Fee'}
               </Button>
             </div>

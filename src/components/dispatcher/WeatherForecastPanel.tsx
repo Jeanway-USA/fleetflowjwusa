@@ -140,7 +140,7 @@ export function WeatherForecastPanel({
   onClose,
 }: WeatherForecastPanelProps) {
   return (
-    <Card className="card-elevated h-full flex flex-col">
+    <Card className="bg-card border border-border rounded-lg h-full flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

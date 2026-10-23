@@ -91,7 +91,7 @@ export function StateFilingRegistry() {
   const hasGenericStates = states.some((s) => !isStateFormRegistered(s.code));
 
   return (
-    <Card className="card-elevated">
+    <Card className="bg-card border border-border rounded-lg">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Landmark className="h-5 w-5" /> State Filing Deadlines

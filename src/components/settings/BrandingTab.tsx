@@ -160,7 +160,7 @@ export function BrandingTab() {
   return (
     <div className="space-y-6">
       {/* Color Scheme */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5 text-primary" />
@@ -235,7 +235,7 @@ export function BrandingTab() {
           <Button
             onClick={handleSaveColor}
             disabled={isSavingColor || selectedColor === primaryColor}
-            className="gradient-gold text-primary-foreground"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             {isSavingColor ? 'Saving...' : 'Apply Color'}
           </Button>
@@ -243,7 +243,7 @@ export function BrandingTab() {
       </Card>
 
       {/* Logo & Banner */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ImageIcon className="h-5 w-5 text-primary" />

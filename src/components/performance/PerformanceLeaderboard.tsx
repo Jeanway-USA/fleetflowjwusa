@@ -55,7 +55,7 @@ function FleetRevenueLeaderboardCard({ selectedDriver }: { selectedDriver: strin
     .slice(0, 10);
 
   return (
-    <Card className="card-elevated">
+    <Card className="bg-card border border-border rounded-lg">
       <CardHeader className="flex flex-col sm:flex-row items-start justify-between gap-4 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2">
@@ -125,7 +125,7 @@ export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver 
     return (
       <div className="space-y-4">
         <FleetRevenueLeaderboardCard selectedDriver={selectedDriver} />
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardContent className="pt-6">
             <EmptyState
               icon={Target}
@@ -141,7 +141,7 @@ export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver 
   return (
     <div className="space-y-4">
       <FleetRevenueLeaderboardCard selectedDriver={selectedDriver} />
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
       <CardHeader>
         <CardTitle>Driver Rankings</CardTitle>
         <CardDescription>Sorted by overall performance score</CardDescription>

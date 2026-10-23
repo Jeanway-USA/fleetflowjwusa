@@ -42,12 +42,13 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const safeStatus = status ?? 'unknown';
   const type = statusMap[safeStatus.toLowerCase()] || 'default';
-  const displayText = safeStatus.replace(/_/g, ' ');
+  const spaced = safeStatus.replace(/_/g, ' ');
+  const displayText = spaced.charAt(0).toUpperCase() + spaced.slice(1);
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide whitespace-nowrap',
+        'inline-flex items-center rounded-md px-2 py-0.5 text-[13px] font-semibold whitespace-nowrap',
         statusColors[type],
         className
       )}

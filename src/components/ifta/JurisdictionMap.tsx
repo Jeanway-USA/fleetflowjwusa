@@ -115,7 +115,7 @@ export function JurisdictionMap({ iftaRecords, fuelPurchases, fleetMpg, quarter 
   return (
     <div className="space-y-6">
       {/* Map */}
-      <Card className="card-elevated overflow-hidden">
+      <Card className="bg-card border border-border rounded-lg overflow-hidden">
         <CardHeader>
           <CardTitle>Tax Liability by State</CardTitle>
           <CardDescription>
@@ -180,7 +180,7 @@ export function JurisdictionMap({ iftaRecords, fuelPurchases, fleetMpg, quarter 
       </Card>
 
       {/* Summary Table */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle>Jurisdiction Summary — {quarter}</CardTitle>
           <CardDescription>Combined mileage, fuel, and tax data per state</CardDescription>

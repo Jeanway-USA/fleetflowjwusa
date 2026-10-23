@@ -1607,7 +1607,7 @@ export default function FleetLoads() {
 
             <DialogFooter className="sticky -bottom-4 z-10 -mx-4 mt-6 flex-row justify-end gap-2 border-t bg-background px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:space-x-0 sm:px-6">
               <Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="h-11 flex-1 gradient-gold sm:flex-none text-primary-foreground" disabled={agencyBlocked}>
+              <Button type="submit" className="h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary/90 sm:flex-none text-primary-foreground" disabled={agencyBlocked}>
                 {editingLoad ? 'Save changes' : 'Add load'}
               </Button>
             </DialogFooter>

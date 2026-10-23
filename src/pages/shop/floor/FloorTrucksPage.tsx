@@ -107,7 +107,7 @@ export default function FloorTrucksPage() {
             </div>
           </div>
           <div className="border-t px-5 py-4">
-            <Button className="h-14 w-full gap-2 text-base gradient-gold text-primary-foreground" onClick={() => { setNewFor(open?.id ?? null); setOpenId(null); }}><Plus className="h-5 w-5" />Start a job on this truck</Button>
+            <Button className="h-14 w-full gap-2 text-base bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setNewFor(open?.id ?? null); setOpenId(null); }}><Plus className="h-5 w-5" />Start a job on this truck</Button>
           </div>
         </SheetContent>
       </Sheet>

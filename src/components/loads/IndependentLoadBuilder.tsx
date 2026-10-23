@@ -460,7 +460,7 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
         <Separator className="my-6" />
         <div className="flex items-center justify-end gap-3">
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-          <Button type="button" onClick={handleSave} className="gradient-gold text-primary-foreground">
+          <Button type="button" onClick={handleSave} className="bg-primary text-primary-foreground hover:bg-primary/90">
             Save Active Load
           </Button>
         </div>

@@ -83,7 +83,7 @@ export default function ShopHistoryPage() {
   return (
     <div>
       <PageHeader title="Service history">
-        <Button className="h-11 gap-2 gradient-gold text-primary-foreground" onClick={() => setLogOpen(true)}><NotebookPen className="h-4 w-4" />Log work done</Button>
+        <Button className="h-11 gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setLogOpen(true)}><NotebookPen className="h-4 w-4" />Log work done</Button>
       </PageHeader>
       <ShopNav />
 

@@ -31,7 +31,7 @@ export default function Settings() {
       <>
         <PageHeader title="Settings" description="Manage your preferences" />
         <div className="max-w-2xl space-y-6">
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {theme === 'dark' ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
@@ -50,7 +50,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardContent className="flex items-center justify-center py-12">
               <div className="text-center">
                 <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -127,7 +127,7 @@ export default function Settings() {
             </TabsContent>
 
             <TabsContent value="appearance" className="space-y-6">
-              <Card className="card-elevated">
+              <Card className="bg-card border border-border rounded-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     {theme === 'dark' ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
@@ -223,7 +223,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="onboarding" className="space-y-6">
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />

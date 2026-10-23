@@ -960,7 +960,7 @@ export default function Finance() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeExpenseDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">{editingExpense ? 'Save Changes' : 'Add Expense'}</Button>
+              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">{editingExpense ? 'Save Changes' : 'Add Expense'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1015,7 +1015,7 @@ export default function Finance() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeMassEditDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">Update {selectedExpenseIds.size} Expenses</Button>
+              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">Update {selectedExpenseIds.size} Expenses</Button>
             </DialogFooter>
           </form>
         </DialogContent>

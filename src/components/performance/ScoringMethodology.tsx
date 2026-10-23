@@ -47,7 +47,7 @@ export function ScoringMethodology() {
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-3">
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground mb-4">
               Each driver receives an <strong>Overall Score</strong> calculated as an equal-weighted average of four categories:

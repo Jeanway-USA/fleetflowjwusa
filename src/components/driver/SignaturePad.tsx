@@ -91,7 +91,7 @@ export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps
           type="button"
           onClick={handleConfirm}
           disabled={disabled || !hasSignature}
-          className="gradient-gold text-primary-foreground w-full sm:w-auto h-12 sm:h-10"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto h-12 sm:h-10"
         >
           <Check className="h-4 w-4 mr-1" />
           Confirm Signature

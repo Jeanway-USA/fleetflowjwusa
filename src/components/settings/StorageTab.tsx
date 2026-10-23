@@ -170,7 +170,7 @@ export function StorageTab() {
 
   if (isLoading) {
     return (
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
@@ -182,7 +182,7 @@ export function StorageTab() {
     <div className="space-y-6">
       {/* Migration Progress */}
       {isMigrating && (
-        <Card className="card-elevated border-primary/30">
+        <Card className="bg-card border border-border rounded-lg border-primary/30">
           <CardContent className="py-6">
             <div className="flex items-center gap-3 mb-3">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -197,7 +197,7 @@ export function StorageTab() {
       )}
 
       {/* Current Status */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <HardDrive className="h-5 w-5 text-primary" />
@@ -286,7 +286,7 @@ export function StorageTab() {
 
       {/* Connect Google Drive */}
       {!isConnected && (
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FolderOpen className="h-5 w-5 text-primary" />
@@ -323,7 +323,7 @@ export function StorageTab() {
       )}
 
       {/* Info Card */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="text-base">How it works</CardTitle>
         </CardHeader>

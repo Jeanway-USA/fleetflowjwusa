@@ -1072,7 +1072,7 @@ export default function Drivers() {
               </Button>
               <LoadingButton 
                 type="submit" 
-                className="gradient-gold text-primary-foreground h-11"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-11"
                 loading={createMutation.isPending || updateMutation.isPending}
                 loadingText={editingDriver ? 'Saving...' : 'Adding...'}
               >

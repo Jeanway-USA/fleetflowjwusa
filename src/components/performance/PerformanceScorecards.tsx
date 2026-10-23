@@ -135,7 +135,7 @@ export function PerformanceScorecards({ metrics, selectedDriver }: PerformanceSc
         const globalIndex = metrics.findIndex(m => m.driver.id === metric.driver.id);
         const badge = getScoreBadge(metric.overallScore);
         return (
-          <Card key={metric.driver.id} className="card-elevated">
+          <Card key={metric.driver.id} className="bg-card border border-border rounded-lg">
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-lg">{metric.driver.first_name} {metric.driver.last_name}</CardTitle>

@@ -33,7 +33,7 @@ export function PerformanceCharts({ metrics }: PerformanceChartsProps) {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle>Top 5 — Overall Scores</CardTitle>
         </CardHeader>
@@ -52,7 +52,7 @@ export function PerformanceCharts({ metrics }: PerformanceChartsProps) {
         </CardContent>
       </Card>
 
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle>Top 5 — Revenue</CardTitle>
         </CardHeader>
@@ -71,7 +71,7 @@ export function PerformanceCharts({ metrics }: PerformanceChartsProps) {
         </CardContent>
       </Card>
 
-      <Card className="card-elevated md:col-span-2">
+      <Card className="bg-card border border-border rounded-lg md:col-span-2">
         <CardHeader>
           <CardTitle>Top 5 — Fuel Efficiency (MPG)</CardTitle>
         </CardHeader>
