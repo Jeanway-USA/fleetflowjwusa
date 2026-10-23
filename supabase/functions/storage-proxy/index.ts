@@ -337,6 +337,7 @@ Deno.serve(async (req) => {
     // - dvir-photos / dvir-signatures / branding-assets / beta_feedback: must start with `${user.id}/`
     function assertOwnsPath(bucket: string, fileRef: string): string | null {
       if (!fileRef || fileRef.startsWith('gdrive:') || fileRef.startsWith('http')) return null;
+      if (fileRef.split('/').some((p) => p === '..' || p === '.' || p === '')) return 'Invalid path';
       const orgScoped = ['documents'];
       const userScoped = ['dvir-photos', 'dvir-signatures', 'branding-assets', 'beta_feedback'];
       if (orgScoped.includes(bucket)) {
@@ -354,7 +355,7 @@ Deno.serve(async (req) => {
     async function assertOwnsDriveFile(fileRef: string): Promise<string | null> {
       if (!fileRef.startsWith('gdrive:')) return null;
       const driveId = fileRef.slice(7);
-      if (!driveId) return 'Invalid file reference';
+      if (!driveId || !/^[A-Za-z0-9_-]{1,200}$/.test(driveId)) return 'Invalid file reference';
 
       const checks = await Promise.all([
         supabase.from('documents').select('id', { head: true, count: 'exact' })
@@ -364,7 +365,9 @@ Deno.serve(async (req) => {
         supabase.from('company_settings').select('id', { head: true, count: 'exact' })
           .eq('org_id', orgId).eq('setting_value', fileRef),
         supabase.from('organizations').select('id', { head: true, count: 'exact' })
-          .eq('id', orgId).or(`logo_url.eq.${fileRef},banner_url.eq.${fileRef}`),
+          .eq('id', orgId).eq('logo_url', fileRef),
+        supabase.from('organizations').select('id', { head: true, count: 'exact' })
+          .eq('id', orgId).eq('banner_url', fileRef),
       ]);
 
       const found = checks.some((c: any) => (c?.count ?? 0) > 0);
@@ -397,14 +400,37 @@ Deno.serve(async (req) => {
         });
       }
 
-      // IDOR guard for built-in storage uploads
-      if (!(storageConfig?.provider === 'google_drive' && storageConfig.encrypted_credentials)) {
-        const denied = assertOwnsPath(bucket, filePath);
-        if (denied) {
-          return new Response(JSON.stringify({ error: denied }), {
-            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
+      // IDOR guard for all uploads (built-in and Google Drive)
+      if (filePath.startsWith('gdrive:') || filePath.startsWith('http')) {
+        return new Response(JSON.stringify({ error: 'Invalid path' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const denied = assertOwnsPath(bucket, filePath);
+      if (denied) {
+        return new Response(JSON.stringify({ error: denied }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // File size / type limits per bucket
+      const IMG = ['image/jpeg', 'image/png', 'image/webp'];
+      const UPLOAD_LIMITS: Record<string, { max: number; types: string[] }> = {
+        'documents': { max: 20 * 1024 * 1024, types: ['application/pdf', ...IMG, 'image/gif', 'image/heic', 'image/heif',
+          'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/csv', 'text/plain'] },
+        'dvir-photos': { max: 10 * 1024 * 1024, types: [...IMG, 'image/heic', 'image/heif'] },
+        'dvir-signatures': { max: 2 * 1024 * 1024, types: ['image/jpeg', 'image/png'] },
+        'branding-assets': { max: 2 * 1024 * 1024, types: [...IMG, 'image/gif'] },
+        'beta_feedback': { max: 10 * 1024 * 1024, types: [...IMG, 'image/gif', 'application/pdf'] },
+      };
+      const limit = UPLOAD_LIMITS[bucket];
+      const fileType = (file.type || '').toLowerCase();
+      if (!limit || file.size > limit.max || !limit.types.includes(fileType)) {
+        return new Response(JSON.stringify({ error: 'File type or size not allowed' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       const fileData = new Uint8Array(await file.arrayBuffer());
@@ -427,7 +453,7 @@ Deno.serve(async (req) => {
             currentFolderId = await ensureFolderExists(accessToken, currentFolderId, part);
           }
 
-          const driveFileId = await uploadToDrive(accessToken, currentFolderId, fileName, fileData, file.type || 'application/octet-stream');
+          const driveFileId = await uploadToDrive(accessToken, currentFolderId, fileName, fileData, fileType);
 
           return new Response(JSON.stringify({
             path: `gdrive:${driveFileId}`,
@@ -447,7 +473,7 @@ Deno.serve(async (req) => {
       // No Google Drive configured — use built-in storage
       const { error: uploadError } = await supabase.storage
         .from(bucket)
-        .upload(filePath, fileData, { contentType: file.type || 'application/octet-stream' });
+        .upload(filePath, fileData, { contentType: fileType });
 
       if (uploadError) throw uploadError;
 
