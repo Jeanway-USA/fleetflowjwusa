@@ -980,6 +980,7 @@ export type Database = {
       document_templates: {
         Row: {
           applies_to: string
+          archived_at: string | null
           archived_by: string | null
           content: string
           created_at: string
@@ -997,6 +998,7 @@ export type Database = {
         }
         Insert: {
           applies_to?: string
+          archived_at?: string | null
           archived_by?: string | null
           content: string
           created_at?: string
@@ -1014,6 +1016,7 @@ export type Database = {
         }
         Update: {
           applies_to?: string
+          archived_at?: string | null
           archived_by?: string | null
           content?: string
           created_at?: string
@@ -5946,6 +5949,7 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
+          deactivated_at: string | null
           default_signing_title: string | null
           email: string | null
           first_name: string | null
@@ -5963,6 +5967,7 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
+          deactivated_at?: string | null
           default_signing_title?: string | null
           email?: string | null
           first_name?: string | null
@@ -5980,6 +5985,7 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
+          deactivated_at?: string | null
           default_signing_title?: string | null
           email?: string | null
           first_name?: string | null
@@ -8419,6 +8425,7 @@ export type Database = {
             Returns: string
           }
       current_org_has_feature: { Args: { _feature: string }; Returns: boolean }
+      deactivate_user: { Args: { _user_id: string }; Returns: undefined }
       employee_write_org: { Args: { _employee_id: string }; Returns: string }
       ensure_employee: {
         Args: {
@@ -8605,6 +8612,7 @@ export type Database = {
           unit_number: string
         }[]
       }
+      reactivate_user: { Args: { _user_id: string }; Returns: undefined }
       recalc_settlement_totals: {
         Args: { _settlement_id: string }
         Returns: {
