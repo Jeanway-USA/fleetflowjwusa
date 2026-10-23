@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
+import { csvCell } from '@/lib/csv';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -76,7 +77,7 @@ interface DataTableProps<T> {
 
 
 function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], filename: string) {
-  const escape = (val: string) => `"${val.replace(/"/g, '""')}"`;
+  const escape = (val: string) => csvCell(val);
   const header = columns.map(c => escape(c.header)).join(',');
   const rows = data.map(item =>
     columns.map(col => escape(String(item[col.key as keyof T] ?? ''))).join(',')

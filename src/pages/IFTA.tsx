@@ -1,4 +1,5 @@
 import { useState, useCallback, lazy, Suspense } from 'react';
+import { toCsv } from '@/lib/csv';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -647,7 +648,7 @@ export default function IFTA() {
       r.tax_owed.toFixed(2)
     ]);
     
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const csv = toCsv(headers, rows);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

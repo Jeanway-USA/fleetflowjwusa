@@ -171,7 +171,7 @@ serve(async (req) => {
     const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
 
     if (claimsError || !claimsData?.claims) {
-      console.error("JWT validation failed:", claimsError);
+      console.error("JWT validation failed");
       return new Response(
         JSON.stringify({ error: 'Invalid authentication token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -179,7 +179,7 @@ serve(async (req) => {
     }
 
     const userId = claimsData.claims.sub;
-    console.log("Authenticated user:", userId);
+    console.log("Authenticated request");
 
     // Create admin client for storage operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
@@ -264,7 +264,7 @@ serve(async (req) => {
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        console.log("Downloading PDF from storage:", filePath);
+        console.log("Downloading PDF from storage");
         const { data: fileData, error: downloadError } = await supabaseAdmin.storage
           .from('documents')
           .download(filePath);
@@ -333,7 +333,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
+      console.error("AI Gateway error:", response.status);
       
       if (response.status === 429) {
         return new Response(
@@ -358,7 +358,7 @@ serve(async (req) => {
       throw new Error("No response from AI");
     }
 
-    console.log("AI response:", content);
+    console.log("AI response received, length:", content?.length ?? 0);
 
     // Parse the JSON response
     let extractedData: ExtractedLoadData;
@@ -375,12 +375,11 @@ serve(async (req) => {
       }
       extractedData = JSON.parse(cleanContent.trim());
     } catch (parseError) {
-      console.error("Failed to parse AI response as JSON:", parseError);
-      console.error("Raw content:", content);
+      console.error("Failed to parse AI response as JSON:", parseError instanceof Error ? parseError.message : "parse error");
       throw new Error("Failed to parse extracted data");
     }
 
-    console.log("Extracted data:", extractedData);
+    console.log("Rate confirmation parsed, fields:", Object.keys(extractedData ?? {}).length);
 
     return new Response(JSON.stringify(extractedData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@4.0.0';
 import { buildFleetFlowEmail } from '../_shared/email-template.ts';
+import { isKnownRecipient, UNKNOWN_RECIPIENT_MESSAGE } from '../_shared/recipients.ts';
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
@@ -226,6 +227,18 @@ Deno.serve(async (req) => {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // A typed-in address must be one of the company's saved contacts (or already on this load) unless an owner is sending.
+    if (override_email && roleRow.role !== 'owner') {
+      const typed = String(override_email).trim().toLowerCase();
+      const onLoad = typeof load.invoice_email === 'string' && load.invoice_email.trim().toLowerCase() === typed;
+      if (!onLoad && !(await isKnownRecipient(supabaseAdmin, profile.org_id, typed))) {
+        return new Response(JSON.stringify({ success: false, error: UNKNOWN_RECIPIENT_MESSAGE }), {
+          status: 200, // answered normally so the screen can show the reason
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Fetch org branding

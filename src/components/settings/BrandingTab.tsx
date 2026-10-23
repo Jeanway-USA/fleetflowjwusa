@@ -30,7 +30,7 @@ export function BrandingTab() {
 
   const validateFile = (file: File): boolean => {
     if (!file.type.startsWith('image/')) {
-      toast.error('Only image files are accepted (PNG, JPG, SVG, WebP).');
+      toast.error('Only PNG, JPG, WebP or GIF images are accepted.');
       return false;
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -122,7 +122,7 @@ export function BrandingTab() {
                 <input
                   ref={logoInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -168,7 +168,7 @@ export function BrandingTab() {
                 <input
                   ref={bannerInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];

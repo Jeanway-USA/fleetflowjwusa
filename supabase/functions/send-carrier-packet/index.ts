@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@4.0.0';
 import { buildFleetFlowEmail } from '../_shared/email-template.ts';
+import { isKnownRecipient, UNKNOWN_RECIPIENT_MESSAGE } from '../_shared/recipients.ts';
 
 const ALLOWED_ORIGINS = [
   'https://tms.jeanwayusa.com',
@@ -158,6 +159,14 @@ Deno.serve(async (req) => {
     if (!roleRow) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // A dispatcher may only send to a saved contact. An owner may send to any address.
+    if (roleRow.role !== 'owner' && !(await isKnownRecipient(supabaseAdmin, profile.org_id, recipientEmail))) {
+      return new Response(JSON.stringify({ success: false, error: UNKNOWN_RECIPIENT_MESSAGE }), {
+        status: 200, // answered normally so the screen can show the reason
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

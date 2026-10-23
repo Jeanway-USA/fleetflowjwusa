@@ -179,13 +179,13 @@ Deno.serve(async (req) => {
           MAPBOX_API_KEY,
         );
         if (!res.ok) {
-          console.error(`Mapbox structured geocoding failed [${res.status}] for "${query}": ${res.text}`);
+          console.error(`Mapbox structured geocoding failed [${res.status}]`);
           if (res.status === 401 || res.status === 402 || res.status === 403) fatal = res;
         } else {
           const f = res.data?.features?.[0];
           if (f && coordsOf(f) && isTrustworthyAddressMatch(f)) feature = f;
           else if (f) {
-            console.warn(`Rejected low-confidence match for "${query}": ${f?.properties?.full_address}`);
+            console.warn("Rejected a low-confidence geocoding match");
           }
         }
       }
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
           MAPBOX_API_KEY,
         );
         if (!res.ok) {
-          console.error(`Mapbox geocoding failed [${res.status}] for "${query}": ${res.text}`);
+          console.error(`Mapbox geocoding failed [${res.status}]`);
           if (res.status === 401 || res.status === 402 || res.status === 403) fatal = res;
         } else {
           const f = res.data?.features?.[0];

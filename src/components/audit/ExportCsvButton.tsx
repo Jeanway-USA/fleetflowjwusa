@@ -7,17 +7,14 @@ interface Props {
   rows: AuditLogRow[];
 }
 
+import { csvCell } from '@/lib/csv';
+
 const COLS: (keyof AuditLogRow)[] = [
   'created_at', 'user_name', 'user_role', 'action', 'table_name',
   'record_id', 'ip_address', 'previous_values', 'new_values',
 ];
 
-function csvEscape(v: any): string {
-  if (v === null || v === undefined) return '';
-  const s = typeof v === 'string' ? v : JSON.stringify(v);
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
+const csvEscape = csvCell;
 
 export function ExportCsvButton({ rows }: Props) {
   const handleExport = () => {

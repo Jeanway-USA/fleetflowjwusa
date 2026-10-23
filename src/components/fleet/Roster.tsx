@@ -1,4 +1,5 @@
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
+import { toCsv } from '@/lib/csv';
 import { Search, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -154,8 +155,7 @@ export function RosterBulkBar({ count, onClear, children }: { count: number; onC
 
 /** Saves rows as a CSV file, quoting every cell. */
 export function downloadCsv(filename: string, headers: string[], rows: (string | number | null | undefined)[][]) {
-  const cell = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const csv = [headers, ...rows].map((r) => r.map(cell).join(',')).join('\n');
+  const csv = toCsv(headers, rows);
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
   const a = document.createElement('a');
   a.href = url;
