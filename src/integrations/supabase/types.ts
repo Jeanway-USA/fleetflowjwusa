@@ -7321,6 +7321,7 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+          org_id: string | null
           osm_id: number
           source: string | null
           state: string
@@ -7337,6 +7338,7 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+          org_id?: string | null
           osm_id: number
           source?: string | null
           state: string
@@ -7353,6 +7355,7 @@ export type Database = {
           latitude?: number
           longitude?: number
           name?: string
+          org_id?: string | null
           osm_id?: number
           source?: string | null
           state?: string
@@ -8402,6 +8405,10 @@ export type Database = {
       }
       auto_cleanup_empty_orgs: { Args: never; Returns: number }
       can_manage_pay_packages: { Args: { _uid: string }; Returns: boolean }
+      can_sign_document_step: {
+        Args: { _instance_id: string; _step: number }
+        Returns: boolean
+      }
       can_view_pay_package: { Args: { _package_id: string }; Returns: boolean }
       can_view_position: { Args: { _position_id: string }; Returns: boolean }
       can_view_shop: { Args: { _uid: string }; Returns: boolean }
