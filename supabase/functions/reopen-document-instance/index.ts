@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     if (delSigErr) return json({ error: delSigErr.message }, 500);
 
     // Remove the signed PDF if present
-    if (inst.pdf_storage_path) {
+    if (inst.pdf_storage_path && inst.pdf_storage_path.startsWith(`${inst.org_id}/`) && !inst.pdf_storage_path.includes('..')) {
       await admin.storage.from('signed-documents').remove([inst.pdf_storage_path]);
     }
 

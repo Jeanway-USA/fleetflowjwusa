@@ -32,6 +32,8 @@ Deno.serve(async (req) => {
       .from("fleet_loads")
       .select("id, origin, destination, status, pickup_date, delivery_date, driver_id, org_id, booked_miles, landstar_load_id, current_route_geometry, current_route_updated_at")
       .eq("tracking_id", trackingId)
+      .eq("public_tracking_enabled", true)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (loadError) {
