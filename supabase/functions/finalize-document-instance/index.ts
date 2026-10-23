@@ -88,14 +88,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    // A completed document is a modest PDF. Refuse anything oversized, anything that is not a PDF, and a second upload.
+    const MAX_BASE64_CHARS = 14 * 1024 * 1024; // about 10 MB of PDF
+    if (typeof body.pdf_base64 !== 'string' || body.pdf_base64.length > MAX_BASE64_CHARS) {
+      return new Response(JSON.stringify({ error: 'The PDF is too large (limit about 10 MB)' }), {
+        status: 413,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (inst.pdf_storage_path) {
+      return new Response(JSON.stringify({ error: 'This document has already been finalized' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const bytes = base64ToBytes(body.pdf_base64);
+    const header = String.fromCharCode(...bytes.slice(0, 5));
+    if (header !== '%PDF-') {
+      return new Response(JSON.stringify({ error: 'The upload is not a PDF' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const path = `${inst.org_id}/completed/${inst.id}.pdf`;
 
     const { error: upErr } = await admin.storage
       .from('signed-documents')
       .upload(path, new Blob([bytes], { type: 'application/pdf' }), {
         contentType: 'application/pdf',
-        upsert: true,
+        upsert: false,
       });
     if (upErr) {
       return new Response(JSON.stringify({ error: upErr.message }), {

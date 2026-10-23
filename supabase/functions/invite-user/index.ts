@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!roleData) {
-      console.log('User is not an owner:', requestingUser.id);
+      console.log('Caller is not an owner');
       return new Response(JSON.stringify({ error: 'Only owners can invite users' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     // Get request body
     const { email, role, driver_id, first_name, last_name, requires_onboarding } = await req.json();
     const requiresOnboarding = typeof requires_onboarding === 'boolean' ? requires_onboarding : null;
-    console.log('Inviting user:', email, 'with role:', role, 'driver_id:', driver_id, 'requires_onboarding:', requiresOnboarding);
+    console.log('Inviting a user with role:', role, 'requires_onboarding:', requiresOnboarding);
 
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), {
@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log('Existing user detected — creating pending invitation:', email);
+      console.log('Existing user detected: creating a pending invitation');
 
       // Upsert-like behavior: if a pending invitation already exists for
       // (email, org_id), refresh it instead of failing on the unique index.
@@ -325,7 +325,7 @@ Deno.serve(async (req) => {
 
       targetUserId = inviteData.user?.id ?? null;
       inviteActionLink = inviteData.properties?.action_link ?? null;
-      console.log('User invited via Supabase:', targetUserId);
+      console.log('User invited via Supabase');
 
       if (targetUserId) {
         const { data: targetProfile } = await supabaseAdmin
@@ -446,7 +446,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        console.log('Driver record linked:', linkedDriverId);
+        console.log('Driver record linked:', !!linkedDriverId);
       } catch (driverLinkErr) {
         console.error('Driver linking exception:', driverLinkErr);
       }
@@ -495,7 +495,7 @@ Deno.serve(async (req) => {
       // Delivery status (delivered/bounced/complained) can be checked in Resend events using the id.
       // @ts-ignore - keep runtime safe even if typings differ
       resendMessageId = emailResponse?.data?.id ?? null;
-      console.log('Email sent via Resend:', emailResponse);
+      console.log('Invitation email sent via Resend');
 
       // @ts-ignore
       if (emailResponse?.error) {

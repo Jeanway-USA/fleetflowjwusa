@@ -91,6 +91,13 @@ Deno.serve(async (req) => {
       return json({ error: 'This invitation was sent to a different email address', reason: 'email_mismatch' }, 403);
     }
 
+    // The invitation was sent to an email address. Only someone who has confirmed they own it may accept: without
+    // this, anyone could create an account with the invitee's address and take the role meant for them.
+    const { data: authUser, error: authUserErr } = await admin.auth.admin.getUserById(userId);
+    if (authUserErr || !authUser?.user?.email_confirmed_at) {
+      return json({ error: 'Confirm your email address first, then open the invitation again.', reason: 'email_unconfirmed' }, 403);
+    }
+
     // Accepting replaces every role this account holds (one active company per account). That must never quietly
     // strip someone who owns a different company, so stop and say so instead.
     const { data: ownedElsewhere } = await admin

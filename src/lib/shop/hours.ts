@@ -1,3 +1,4 @@
+import { csvCell } from '@/lib/csv';
 import { addDays, format, startOfDay } from 'date-fns';
 
 /**
@@ -150,7 +151,7 @@ export function hourlyPay(rate: number, regularMinutes: number, overtimeMinutes:
 
 /** The report as CSV, one row per mechanic. */
 export function hoursCsv(rows: WeekHours[], weekStart: Date): string {
-  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const esc = (v: string | number) => csvCell(v);
   const lines = [['Pay week', 'Mechanic', 'Regular hours', 'Overtime hours', 'Total paid hours', 'Hours on jobs', 'Hours not on a job', 'Entries to review'].map(esc).join(',')];
   for (const r of rows) {
     lines.push([payWeekLabel(weekStart), r.userName ?? 'Unnamed', hours(r.regularMinutes), hours(r.overtimeMinutes), hours(r.totalMinutes), hours(r.jobMinutes), hours(r.unassignedMinutes), r.reviewCount].map(esc).join(','));
