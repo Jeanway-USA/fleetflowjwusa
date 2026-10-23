@@ -71,6 +71,20 @@
       "when": 1792712965242,
       "tag": "0009_dispatcher_driver_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792715550292,
+      "tag": "0010_deactivate_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792715553306,
+      "tag": "0011_template_archive",
+      "breakpoints": true
     }
   ]
 }
