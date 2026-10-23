@@ -33,14 +33,14 @@ export function EmptyState({
       {ResolvedIcon && (
         <div
           className={cn(
-            'mb-4 rounded-full p-4',
+            'mb-4 rounded-lg p-4',
             variant === 'filtered' ? 'bg-muted/60' : 'bg-muted'
           )}
         >
           <ResolvedIcon className="h-8 w-8 text-muted-foreground" />
         </div>
       )}
-      <h3 className="text-lg font-semibold">{title}</h3>
+      <h3 className="font-condensed text-xl font-bold leading-tight">{title}</h3>
       {description && (
         <p className="mt-1 text-sm text-muted-foreground max-w-sm">{description}</p>
       )}
@@ -49,7 +49,6 @@ export function EmptyState({
           {action && (
             <Button
               onClick={action.onClick}
-              className={variant === 'default' ? 'gradient-gold text-primary-foreground' : ''}
               variant={variant === 'filtered' ? 'outline' : 'default'}
             >
               {variant === 'default' && <Plus className="mr-2 h-4 w-4" />}

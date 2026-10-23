@@ -67,7 +67,7 @@ export function UnsyncedExpenses({ expenses, trucks }: UnsyncedExpensesProps) {
   if (expenses.length === 0) return null;
 
   return (
-    <Card className="card-elevated mt-6 border-warning/30">
+    <Card className="bg-card border border-border rounded-lg mt-6 border-warning/30">
       <CardHeader>
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-warning" />

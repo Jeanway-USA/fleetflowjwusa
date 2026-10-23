@@ -52,7 +52,7 @@ export function PositionsTab() {
 
   if (error) {
     return (
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardContent className="py-10 text-center">
           <Briefcase className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
           <h3 className="text-lg font-semibold">{isMissingTables(error) ? 'Positions are not switched on yet' : 'Positions could not load'}</h3>
@@ -65,7 +65,7 @@ export function PositionsTab() {
   }
 
   return (
-    <Card className="card-elevated">
+    <Card className="bg-card border border-border rounded-lg">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" />Positions</CardTitle>
@@ -76,7 +76,7 @@ export function PositionsTab() {
             <Button variant="outline" className="min-h-[44px]" onClick={() => setBulkOpen(true)}>
               <Users className="mr-1.5 h-4 w-4" />Assign to many drivers
             </Button>
-            <Button className="min-h-[44px] gradient-gold text-primary-foreground" onClick={() => setCreating(true)}>
+            <Button className="min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setCreating(true)}>
               <Plus className="mr-1.5 h-4 w-4" />New position
             </Button>
           </div>

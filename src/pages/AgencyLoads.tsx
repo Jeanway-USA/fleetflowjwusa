@@ -391,7 +391,7 @@ export default function AgencyLoads() {
 
             <DialogFooter className="sticky -bottom-4 z-10 -mx-4 mt-2 flex-row justify-end gap-2 border-t bg-background px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:space-x-0 sm:px-6">
               <Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none" onClick={closeDialog}>Cancel</Button>
-              <LoadingButton type="submit" className="h-11 flex-1 gradient-gold text-primary-foreground sm:flex-none" loading={createMutation.isPending || updateMutation.isPending}>
+              <LoadingButton type="submit" className="h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary/90 sm:flex-none" loading={createMutation.isPending || updateMutation.isPending}>
                 {editingLoad ? 'Save changes' : 'Add load'}
               </LoadingButton>
             </DialogFooter>

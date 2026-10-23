@@ -282,7 +282,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
               type="button"
               onClick={handleAddExpense}
               disabled={createMutation.isPending}
-              className="gradient-gold text-primary-foreground"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {createMutation.isPending ? 'Adding...' : 'Add Expense'}
             </Button>

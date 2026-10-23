@@ -141,7 +141,7 @@ export function LoadProfitabilityTab({
     <div className="space-y-6">
       {/* Revenue Trends Chart */}
       {trendData.length > 1 && (
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
@@ -167,7 +167,7 @@ export function LoadProfitabilityTab({
       )}
 
       {/* Per-Load Profitability Table */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle>Per-Load Profitability</CardTitle>
           <CardDescription>

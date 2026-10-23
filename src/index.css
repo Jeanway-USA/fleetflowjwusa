@@ -279,37 +279,6 @@
     }
   }
 
-  /*
-   * Legacy class names kept so every existing screen adopts the new world.
-   * The gold gradients and glows are retired: primary actions are solid
-   * brand dark gold, emphasis comes from weight, not effects.
-   */
-  .gradient-gold {
-    background: hsl(var(--primary));
-    color: hsl(var(--primary-foreground));
-  }
-  .gradient-gold:hover {
-    background: hsl(var(--primary) / 0.9);
-  }
-
-  .text-gradient-gold {
-    color: hsl(var(--primary));
-  }
-
-  .glow-gold,
-  .pulse-glow-gold {
-    box-shadow: none;
-  }
-
-  .card-elevated {
-    @apply bg-card border border-border rounded-lg;
-    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
-  }
-
-  .animate-float {
-    animation: none;
-  }
-
   /* Big money figures: condensed, tabular, tight. */
   .figure {
     font-family: "Barlow Condensed", "Barlow", system-ui, sans-serif;

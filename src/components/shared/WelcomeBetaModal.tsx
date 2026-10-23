@@ -38,11 +38,11 @@ export function WelcomeBetaModal({ open, userId, onStartTour, onClose }: Welcome
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center justify-center mb-4">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border border-amber-500/30 flex items-center justify-center">
-              <Sparkles className="h-7 w-7 text-amber-500" />
+            <div className="h-14 w-14 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+              <Sparkles className="h-7 w-7 text-primary" />
             </div>
           </div>
-          <DialogTitle className="text-center text-xl">Welcome to the Beta!</DialogTitle>
+          <DialogTitle className="text-center">Welcome to the Beta!</DialogTitle>
         </DialogHeader>
 
         <p className="text-center text-sm text-muted-foreground leading-relaxed">
@@ -51,7 +51,7 @@ export function WelcomeBetaModal({ open, userId, onStartTour, onClose }: Welcome
         </p>
 
         <div className="flex flex-col gap-2 pt-2">
-          <Button onClick={handleStartTour} className="gap-2 gradient-gold text-primary-foreground">
+          <Button onClick={handleStartTour} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
             <Rocket className="h-4 w-4" />
             Start Quick Tour
           </Button>

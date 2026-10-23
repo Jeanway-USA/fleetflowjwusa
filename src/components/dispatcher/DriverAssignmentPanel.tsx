@@ -118,7 +118,7 @@ export function DriverAssignmentPanel() {
 
   if (isLoading) {
     return (
-      <Card className="card-elevated h-full">
+      <Card className="bg-card border border-border rounded-lg h-full">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="h-4 w-4 text-primary" />
@@ -137,7 +137,7 @@ export function DriverAssignmentPanel() {
   }
 
   return (
-    <Card className="card-elevated h-full">
+    <Card className="bg-card border border-border rounded-lg h-full">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Users className="h-4 w-4 text-primary" />

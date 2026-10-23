@@ -215,7 +215,7 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
 
         <div className="flex gap-2 border-t bg-background px-5 py-4">
           <Button variant="outline" className="h-12 flex-1" onClick={() => onOpenChange(false)} disabled={actions.createJob.isPending}>Cancel</Button>
-          <LoadingButton loading={actions.createJob.isPending} disabled={actions.createJob.isPending} onClick={submit} className="h-12 flex-[2] gradient-gold text-primary-foreground">Create job</LoadingButton>
+          <LoadingButton loading={actions.createJob.isPending} disabled={actions.createJob.isPending} onClick={submit} className="h-12 flex-[2] bg-primary text-primary-foreground hover:bg-primary/90">Create job</LoadingButton>
         </div>
       </SheetContent>
     </Sheet>

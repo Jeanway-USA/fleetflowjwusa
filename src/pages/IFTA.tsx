@@ -854,7 +854,7 @@ export default function IFTA() {
         </TabsList>
 
         <TabsContent value="fuel" className="mt-6">
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <CardTitle>Fuel Purchases</CardTitle>
@@ -874,7 +874,7 @@ export default function IFTA() {
                   )}
                   {isSyncing ? 'Syncing...' : 'Sync from Expenses'}
                 </Button>
-                <Button onClick={() => openFuelDialog()} className="gradient-gold text-primary-foreground">
+                <Button onClick={() => openFuelDialog()} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Fuel Purchase
                 </Button>
@@ -994,7 +994,7 @@ export default function IFTA() {
         </TabsContent>
 
         <TabsContent value="report" className="mt-6">
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>IFTA Report - {selectedQuarter}</CardTitle>
@@ -1222,7 +1222,7 @@ export default function IFTA() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeFuelDialog}>Cancel</Button>
-              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createFuelMutation.isPending || updateFuelMutation.isPending}>
+              <LoadingButton type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" loading={createFuelMutation.isPending || updateFuelMutation.isPending}>
                 {editingFuel ? 'Update' : 'Add'} Purchase
               </LoadingButton>
             </DialogFooter>

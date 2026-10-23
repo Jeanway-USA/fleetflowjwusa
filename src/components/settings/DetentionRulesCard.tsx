@@ -72,7 +72,7 @@ export function DetentionRulesCard() {
   };
 
   return (
-    <Card className="card-elevated">
+    <Card className="bg-card border border-border rounded-lg">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5 text-primary" />
@@ -140,7 +140,7 @@ export function DetentionRulesCard() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="gradient-gold text-primary-foreground"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {saving ? 'Saving…' : 'Save Detention Rules'}
             </Button>

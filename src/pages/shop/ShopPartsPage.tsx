@@ -108,7 +108,7 @@ function PartDialog({ part, open, onOpenChange }: { part: Part | null; open: boo
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="h-12 flex-1" onClick={() => onOpenChange(false)} disabled={save.isPending}>Cancel</Button>
-          <LoadingButton loading={save.isPending} disabled={save.isPending} onClick={submit} className="h-12 flex-[2] gradient-gold text-primary-foreground">{part ? 'Save' : 'Add the part'}</LoadingButton>
+          <LoadingButton loading={save.isPending} disabled={save.isPending} onClick={submit} className="h-12 flex-[2] bg-primary text-primary-foreground hover:bg-primary/90">{part ? 'Save' : 'Add the part'}</LoadingButton>
         </div>
       </DialogContent>
     </Dialog>
@@ -135,7 +135,7 @@ function ReceiveDialog({ part, open, onOpenChange }: { part: Part | null; open: 
         <Input className="h-11" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Vendor (optional)" />
         <div className="flex gap-2">
           <Button variant="outline" className="h-12 flex-1" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <LoadingButton loading={receive.isPending} disabled={receive.isPending} onClick={submit} className="h-12 flex-[2] gradient-gold text-primary-foreground">Add to the shelf</LoadingButton>
+          <LoadingButton loading={receive.isPending} disabled={receive.isPending} onClick={submit} className="h-12 flex-[2] bg-primary text-primary-foreground hover:bg-primary/90">Add to the shelf</LoadingButton>
         </div>
       </DialogContent>
     </Dialog>
@@ -168,7 +168,7 @@ export default function ShopPartsPage() {
   return (
     <div>
       <PageHeader title="Parts room">
-        <Button className="h-11 gap-2 gradient-gold text-primary-foreground" onClick={() => setCreating(true)}><Plus className="h-4 w-4" />New part</Button>
+        <Button className="h-11 gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setCreating(true)}><Plus className="h-4 w-4" />New part</Button>
       </PageHeader>
       <ShopNav />
 

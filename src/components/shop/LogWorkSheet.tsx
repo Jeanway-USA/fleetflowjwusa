@@ -172,7 +172,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
 
         <div className="flex gap-2 border-t bg-background px-5 py-4">
           <Button variant="outline" className="h-12 flex-1" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-          <LoadingButton loading={saving} disabled={saving} onClick={() => save(!!dupe)} className="h-12 flex-[2] gradient-gold text-primary-foreground">{dupe ? 'Save it anyway' : 'Add to history'}</LoadingButton>
+          <LoadingButton loading={saving} disabled={saving} onClick={() => save(!!dupe)} className="h-12 flex-[2] bg-primary text-primary-foreground hover:bg-primary/90">{dupe ? 'Save it anyway' : 'Add to history'}</LoadingButton>
         </div>
       </SheetContent>
     </Sheet>

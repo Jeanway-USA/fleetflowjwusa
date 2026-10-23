@@ -17,7 +17,7 @@ export default {
         sans: ["Barlow", "system-ui", "sans-serif"],
         heading: ['"Barlow Condensed"', "Barlow", "system-ui", "sans-serif"],
         condensed: ['"Barlow Condensed"', "Barlow", "system-ui", "sans-serif"],
-        mono: ['"JetBrains Mono"', "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",

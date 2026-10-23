@@ -84,7 +84,7 @@ export function StaffPayTab() {
 
   if (error) {
     return (
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardContent className="py-10 text-center">
           <Receipt className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
           <h3 className="text-lg font-semibold">{isMissingTables(error) ? 'Staff pay is not switched on yet' : 'Staff pay could not load'}</h3>
@@ -97,7 +97,7 @@ export function StaffPayTab() {
   }
 
   return (
-    <Card className="card-elevated">
+    <Card className="bg-card border border-border rounded-lg">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" />{hasPayrollAccess ? 'Staff pay' : 'My pay statements'}</CardTitle>
@@ -118,7 +118,7 @@ export function StaffPayTab() {
               <Input type="date" className="h-11" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
             </Field>
             <p className="pb-3 text-xs text-muted-foreground">Covers {formatDate(periodStart)} to {periodEnd ? formatDate(periodEnd) : '…'}</p>
-            <LoadingButton loading={generate.isPending} disabled={generate.isPending} onClick={() => generate.mutate()} className="min-h-[44px] gradient-gold text-primary-foreground">
+            <LoadingButton loading={generate.isPending} disabled={generate.isPending} onClick={() => generate.mutate()} className="min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90">
               Make statements
             </LoadingButton>
           </div>

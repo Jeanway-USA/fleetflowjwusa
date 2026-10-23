@@ -225,7 +225,7 @@ export function PositionEditor({ open, onOpenChange, position }: Props) {
 
         <DialogFooter>
           <Button variant="outline" className="min-h-[44px] w-full sm:w-auto" onClick={() => onOpenChange(false)} disabled={save.isPending}>Cancel</Button>
-          <LoadingButton loading={save.isPending} disabled={save.isPending} onClick={submit} className="min-h-[44px] w-full gradient-gold text-primary-foreground sm:w-auto">
+          <LoadingButton loading={save.isPending} disabled={save.isPending} onClick={submit} className="min-h-[44px] w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">
             {position ? 'Save changes' : 'Create position'}
           </LoadingButton>
         </DialogFooter>

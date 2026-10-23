@@ -35,7 +35,7 @@ function Tile({ job, mine, onTake }: { job: ShopJob; mine: boolean; onTake: () =
         {job.runningTimer && <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1.5 text-base font-bold text-primary"><Timer className="h-4 w-4" /><RunningClock since={job.runningTimer.startedAt} /></span>}
         {!mine && job.assignedName && <span className="text-sm text-muted-foreground">{job.assignedName}</span>}
         <div className="ml-auto flex gap-2">
-          {open && <Button className="h-14 gap-2 px-5 text-base gradient-gold text-primary-foreground" onClick={onTake}><Hand className="h-5 w-5" />Take it</Button>}
+          {open && <Button className="h-14 gap-2 px-5 text-base bg-primary text-primary-foreground hover:bg-primary/90" onClick={onTake}><Hand className="h-5 w-5" />Take it</Button>}
           <Button asChild variant={open ? 'outline' : 'default'} className="h-14 gap-2 px-5 text-base"><Link to={`/shop/floor/jobs/${job.id}`}>Open<ArrowRight className="h-5 w-5" /></Link></Button>
         </div>
       </div>
@@ -92,7 +92,7 @@ export default function FloorJobsPage() {
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a truck" className="h-14 pl-12 sm:pl-12 text-lg" />
         </div>
-        <Button className="h-14 gap-2 px-6 text-base gradient-gold text-primary-foreground" onClick={() => setNewOpen(true)}><Plus className="h-5 w-5" />New job</Button>
+        <Button className="h-14 gap-2 px-6 text-base bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setNewOpen(true)}><Plus className="h-5 w-5" />New job</Button>
       </div>
 
       {isLoading ? (

@@ -13,7 +13,7 @@ export function RevenueTab({ filteredLoads, revenueTotals }: RevenueTabProps) {
 
   return (
     <div className="space-y-6">
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle>Load-by-Load Revenue</CardTitle>
           <CardDescription>Detailed revenue breakdown for each load</CardDescription>

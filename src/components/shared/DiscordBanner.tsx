@@ -28,21 +28,21 @@ export function DiscordBanner() {
   };
 
   return (
-    <div className="relative flex items-center justify-center gap-3 bg-gradient-to-r from-[hsl(235,86%,55%)] to-[hsl(255,70%,60%)] px-4 py-2.5 text-sm text-white">
+    <div className="relative flex items-center justify-center gap-3 bg-shell px-4 py-2.5 text-sm text-shell-foreground">
       <DiscordIcon className="h-4 w-4 shrink-0" />
       <span className="font-medium">Join our Discord for update alerts and beta testing feedback!</span>
       <a
         href={DISCORD_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-md bg-white/20 px-3 py-1 text-xs font-semibold text-white hover:bg-white/30 transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-md bg-carbon px-3 py-1 text-[13px] font-semibold text-carbon-foreground hover:bg-carbon/90 transition-colors"
       >
         Join Now
         <ExternalLink className="h-3 w-3" />
       </a>
       <button
         onClick={handleDismiss}
-        className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-white/20 transition-colors"
+        className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-shell-active transition-colors"
         aria-label="Dismiss"
       >
         <X className="h-4 w-4" />

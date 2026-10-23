@@ -28,7 +28,7 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Shift clock</p>
           <p className={cn('font-condensed font-bold leading-none', touch ? 'text-4xl' : 'text-2xl')}>Not clocked in</p>
         </div>
-        <LoadingButton loading={actions.clockIn.isPending} disabled={actions.clockIn.isPending} className={cn('gradient-gold text-primary-foreground', btn)} onClick={() => actions.clockIn.mutate(undefined, { onError: fail })}>
+        <LoadingButton loading={actions.clockIn.isPending} disabled={actions.clockIn.isPending} className={cn('bg-primary text-primary-foreground hover:bg-primary/90', btn)} onClick={() => actions.clockIn.mutate(undefined, { onError: fail })}>
           <LogIn className="h-5 w-5" />Clock in
         </LoadingButton>
       </div>
@@ -64,7 +64,7 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
         </div>
         <div className="flex flex-wrap gap-2">
           {onMeal ? (
-            <LoadingButton loading={actions.mealEnd.isPending} disabled={actions.mealEnd.isPending} className={cn('gradient-gold text-primary-foreground', btn)} onClick={() => actions.mealEnd.mutate(undefined, { onError: fail })}>
+            <LoadingButton loading={actions.mealEnd.isPending} disabled={actions.mealEnd.isPending} className={cn('bg-primary text-primary-foreground hover:bg-primary/90', btn)} onClick={() => actions.mealEnd.mutate(undefined, { onError: fail })}>
               <Play className="h-5 w-5" />Back to work
             </LoadingButton>
           ) : (

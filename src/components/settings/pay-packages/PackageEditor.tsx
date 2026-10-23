@@ -180,7 +180,7 @@ export function PackageEditor({ open, onOpenChange, pkg, copyOf, readOnly }: Pro
             {readOnly ? 'Close' : 'Cancel'}
           </Button>
           {!readOnly && (
-            <LoadingButton loading={save.isPending} disabled={save.isPending} onClick={submit} className="min-h-[44px] w-full gradient-gold text-primary-foreground sm:w-auto">
+            <LoadingButton loading={save.isPending} disabled={save.isPending} onClick={submit} className="min-h-[44px] w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto">
               {pkg ? 'Save changes' : 'Create package'}
             </LoadingButton>
           )}

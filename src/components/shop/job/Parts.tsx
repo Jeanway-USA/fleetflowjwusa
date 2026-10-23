@@ -110,7 +110,7 @@ export function PartPicker({ jobId, open, onOpenChange, touch, initialPart }: { 
             </p>
             <div className="flex gap-2">
               <Button variant="outline" className="h-14 flex-1 text-base" onClick={() => setPicked(null)}>Back</Button>
-              <LoadingButton loading={actions.logPart.isPending} disabled={actions.logPart.isPending} onClick={use} className="h-14 flex-[2] gradient-gold text-base text-primary-foreground">Use {qty} on this job</LoadingButton>
+              <LoadingButton loading={actions.logPart.isPending} disabled={actions.logPart.isPending} onClick={use} className="h-14 flex-[2] bg-primary text-primary-foreground hover:bg-primary/90 text-base text-primary-foreground">Use {qty} on this job</LoadingButton>
             </div>
           </div>
         )}
@@ -154,7 +154,7 @@ export function PartsList({ detail, touch, onAdd }: { detail: ShopJobDetail; tou
       )}
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground">Parts on this job <strong className="text-foreground">{money(total)}</strong></span>
-        {!locked && <Button className={cn('gradient-gold text-primary-foreground', touch ? 'h-14 px-6 text-base' : 'h-11')} onClick={onAdd}><PackagePlus className="mr-2 h-5 w-5" />Add a part</Button>}
+        {!locked && <Button className={cn('bg-primary text-primary-foreground hover:bg-primary/90', touch ? 'h-14 px-6 text-base' : 'h-11')} onClick={onAdd}><PackagePlus className="mr-2 h-5 w-5" />Add a part</Button>}
       </div>
     </div>
   );

@@ -576,7 +576,7 @@ export default function Incidents() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {editingIncident ? 'Update' : 'Report'} Incident
               </Button>
             </DialogFooter>

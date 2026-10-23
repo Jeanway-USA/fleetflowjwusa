@@ -129,7 +129,7 @@ export default function Auth() {
                     <Label htmlFor="reset-email">Email</Label>
                     <Input id="reset-email" name="reset-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
                   </div>
-                  <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
+                  <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
                     {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send Reset Link'}
                   </Button>
                   <Button type="button" variant="ghost" className="w-full" onClick={() => { setShowForgotPassword(false); setEmail(''); }}>
@@ -174,7 +174,7 @@ export default function Auth() {
                 </div>
                 <Input id="signin-password" name="signin-password" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
               </div>
-              <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
+              <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
                 {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : 'Sign In'}
               </Button>
             </form>

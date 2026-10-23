@@ -379,7 +379,7 @@ export function TeamManagementTab() {
           <h3 className="font-condensed text-xl font-bold leading-tight text-foreground">Team members</h3>
           <p className="text-[13px] text-muted-foreground">Manage your organization's users and their roles</p>
         </div>
-        <Button onClick={() => setInviteOpen(true)} className="h-11 gradient-gold text-primary-foreground">
+        <Button onClick={() => setInviteOpen(true)} className="h-11 bg-primary text-primary-foreground hover:bg-primary/90">
           <UserPlus className="h-4 w-4 mr-2" />
           Invite Member
         </Button>
@@ -514,7 +514,7 @@ export function TeamManagementTab() {
             </div>
             </div>
             <SheetFooter className="shrink-0 mx-0 mb-0 px-6 pt-4 pb-6 border-t static">
-              <Button type="submit" className="w-full gradient-gold text-primary-foreground" disabled={isInviting}>
+              <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isInviting}>
                 {isInviting ? 'Sending...' : 'Send Invitation'}
               </Button>
             </SheetFooter>
@@ -547,7 +547,7 @@ export function TeamManagementTab() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
-              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={assignRoleMutation.isPending}>Assign Role</LoadingButton>
+              <LoadingButton type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" loading={assignRoleMutation.isPending}>Assign Role</LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -592,7 +592,7 @@ export function TeamManagementTab() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={isEditing}>
+              <LoadingButton type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" loading={isEditing}>
                 Save Changes
               </LoadingButton>
             </DialogFooter>
@@ -636,7 +636,7 @@ export function TeamManagementTab() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isResettingPassword}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleForcePasswordReset} className="gradient-gold text-primary-foreground" disabled={isResettingPassword}>
+            <AlertDialogAction onClick={handleForcePasswordReset} className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={isResettingPassword}>
               {isResettingPassword ? 'Sending...' : 'Send Reset Email'}
             </AlertDialogAction>
           </AlertDialogFooter>

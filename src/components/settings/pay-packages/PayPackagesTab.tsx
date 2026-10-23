@@ -59,7 +59,7 @@ export function PayPackagesTab() {
 
   if (error) {
     return (
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardContent className="py-10 text-center">
           <Wallet className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
           <h3 className="text-lg font-semibold">{isMissingTables(error) ? 'Pay packages are not switched on yet' : 'Pay packages could not load'}</h3>
@@ -75,7 +75,7 @@ export function PayPackagesTab() {
 
   return (
     <div className="space-y-4">
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -89,7 +89,7 @@ export function PayPackagesTab() {
             </CardDescription>
           </div>
           {hasPayrollAccess && (
-            <Button className="min-h-[44px] gradient-gold text-primary-foreground" onClick={() => setCreating(true)}>
+            <Button className="min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setCreating(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               New package
             </Button>

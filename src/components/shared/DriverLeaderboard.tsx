@@ -98,7 +98,7 @@ export function DriverLeaderboard({ readOnly, variant = 'card' }: DriverLeaderbo
 
   if (isLoading) {
     return (
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader className="pb-3">
           <Skeleton className="h-5 w-48" />
         </CardHeader>
@@ -137,7 +137,7 @@ export function DriverLeaderboard({ readOnly, variant = 'card' }: DriverLeaderbo
   }
 
   return (
-    <Card className="card-elevated">
+    <Card className="bg-card border border-border rounded-lg">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Trophy className="h-4 w-4 text-yellow-500" />

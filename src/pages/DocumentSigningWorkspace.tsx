@@ -326,7 +326,7 @@ export default function DocumentSigningWorkspace() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 card-elevated">
+        <Card className="lg:col-span-2 bg-card border border-border rounded-lg">
           <CardHeader>
             <CardTitle className="text-base">Document</CardTitle>
           </CardHeader>
@@ -370,7 +370,7 @@ export default function DocumentSigningWorkspace() {
         </Card>
 
         <div className="space-y-4">
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader>
               <CardTitle className="text-base">Signing progress</CardTitle>
             </CardHeader>
@@ -405,7 +405,7 @@ export default function DocumentSigningWorkspace() {
           </Card>
 
           {canSignNow && (
-            <Card className="card-elevated border-primary/40">
+            <Card className="bg-card border border-border rounded-lg border-primary/40">
               <CardHeader>
                 <CardTitle className="text-base">Your signature</CardTitle>
               </CardHeader>
@@ -511,7 +511,7 @@ export default function DocumentSigningWorkspace() {
                 <Button
                   onClick={() => signMutation.mutate()}
                   disabled={signMutation.isPending || !signatureDataUrl}
-                  className="w-full gradient-gold text-primary-foreground h-12"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12"
                 >
                   {signMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Sign and submit
@@ -521,7 +521,7 @@ export default function DocumentSigningWorkspace() {
           )}
 
           {!canSignNow && instance.status === 'pending_signatures' && (
-            <Card className="card-elevated">
+            <Card className="bg-card border border-border rounded-lg">
               <CardContent className="p-4 text-sm text-muted-foreground">
                 {alreadySignedThisStep
                   ? 'You already signed this step. Waiting for the next signer.'
@@ -531,7 +531,7 @@ export default function DocumentSigningWorkspace() {
           )}
 
           {instance.status === 'completed' && (
-            <Card className="card-elevated border-green-500/40">
+            <Card className="bg-card border border-border rounded-lg border-green-500/40">
               <CardContent className="p-4 text-sm space-y-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />

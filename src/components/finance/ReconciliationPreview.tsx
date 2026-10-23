@@ -757,7 +757,7 @@ export function ReconciliationPreview({
             <Button
               onClick={handleImport}
               disabled={totalSelectedCount === 0 || isImporting || revenue.hasBlockingDiscrepancy}
-              className="gradient-gold text-primary-foreground"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
               title={revenue.hasBlockingDiscrepancy ? 'Resolve flat-rate discrepancies before importing' : undefined}
             >
               {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

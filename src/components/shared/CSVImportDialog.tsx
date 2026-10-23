@@ -280,7 +280,7 @@ export function CSVImportDialog({ open, onOpenChange, tableName, fields, queryKe
                 onClick={handleImport}
                 loading={importing}
                 loadingText="Importing..."
-                className="gradient-gold text-primary-foreground"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={validCount === 0}
               >
                 Confirm Import ({validCount} rows)

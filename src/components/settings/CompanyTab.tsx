@@ -131,7 +131,7 @@ export function CompanyTab() {
   return (
     <div className="space-y-6">
       {/* TMS Mode Badge */}
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Landmark className="h-5 w-5 text-primary" />
@@ -151,7 +151,7 @@ export function CompanyTab() {
         </CardContent>
       </Card>
 
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
@@ -171,7 +171,7 @@ export function CompanyTab() {
               <Button
                 onClick={handleSaveName}
                 disabled={isSavingName || companyName.trim() === orgName}
-                className="gradient-gold text-primary-foreground shrink-0"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
               >
                 {isSavingName ? 'Saving...' : 'Save'}
               </Button>
@@ -201,7 +201,7 @@ export function CompanyTab() {
               <Button
                 onClick={handleSaveAuthority}
                 disabled={isSavingAuthority}
-                className="gradient-gold text-primary-foreground"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {isSavingAuthority ? 'Saving...' : 'Save Authority Details'}
               </Button>
@@ -240,7 +240,7 @@ export function CompanyTab() {
 
       {/* Factoring Settings - Independent Only */}
       {isIndependent && (
-        <Card className="card-elevated">
+        <Card className="bg-card border border-border rounded-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Banknote className="h-5 w-5 text-primary" />
@@ -302,7 +302,7 @@ export function CompanyTab() {
             <Button
               onClick={handleSaveFactoring}
               disabled={isSavingFactoring}
-              className="gradient-gold text-primary-foreground"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSavingFactoring ? 'Saving...' : 'Save Factoring Settings'}
             </Button>

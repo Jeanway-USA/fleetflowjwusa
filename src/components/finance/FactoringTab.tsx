@@ -153,7 +153,7 @@ export function FactoringTab() {
 
   if (!orgSettings?.factoring_enabled) {
     return (
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardContent className="py-12 text-center">
           <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Factoring Not Enabled</h3>
@@ -172,7 +172,7 @@ export function FactoringTab() {
       <div className="space-y-6">
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-4">
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Ready to Submit</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -182,7 +182,7 @@ export function FactoringTab() {
               <p className="text-xs text-muted-foreground">invoiced loads</p>
             </CardContent>
           </Card>
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Submitted</CardTitle>
               <Send className="h-4 w-4 text-primary" />
@@ -192,7 +192,7 @@ export function FactoringTab() {
               <p className="text-xs text-muted-foreground">{formatCurrency(submittedTotal)} pending</p>
             </CardContent>
           </Card>
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Funded Total</CardTitle>
               <Banknote className="h-4 w-4 text-success" />
@@ -202,7 +202,7 @@ export function FactoringTab() {
               <p className="text-xs text-muted-foreground">after {feePercent}% fee</p>
             </CardContent>
           </Card>
-          <Card className="card-elevated">
+          <Card className="bg-card border border-border rounded-lg">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Factoring Fee</CardTitle>
               <DollarSign className="h-4 w-4 text-destructive" />
@@ -225,7 +225,7 @@ export function FactoringTab() {
           <TabsContent value="ready" className="mt-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Load Table */}
-              <Card className="card-elevated lg:col-span-2">
+              <Card className="bg-card border border-border rounded-lg lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Ready to Submit</CardTitle>
@@ -305,7 +305,7 @@ export function FactoringTab() {
               </Card>
 
               {/* Batch Summary Sidebar */}
-              <Card className="card-elevated flex flex-col">
+              <Card className="bg-card border border-border rounded-lg flex flex-col">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">Batch Summary</CardTitle>
                   {orgSettings.factoring_provider_name && (
@@ -360,7 +360,7 @@ export function FactoringTab() {
 
           {/* Submitted */}
           <TabsContent value="submitted" className="mt-4">
-            <Card className="card-elevated">
+            <Card className="bg-card border border-border rounded-lg">
               <CardHeader>
                 <CardTitle>Submitted to Factoring</CardTitle>
                 <CardDescription>Awaiting funding from {orgSettings.factoring_provider_name || 'factoring company'}</CardDescription>
@@ -416,7 +416,7 @@ export function FactoringTab() {
 
           {/* Funded */}
           <TabsContent value="funded" className="mt-4">
-            <Card className="card-elevated">
+            <Card className="bg-card border border-border rounded-lg">
               <CardHeader>
                 <CardTitle>Funded Loads</CardTitle>
                 <CardDescription>Completed factoring transactions</CardDescription>

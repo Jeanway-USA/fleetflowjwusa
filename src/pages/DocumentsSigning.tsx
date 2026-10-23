@@ -89,7 +89,7 @@ export default function DocumentsSigning() {
         description="Sign, route, and track documents across your organization."
       >
         {canSimulateRoles && (
-          <Button onClick={() => setSendOpen(true)} className="h-11 gradient-gold text-primary-foreground">
+          <Button onClick={() => setSendOpen(true)} className="h-11 bg-primary text-primary-foreground hover:bg-primary/90">
             <Send className="h-4 w-4 mr-2" />
             Send document
           </Button>
@@ -166,7 +166,7 @@ function InstanceList({
   const [reopenTarget, setReopenTarget] = useState<DocumentInstance | null>(null);
   if (rows.length === 0) {
     return (
-      <Card className="card-elevated">
+      <Card className="bg-card border border-border rounded-lg">
         <CardContent className="flex flex-col items-center justify-center py-14 text-center">
           <FileSignature className="h-10 w-10 text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
@@ -179,7 +179,7 @@ function InstanceList({
       {rows.map((r) => {
         const canReopen = canManage && (r.status === 'completed' || r.status === 'pending_signatures');
         return (
-          <Card key={r.id} className={`card-elevated ${highlight ? 'border-primary/50' : ''}`}>
+          <Card key={r.id} className={`bg-card border border-border rounded-lg ${highlight ? 'border-primary/50' : ''}`}>
             <CardContent className="p-4 flex flex-wrap items-center gap-4">
               <div className="flex-1 min-w-[220px]">
                 <div className="font-medium">{r.title}</div>
