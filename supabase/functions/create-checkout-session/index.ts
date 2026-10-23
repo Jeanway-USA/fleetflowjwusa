@@ -63,7 +63,7 @@ serve(async (req) => {
 
     const userId = claimsData.claims.sub as string;
     const userEmail = claimsData.claims.email as string;
-    logStep("User authenticated", { userId, email: userEmail });
+    logStep("User authenticated", { userId });
 
     // Verify user has 'owner' role before allowing subscription changes
     const { data: roleData } = await supabaseAdmin
@@ -161,19 +161,13 @@ serve(async (req) => {
     let customerId = org?.stripe_customer_id;
 
     if (!customerId) {
-      // Check if customer exists in Stripe by email
-      const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
-      
-      if (customers.data.length > 0) {
-        customerId = customers.data[0].id;
-      } else {
-        // Create new customer
-        const customer = await stripe.customers.create({
-          email: userEmail,
-          metadata: { org_id: orgId, org_name: org?.name || "" },
-        });
-        customerId = customer.id;
-      }
+      // Always create a fresh customer tied to this org — never link an
+      // existing Stripe customer by (possibly unverified) email.
+      const customer = await stripe.customers.create({
+        email: userEmail,
+        metadata: { org_id: orgId, org_name: org?.name || "" },
+      });
+      customerId = customer.id;
 
       // Save stripe_customer_id to org
       await supabaseAdmin
