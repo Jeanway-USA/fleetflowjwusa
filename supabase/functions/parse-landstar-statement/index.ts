@@ -316,7 +316,7 @@ CONTRACTOR STATEMENT SPECIFICS:
       throw new Error("No response from AI");
     }
 
-    console.log("AI response:", content);
+    console.log("AI response received, length:", content?.length ?? 0);
 
     let extractedData: ParsedStatement;
     try {
@@ -333,12 +333,10 @@ CONTRACTOR STATEMENT SPECIFICS:
       extractedData = JSON.parse(cleanContent.trim());
     } catch (parseError) {
       console.error("Failed to parse AI response as JSON:", parseError);
-      console.error("Raw content:", content);
       throw new Error("Failed to parse extracted data");
     }
 
-    console.log("Extracted statement data:", extractedData);
-    console.log("Total expenses extracted:", extractedData.expenses?.length || 0);
+        console.log("Total expenses extracted:", extractedData.expenses?.length || 0);
 
     return new Response(JSON.stringify(extractedData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
