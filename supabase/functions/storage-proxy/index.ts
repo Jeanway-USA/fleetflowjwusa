@@ -426,7 +426,12 @@ Deno.serve(async (req) => {
         'beta_feedback': { max: 10 * 1024 * 1024, types: [...IMG, 'image/gif', 'application/pdf'] },
       };
       const limit = UPLOAD_LIMITS[bucket];
-      const fileType = (file.type || '').toLowerCase();
+      const EXT_TYPES: Record<string, string> = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        webp: 'image/webp', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', csv: 'text/csv', txt: 'text/plain',
+        doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+      const ext = (filePath.split('.').pop() || '').toLowerCase();
+      const fileType = ((file.type && file.type !== 'application/octet-stream') ? file.type : (EXT_TYPES[ext] || '')).toLowerCase();
       if (!limit || file.size > limit.max || !limit.types.includes(fileType)) {
         return new Response(JSON.stringify({ error: 'File type or size not allowed' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
