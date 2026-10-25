@@ -7372,6 +7372,7 @@ export type Database = {
           down_payment: number | null
           duty_cycle: string
           engine_make: string | null
+          engine_model: string | null
           financing_fees: number | null
           id: string
           interest_rate: number | null
@@ -7391,6 +7392,7 @@ export type Database = {
           original_loan_amount: number | null
           purchase_mileage: number | null
           status: string
+          transmission: string | null
           unit_number: string
           updated_at: string
           vin: string | null
@@ -7405,6 +7407,7 @@ export type Database = {
           down_payment?: number | null
           duty_cycle?: string
           engine_make?: string | null
+          engine_model?: string | null
           financing_fees?: number | null
           id?: string
           interest_rate?: number | null
@@ -7424,6 +7427,7 @@ export type Database = {
           original_loan_amount?: number | null
           purchase_mileage?: number | null
           status?: string
+          transmission?: string | null
           unit_number: string
           updated_at?: string
           vin?: string | null
@@ -7438,6 +7442,7 @@ export type Database = {
           down_payment?: number | null
           duty_cycle?: string
           engine_make?: string | null
+          engine_model?: string | null
           financing_fees?: number | null
           id?: string
           interest_rate?: number | null
@@ -7457,6 +7462,7 @@ export type Database = {
           original_loan_amount?: number | null
           purchase_mileage?: number | null
           status?: string
+          transmission?: string | null
           unit_number?: string
           updated_at?: string
           vin?: string | null

@@ -113,6 +113,13 @@
       "when": 1792945984702,
       "tag": "0015_service_planner_data",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792947066639,
+      "tag": "0016_truck_drivetrain",
+      "breakpoints": true
     }
   ]
 }
