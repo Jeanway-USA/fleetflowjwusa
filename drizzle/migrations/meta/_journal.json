@@ -99,6 +99,13 @@
       "when": 1792719619050,
       "tag": "0013_doc_signing_rules_and_truck_stops_org",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792944423573,
+      "tag": "0014_finite_account_deactivation_ban",
+      "breakpoints": true
     }
   ]
 }

@@ -42,7 +42,7 @@ WHERE (o.name ILIKE '%demo%'
 
 -- Block the demo sign-in (a ban, not a delete).
 UPDATE auth.users
-SET banned_until = 'infinity'
+SET banned_until = now() + interval '100 years'
 WHERE email = 'demo@fleetflow-tms.com';
 
 -- Check: the demo company should now show is_active = false, and the demo user a ban.
