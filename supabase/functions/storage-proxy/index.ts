@@ -266,6 +266,7 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const callerId = user.id;
 
     // Get user's org
     const { data: profile } = await supabase
@@ -343,7 +344,7 @@ Deno.serve(async (req) => {
       if (orgScoped.includes(bucket)) {
         if (!fileRef.startsWith(`${orgId}/`)) return 'Forbidden: path does not belong to your organization';
       } else if (userScoped.includes(bucket)) {
-        if (!fileRef.startsWith(`${user.id}/`)) return 'Forbidden: path does not belong to you';
+        if (!fileRef.startsWith(`${callerId}/`)) return 'Forbidden: path does not belong to you';
       } else {
         return 'Forbidden: bucket not allowed';
       }
@@ -519,7 +520,7 @@ Deno.serve(async (req) => {
         const accessToken = await getAccessToken(creds, supabase, orgId);
         const { data, contentType, fileName } = await downloadFromDrive(accessToken, driveFileId);
 
-        return new Response(data, {
+        return new Response(new Blob([new Uint8Array(data)], { type: contentType }), {
           headers: {
             ...corsHeaders,
             'Content-Type': contentType,
