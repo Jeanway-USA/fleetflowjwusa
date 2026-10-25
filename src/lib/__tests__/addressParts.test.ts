@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cityAndState, parseAddressParts } from '@/lib/address-parts';
+import { cityAndState, parseAddressParts, plausibleForCountry } from '@/lib/address-parts';
 
 describe('parseAddressParts', () => {
   it('reads a Canadian address with a postal code (the Calgary load)', () => {
@@ -47,5 +47,24 @@ describe('cityAndState', () => {
     expect(cityAndState('Calgary, AB T2C 3C4')).toEqual({ city: 'Calgary', state: 'AB', country: 'ca' });
     expect(cityAndState('Dallas, TX 75201')).toEqual({ city: 'Dallas', state: 'TX', country: 'us' });
     expect(cityAndState('no address here')).toBeNull();
+  });
+});
+
+describe('plausibleForCountry', () => {
+  it('accepts Calgary as Canadian and rejects a Texas town for a Canadian address', () => {
+    expect(plausibleForCountry({ lat: 51.0447, lng: -114.0719 }, 'ca')).toBe(true);
+    expect(plausibleForCountry({ lat: 31.4974, lng: -97.1246 }, 'ca')).toBe(false); // Robinson, Texas
+    expect(plausibleForCountry({ lat: 33.7, lng: -84.4 }, 'ca')).toBe(false); // Georgia
+  });
+
+  it('accepts US points, including Alaska and Hawaii, and rejects Calgary for a US address', () => {
+    expect(plausibleForCountry({ lat: 45.6688, lng: -111.1509 }, 'us')).toBe(true); // Bozeman
+    expect(plausibleForCountry({ lat: 61.2, lng: -149.9 }, 'us')).toBe(true); // Anchorage
+    expect(plausibleForCountry({ lat: 21.3, lng: -157.9 }, 'us')).toBe(true); // Honolulu
+    expect(plausibleForCountry({ lat: 51.0447, lng: -114.0719 }, 'us')).toBe(false);
+  });
+
+  it('does not judge an address with no known country', () => {
+    expect(plausibleForCountry({ lat: 0, lng: 0 }, undefined)).toBe(true);
   });
 });
