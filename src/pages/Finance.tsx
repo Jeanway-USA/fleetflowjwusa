@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,36 +25,36 @@ const StatementUpload = lazy(() =>
   import('@/components/finance/StatementUpload').then(m => ({ default: m.StatementUpload })),
 );
 import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks';
-import { YearToDateCheck } from '@/components/finance/YearToDateCheck';
-import { TrueUpLoads } from '@/components/finance/TrueUpLoads';
-import { WeeklyProof } from '@/components/finance/WeeklyProof';
-import { YearLedger } from '@/components/finance/YearLedger';
-import { RevenueOverview } from '@/components/finance/RevenueOverview';
+const YearToDateCheck = lazy(() => import('@/components/finance/YearToDateCheck').then((m) => ({ default: m.YearToDateCheck })));
+const TrueUpLoads = lazy(() => import('@/components/finance/TrueUpLoads').then((m) => ({ default: m.TrueUpLoads })));
+const WeeklyProof = lazy(() => import('@/components/finance/WeeklyProof').then((m) => ({ default: m.WeeklyProof })));
+const YearLedger = lazy(() => import('@/components/finance/YearLedger').then((m) => ({ default: m.YearLedger })));
+const RevenueOverview = lazy(() => import('@/components/finance/RevenueOverview').then((m) => ({ default: m.RevenueOverview })));
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
-import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
-import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
-import { PossibleDuplicates } from '@/components/finance/PossibleDuplicates';
-import { ImportedLinesToCheck } from '@/components/finance/ImportedLinesToCheck';
-import { ExpenseSummary } from '@/components/finance/ExpenseSummary';
-import { ExpensesList } from '@/components/finance/ExpensesList';
+const PLSummaryTab = lazy(() => import('@/components/finance/PLSummaryTab').then((m) => ({ default: m.PLSummaryTab })));
+const SettlementStatementTab = lazy(() => import('@/components/finance/SettlementStatementTab').then((m) => ({ default: m.SettlementStatementTab })));
+const PossibleDuplicates = lazy(() => import('@/components/finance/PossibleDuplicates').then((m) => ({ default: m.PossibleDuplicates })));
+const ImportedLinesToCheck = lazy(() => import('@/components/finance/ImportedLinesToCheck').then((m) => ({ default: m.ImportedLinesToCheck })));
+const ExpenseSummary = lazy(() => import('@/components/finance/ExpenseSummary').then((m) => ({ default: m.ExpenseSummary })));
+const ExpensesList = lazy(() => import('@/components/finance/ExpensesList').then((m) => ({ default: m.ExpensesList })));
 import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { driverPayTotals, fuelStats } from '@/lib/pl-metrics';
 const RevenueTab = lazy(() =>
   import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
 );
-import { CommissionsTab } from '@/components/finance/CommissionsTab';
-import { DriverSettlementsTab } from '@/components/finance/driver-settlements/DriverSettlementsTab';
-import { ActiveBatchTab } from '@/components/finance/inhouse-payroll/ActiveBatchTab';
+const CommissionsTab = lazy(() => import('@/components/finance/CommissionsTab').then((m) => ({ default: m.CommissionsTab })));
+const DriverSettlementsTab = lazy(() => import('@/components/finance/driver-settlements/DriverSettlementsTab').then((m) => ({ default: m.DriverSettlementsTab })));
+const ActiveBatchTab = lazy(() => import('@/components/finance/inhouse-payroll/ActiveBatchTab').then((m) => ({ default: m.ActiveBatchTab })));
 
 
-import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
-import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
-import { SafetyBonusPayouts } from '@/components/finance/SafetyBonusPayouts';
+const CompensationSettingsTab = lazy(() => import('@/components/finance/CompensationSettingsTab').then((m) => ({ default: m.CompensationSettingsTab })));
+const SafetyBonusSettings = lazy(() => import('@/components/finance/SafetyBonusSettings').then((m) => ({ default: m.SafetyBonusSettings })));
+const SafetyBonusPayouts = lazy(() => import('@/components/finance/SafetyBonusPayouts').then((m) => ({ default: m.SafetyBonusPayouts })));
 import { format, parseISO, endOfMonth, endOfQuarter, endOfDay, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { settlementWeek } from '@/lib/settlement-week';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { InvoicingTab } from '@/components/finance/InvoicingTab';
-import { FactoringTab } from '@/components/finance/FactoringTab';
+const InvoicingTab = lazy(() => import('@/components/finance/InvoicingTab').then((m) => ({ default: m.InvoicingTab })));
+const FactoringTab = lazy(() => import('@/components/finance/FactoringTab').then((m) => ({ default: m.FactoringTab })));
 
 const LoadProfitabilityTab = lazy(() =>
   import('@/components/finance/LoadProfitabilityTab').then(m => ({ default: m.LoadProfitabilityTab })),
@@ -67,6 +68,15 @@ type Expense = Database['public']['Tables']['expenses']['Row'];
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
 type DriverPayroll = Database['public']['Tables']['driver_payroll']['Row'];
 type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
+
+function TabFallback() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading">
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-48 w-full" />
+    </div>
+  );
+}
 
 export default function Finance() {
   const queryClient = useQueryClient();
@@ -642,6 +652,7 @@ export default function Finance() {
 
         {/* ===== SETTLEMENT: the weekly Landstar statement ===== */}
         <TabsContent value="settlement">
+          <Suspense fallback={<TabFallback />}>
           <div className="animate-in fade-in-50">
             {trucks.length > 1 && (
               <div className="mb-4">
@@ -679,17 +690,21 @@ export default function Finance() {
               <YearLedger />
             </div>
           </div>
+        </Suspense>
         </TabsContent>
 
         {/* ===== OVERVIEW: the all-in rate and the year against last year ===== */}
         <TabsContent value="overview">
+          <Suspense fallback={<TabFallback />}>
           <div className="animate-in fade-in-50">
             <RevenueOverview />
           </div>
+        </Suspense>
         </TabsContent>
 
         {/* ===== PROFIT & LOSS ===== */}
         <TabsContent value="pnl">
+          <Suspense fallback={<TabFallback />}>
           <div className="space-y-8 animate-in fade-in-50">
             {renderFilters()}
             <PLSummaryTab
@@ -730,10 +745,12 @@ export default function Finance() {
               />
             </Suspense>
           </div>
+        </Suspense>
         </TabsContent>
 
         {/* ===== EXPENSES ===== */}
         <TabsContent value="expenses">
+          <Suspense fallback={<TabFallback />}>
           <PossibleDuplicates
             expenses={expenses}
             loads={loads}
@@ -785,10 +802,12 @@ export default function Finance() {
               onBulkDelete={() => setMassDeleteDialogOpen(true)}
             />
           </div>
+        </Suspense>
         </TabsContent>
 
         {/* ===== PAYROLL: W-2 batch, contractor settlements, agent commissions, safety bonuses ===== */}
         <TabsContent value="payroll">
+          <Suspense fallback={<TabFallback />}>
           <div className="animate-in fade-in-50 space-y-5">
             {renderFilters(false)}
 
@@ -846,10 +865,12 @@ export default function Finance() {
               )
             )}
           </div>
+        </Suspense>
         </TabsContent>
 
         {/* ===== SETTINGS: pay rules, audit, invoicing ===== */}
         <TabsContent value="settings">
+          <Suspense fallback={<TabFallback />}>
           <div className="space-y-8 animate-in fade-in-50">
             <CompensationSettingsTab getSetting={getSetting} />
             {isIndependent && (
@@ -860,6 +881,7 @@ export default function Finance() {
             )}
             <SafetyBonusSettings />
           </div>
+        </Suspense>
         </TabsContent>
       </Tabs>
 

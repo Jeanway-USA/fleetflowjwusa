@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Truck, Users, Wrench, FileWarning, FileSignature } from 'lucide-react';
+import { Truck, Users, Wrench, FileWarning, FileSignature, UserPlus, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { BriefingLoadsDialog } from './BriefingLoadsDialog';
@@ -147,6 +147,36 @@ export function MorningBriefingWidget() {
           action: 'dialog',
           dialogType: 'missing-pod',
         });
+      }
+
+      // People who have to finish onboarding, and signed paperwork waiting for a review. Owners and payroll admins only.
+      if (roles.includes('owner') || roles.includes('payroll_admin')) {
+        const [onboarding, awaitingReview] = await Promise.all([
+          supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('org_id', orgId).eq('requires_onboarding', true).eq('onboarding_completed', false),
+          supabase.from('driver_signed_documents').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('review_status', 'pending'),
+        ]);
+        if ((onboarding.count ?? 0) > 0) {
+          results.push({
+            key: 'onboarding-pending',
+            label: 'Still Onboarding',
+            count: onboarding.count ?? 0,
+            icon: UserPlus,
+            colorClass: 'bg-warning/10 text-warning border-warning/20 hover:bg-warning/20',
+            action: 'navigate',
+            route: '/settings?tab=team',
+          });
+        }
+        if ((awaitingReview.count ?? 0) > 0) {
+          results.push({
+            key: 'documents-to-review',
+            label: 'Documents Awaiting Review',
+            count: awaitingReview.count ?? 0,
+            icon: ClipboardCheck,
+            colorClass: 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20',
+            action: 'navigate',
+            route: '/drivers',
+          });
+        }
       }
 
       // Pending signatures for the current user

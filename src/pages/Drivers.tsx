@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PaidByPackageNote } from '@/components/settings/pay-packages/PaidByPackageNote';
@@ -96,9 +97,9 @@ export default function Drivers() {
   const [leaseForm, setLeaseForm] = useState<{ id?: string; weekly_lease_amount: number; escrow_cpm_rate: number; total_weeks_remaining: number }>({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
 
   // Toolbar / bulk selection state
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'hire_recent' | 'compliance'>('name_asc');
+  const [search, setSearch] = usePersistedState<string>('drivers.search', '');
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('drivers.status', 'all');
+  const [sortBy, setSortBy] = usePersistedState<'name_asc' | 'name_desc' | 'hire_recent' | 'compliance'>('drivers.sort', 'name_asc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
 
