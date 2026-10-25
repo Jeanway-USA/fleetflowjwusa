@@ -262,8 +262,10 @@ CONTRACTOR STATEMENT SPECIFICS:
 - Do NOT include "TRIP% ESCROW PAYMENT (VOLUNTARY)" lines; escrow is the contractor's savings, not an expense.
 - Ignore the "Pending Adjustments" and "Outstanding Trips" sections; they are not part of this week's settlement.`;
 
+    // Give up after two minutes instead of leaving the screen waiting on the document service.
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
+      signal: AbortSignal.timeout(120_000),
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
@@ -342,6 +344,13 @@ CONTRACTOR STATEMENT SPECIFICS:
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      console.error("Parse Landstar statement timed out");
+      return new Response(
+        JSON.stringify({ error: "Reading this PDF took too long. Please try again." }),
+        { status: 504, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      );
+    }
     console.error("Parse Landstar statement error:", error);
     const safeMessage = (error instanceof Error && (
       error.message === 'Failed to parse extracted data' ||

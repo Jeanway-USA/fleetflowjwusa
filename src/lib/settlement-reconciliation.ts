@@ -7,7 +7,7 @@ import { isSameCharge, daysBetween } from '@/lib/expense-matching';
 export interface StagedFile {
   file: File;
   type: 'settlement_xlsx' | 'freight_bill_xlsx' | 'card_activity_pdf' | 'contractor_pdf' | 'unknown';
-  status: 'pending' | 'parsed' | 'error';
+  status: 'pending' | 'parsing' | 'parsed' | 'error';
   error?: string;
   data?: ParsedStatement;
 }

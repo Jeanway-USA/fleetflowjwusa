@@ -308,6 +308,12 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* A spinner is not decoration, it is how the screen says "still working". With every animation switched off a
+     loading button looked frozen, so spinners keep turning (and stay calm) even when the device asks for less motion. */
+  .animate-spin {
+    animation: spin 1.2s linear infinite !important;
+  }
 }
 
 /* Leaflet map marker styles */
