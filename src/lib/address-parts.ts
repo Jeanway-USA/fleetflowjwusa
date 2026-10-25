@@ -90,3 +90,20 @@ export function cityAndState(address: string): { city: string; state: string; co
   if (!city || !state || !country) return null;
   return { city, state, country };
 }
+
+// Rough outlines of each country. Only used to catch a lookup that landed in the wrong country entirely, such as a
+// Calgary address matched to a town named Robinson in Texas. They are deliberately generous at the borders.
+const BOUNDS: Record<Country, Array<{ minLat: number; maxLat: number; minLng: number; maxLng: number }>> = {
+  ca: [{ minLat: 41.6, maxLat: 83.2, minLng: -141.1, maxLng: -52.5 }],
+  us: [
+    { minLat: 24.3, maxLat: 49.6, minLng: -125.1, maxLng: -66.8 }, // lower 48
+    { minLat: 51.0, maxLat: 71.6, minLng: -180.0, maxLng: -129.0 }, // Alaska
+    { minLat: 18.8, maxLat: 22.4, minLng: -160.6, maxLng: -154.6 }, // Hawaii
+  ],
+};
+
+/** True when a point is plausibly inside the country its address says it is in. */
+export function plausibleForCountry(point: { lat: number; lng: number }, country: Country | undefined): boolean {
+  if (!country) return true;
+  return BOUNDS[country].some((b) => point.lat >= b.minLat && point.lat <= b.maxLat && point.lng >= b.minLng && point.lng <= b.maxLng);
+}

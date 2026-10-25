@@ -4,7 +4,7 @@
 // Includes caching to minimize API calls and respect rate limits.
 
 import { supabase } from '@/integrations/supabase/client';
-import { parseAddressParts, cityAndState, type Country } from '@/lib/address-parts';
+import { parseAddressParts, cityAndState, plausibleForCountry, type Country } from '@/lib/address-parts';
 
 interface Coordinates {
   lat: number;
@@ -214,7 +214,8 @@ async function geocodeStructuredWithNominatim(address: string): Promise<Coordina
   const { street, city, state, postal, country } = parseAddressParts(address);
   if (!street || !city || !state) return null;
   return nominatimQuery({
-    street,
+    // A suite or unit number ("#14") stops the street from matching, so it is left off.
+    street: street.replace(/\s*#\s*\w+$/, ''),
     city,
     state,
     countrycodes: country ?? 'us,ca',
@@ -263,8 +264,10 @@ export async function geocodeLocationAsync(location: string): Promise<Coordinate
 
   const run = (async (): Promise<Coordinates | null> => {
     // 1. Mapbox on the full street address
+    // An answer in the wrong country (a Calgary address matched to a Texas town, say) is thrown away, not trusted.
+    const wantCountry = parseAddressParts(location).country;
     const mapbox = await geocodeWithMapbox(location);
-    if (mapbox) {
+    if (mapbox && plausibleForCountry(mapbox.coords, wantCountry)) {
       geocodeCache.set(cacheKey, mapbox.coords);
       precisionCache.set(cacheKey, mapbox.precision);
       return mapbox.coords;
@@ -272,7 +275,7 @@ export async function geocodeLocationAsync(location: string): Promise<Coordinate
 
     // 2. Nominatim structured full address
     const structured = await geocodeStructuredWithNominatim(location);
-    if (structured) {
+    if (structured && plausibleForCountry(structured, wantCountry)) {
       geocodeCache.set(cacheKey, structured);
       precisionCache.set(cacheKey, 'address');
       return structured;
@@ -280,7 +283,7 @@ export async function geocodeLocationAsync(location: string): Promise<Coordinate
 
     // 3. Nominatim City, State (centroid)
     const cityState = await geocodeCityStateWithNominatim(location);
-    if (cityState) {
+    if (cityState && plausibleForCountry(cityState, wantCountry)) {
       geocodeCache.set(cacheKey, cityState);
       precisionCache.set(cacheKey, 'city');
       return cityState;
