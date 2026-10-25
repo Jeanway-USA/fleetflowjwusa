@@ -25,39 +25,59 @@ function precisionFor(featureType: string | undefined): 'address' | 'city' {
   }
 }
 
-// Split "Fenway Park, 4 Yawkey Way, Boston, MA 02215-3409" into structured pieces.
-// A leading business-name segment (no house number) is dropped.
+// Split "Fenway Park, 4 Yawkey Way, Boston, MA 02215-3409" or "Refrigerative Supply, 5543 72nd Ave SE #14, Calgary, AB T2C 3C4"
+// into structured pieces. A leading business-name segment (no house number) is dropped.
+// (A copy of src/lib/address-parts.ts: functions cannot import from src. Keep the two in step.)
+const CA_PROVINCES = new Set(['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT']);
+const ZIP = String.raw`\d{5}(?:-\d{4})?`;
+const CA_POSTAL = String.raw`[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d`;
+const POSTAL = `(?:${ZIP}|${CA_POSTAL})`;
+const STATE_ONLY = new RegExp(`^([A-Za-z]{2})(?:\\s+(${POSTAL}))?$`);
+const CITY_STATE = new RegExp(`^(.+?)\\s+([A-Za-z]{2})(?:\\s+(${POSTAL}))?$`);
+
 function parseAddressParts(address: string): {
   street?: string;
   city?: string;
   state?: string;
   postal?: string;
+  country?: 'us' | 'ca';
 } {
   const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
   if (parts.length < 2) return {};
 
   let state: string | undefined;
-  let postal: string | undefined;
+  let rawPostal: string | undefined;
   let stateIdx = -1;
 
   for (let i = parts.length - 1; i >= 0; i--) {
-    const m = parts[i].match(/^([A-Za-z]{2})(?:\s+(\d{5})(?:-\d{4})?)?$/);
+    const m = parts[i].match(STATE_ONLY);
     if (m) {
       state = m[1].toUpperCase();
-      postal = m[2];
+      rawPostal = m[2];
       stateIdx = i;
       break;
     }
-    const m2 = parts[i].match(/^(.+?)\s+([A-Za-z]{2})(?:\s+(\d{5})(?:-\d{4})?)?$/);
+    const m2 = parts[i].match(CITY_STATE);
     if (m2) {
       state = m2[2].toUpperCase();
-      postal = m2[3];
+      rawPostal = m2[3];
       stateIdx = i;
       break;
     }
   }
 
-  if (stateIdx === -1) return {};
+  if (stateIdx === -1 || !state) return {};
+
+  const country: 'us' | 'ca' = CA_PROVINCES.has(state) ? 'ca' : 'us';
+  let postal: string | undefined = rawPostal;
+  if (rawPostal) {
+    if (country === 'ca') {
+      const compact = rawPostal.replace(/[\s-]/g, '').toUpperCase();
+      postal = `${compact.slice(0, 3)} ${compact.slice(3)}`;
+    } else {
+      postal = rawPostal.slice(0, 5);
+    }
+  }
 
   const city = stateIdx > 0 ? parts[stateIdx - 1] : undefined;
   // The street is the part before the city that starts with a house number.
@@ -72,7 +92,7 @@ function parseAddressParts(address: string): {
   // obviously a business name only (single token names are usually POIs).
   if (!street && stateIdx - 2 >= 0) street = parts[stateIdx - 2];
 
-  return { street, city, state, postal };
+  return { street, city, state, postal, country };
 }
 
 async function mapboxForward(
@@ -80,7 +100,8 @@ async function mapboxForward(
   lovableKey: string,
   mapboxKey: string,
 ): Promise<{ ok: true; data: any } | { ok: false; status: number; text: string }> {
-  const qs = new URLSearchParams({ country: 'us', limit: '1', autocomplete: 'false', ...params });
+  // Callers pass the country they parsed; anything unparsed is searched in the US and Canada.
+  const qs = new URLSearchParams({ country: 'us,ca', limit: '1', autocomplete: 'false', ...params });
   const upstream = await fetch(`${GATEWAY_URL}/search/geocode/v6/forward?${qs.toString()}`, {
     headers: {
       Authorization: `Bearer ${lovableKey}`,
@@ -162,7 +183,7 @@ Deno.serve(async (req) => {
     let fatal: { status: number; text: string } | null = null;
 
     for (const query of addresses) {
-      const { street, city, state, postal } = parseAddressParts(query);
+      const { street, city, state, postal, country } = parseAddressParts(query);
 
       // 1. Structured lookup — keeps Mapbox from matching a same-named street
       //    in a different city (e.g. "4 Yawkey Way" resolving to Nantucket).
@@ -173,6 +194,7 @@ Deno.serve(async (req) => {
             address_line1: street,
             place: city,
             region: state,
+            country: country ?? 'us',
             ...(postal ? { postcode: postal } : {}),
           },
           LOVABLE_API_KEY,
@@ -209,7 +231,7 @@ Deno.serve(async (req) => {
       // 3. City centroid — wrong by a few miles beats wrong by an island.
       if (!feature && !fatal && city && state) {
         const res = await mapboxForward(
-          { q: `${city}, ${state}`, types: 'place' },
+          { q: `${city}, ${state}`, types: 'place', country: country ?? 'us' },
           LOVABLE_API_KEY,
           MAPBOX_API_KEY,
         );
