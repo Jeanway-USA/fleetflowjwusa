@@ -520,7 +520,7 @@ Deno.serve(async (req) => {
         const accessToken = await getAccessToken(creds, supabase, orgId);
         const { data, contentType, fileName } = await downloadFromDrive(accessToken, driveFileId);
 
-        return new Response(new Blob([data], { type: contentType }), {
+        return new Response(new Blob([new Uint8Array(data)], { type: contentType }), {
           headers: {
             ...corsHeaders,
             'Content-Type': contentType,
