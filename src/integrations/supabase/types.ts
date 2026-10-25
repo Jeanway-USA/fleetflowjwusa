@@ -2116,6 +2116,8 @@ export type Database = {
       driver_signed_documents: {
         Row: {
           admin_file_path: string | null
+          archived_at: string | null
+          archived_by: string | null
           attachment_file_path: string | null
           created_at: string
           document_type: string
@@ -2134,6 +2136,8 @@ export type Database = {
         }
         Insert: {
           admin_file_path?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           attachment_file_path?: string | null
           created_at?: string
           document_type: string
@@ -2152,6 +2156,8 @@ export type Database = {
         }
         Update: {
           admin_file_path?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           attachment_file_path?: string | null
           created_at?: string
           document_type?: string
