@@ -7384,9 +7384,6 @@ export type Database = {
           loan_balance: number | null
           loan_start_date: string | null
           loan_term_months: number | null
-          duty_cycle: string
-          engine_make: string | null
-          engine_model: string | null
           make: string | null
           model: string | null
           monthly_payment: number | null
@@ -7422,9 +7419,6 @@ export type Database = {
           loan_balance?: number | null
           loan_start_date?: string | null
           loan_term_months?: number | null
-          duty_cycle?: string
-          engine_make?: string | null
-          engine_model?: string | null
           make?: string | null
           model?: string | null
           monthly_payment?: number | null
@@ -7460,9 +7454,6 @@ export type Database = {
           loan_balance?: number | null
           loan_start_date?: string | null
           loan_term_months?: number | null
-          duty_cycle?: string
-          engine_make?: string | null
-          engine_model?: string | null
           make?: string | null
           model?: string | null
           monthly_payment?: number | null

@@ -13,7 +13,7 @@ import { RequestRevisionDialog } from './RequestRevisionDialog';
 import { fetchOutstandingTemplates } from '@/lib/onboarding/outstanding';
 import { regenerateAdminPdf, isRegenerable } from '@/lib/onboarding/regenerateAdminPdf';
 
-const DOCUMENT_LABELS: Record<string, string> = {
+export const DOCUMENT_LABELS: Record<string, string> = {
   driver_agreement: 'Driver Agreement',
   direct_deposit: 'Direct Deposit Authorization',
   direct_deposit_form: 'Direct Deposit Authorization (Form)',
