@@ -2116,6 +2116,8 @@ export type Database = {
       driver_signed_documents: {
         Row: {
           admin_file_path: string | null
+          archived_at: string | null
+          archived_by: string | null
           attachment_file_path: string | null
           created_at: string
           document_type: string
@@ -2134,6 +2136,8 @@ export type Database = {
         }
         Insert: {
           admin_file_path?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           attachment_file_path?: string | null
           created_at?: string
           document_type: string
@@ -2152,6 +2156,8 @@ export type Database = {
         }
         Update: {
           admin_file_path?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           attachment_file_path?: string | null
           created_at?: string
           document_type?: string
@@ -7384,9 +7390,6 @@ export type Database = {
           loan_balance: number | null
           loan_start_date: string | null
           loan_term_months: number | null
-          duty_cycle: string
-          engine_make: string | null
-          engine_model: string | null
           make: string | null
           model: string | null
           monthly_payment: number | null
@@ -7422,9 +7425,6 @@ export type Database = {
           loan_balance?: number | null
           loan_start_date?: string | null
           loan_term_months?: number | null
-          duty_cycle?: string
-          engine_make?: string | null
-          engine_model?: string | null
           make?: string | null
           model?: string | null
           monthly_payment?: number | null
@@ -7460,9 +7460,6 @@ export type Database = {
           loan_balance?: number | null
           loan_start_date?: string | null
           loan_term_months?: number | null
-          duty_cycle?: string
-          engine_make?: string | null
-          engine_model?: string | null
           make?: string | null
           model?: string | null
           monthly_payment?: number | null
@@ -7961,7 +7958,6 @@ export type Database = {
           service_types?: string[] | null
           started_at?: string | null
           status?: string
-          transmission?: string | null
           truck_id: string
           updated_at?: string
           vendor?: string | null
@@ -7992,7 +7988,6 @@ export type Database = {
           service_types?: string[] | null
           started_at?: string | null
           status?: string
-          transmission?: string | null
           truck_id?: string
           updated_at?: string
           vendor?: string | null
