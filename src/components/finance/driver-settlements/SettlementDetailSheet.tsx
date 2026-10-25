@@ -156,7 +156,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0 overflow-hidden">
-        <SheetHeader className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b pr-12">
+        <SheetHeader className="shrink-0 mx-0 mt-0 static px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b pr-12">
           <SheetTitle className="text-base sm:text-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span className="truncate">Settlement — {driverName}</span>
             {settlement && (

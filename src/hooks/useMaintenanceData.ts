@@ -73,6 +73,12 @@ export interface TruckWithSchedules {
   id: string;
   unit_number: string;
   make: string | null;
+  /** Who built the engine (Detroit, Cummins, PACCAR...). Decides the oil interval for trucks built by someone else. */
+  engine_make?: string | null;
+  engine_model?: string | null;
+  transmission?: string | null;
+  /** How hard the truck works: normal, heavy or severe. Shortens the oil interval. */
+  duty_cycle?: string | null;
   current_odometer: number | null;
   /** Mileage when the truck was purchased (for fallback PM calculations). */
   purchase_mileage: number | null;
@@ -338,7 +344,7 @@ export function usePMSchedule() {
     queryFn: async () => {
       const { data: trucks, error: trucksError } = await supabase
         .from('trucks')
-        .select('id, unit_number, make, current_odometer, last_120_inspection_date, status, purchase_mileage')
+        .select('id, unit_number, make, engine_make, duty_cycle, current_odometer, last_120_inspection_date, status, purchase_mileage')
         .eq('status', 'active')
         .is('deleted_at', null)
         .order('unit_number');
@@ -465,6 +471,10 @@ export function usePMSchedule() {
             return st => st.includes('m1') || st.includes('grease') || st.includes('lube');
           case 'PM_A':
             return st => st === 'pm' || st.includes('oil') || st.includes('pm a') || st.includes('pm_a');
+          case 'PM_B':
+          case 'CLASS_B':
+            // The oil service for PACCAR, Volvo, Mack and International: a plain oil change job counts too.
+            return st => st === 'pm' || st.includes('oil') || st.includes(serviceCode.toLowerCase());
           case 'M2':
             return st => st.includes('m2') || st.includes('annual');
           case 'M3':

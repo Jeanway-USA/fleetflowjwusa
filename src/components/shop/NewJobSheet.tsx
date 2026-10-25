@@ -11,7 +11,8 @@ import { LoadingButton } from '@/components/shared/LoadingButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useShopActions, useShopCrew } from '@/hooks/useShop';
 import { PRIORITY_LABEL, type Priority } from '@/lib/shop/board';
-import { tasksForKinds, WORK_KINDS } from '@/lib/shop/templates';
+import { useManufacturerPMProfiles } from '@/hooks/useMaintenanceData';
+import { buildLine, tasksForKindsIn, workKindsFor } from '@/lib/shop/truckWork';
 import { cn } from '@/lib/utils';
 
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'critical'];
@@ -43,12 +44,13 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
   const [due, setDue] = useState('');
   const [newTask, setNewTask] = useState('');
 
+  const { data: profiles = [] } = useManufacturerPMProfiles();
   const { data: trucks = [] } = useQuery({
     queryKey: ['shop', 'trucks-for-new-job'],
     enabled: open,
     queryFn: async () => {
       const [{ data: t }, { data: active }] = await Promise.all([
-        supabase.from('trucks').select('id, unit_number, make, model, status').is('deleted_at', null).order('unit_number'),
+        supabase.from('trucks').select('id, unit_number, make, model, engine_make, engine_model, transmission, status').is('deleted_at', null).order('unit_number'),
         supabase.from('work_orders').select('truck_id').in('status', ['open', 'parts_ordered', 'in_progress']).is('deleted_at', null),
       ]);
       const busy = new Set((active ?? []).map((a) => a.truck_id));
@@ -62,7 +64,7 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
     setKinds(kind ? [kind] : []);
     setPriority('normal');
     setDescription(startDescription ?? '');
-    setTasks(kind ? tasksForKinds([kind]) : []);
+    setTasks([]);
     setTasksEdited(false);
     setAssignee('__none__');
     setDue('');
@@ -71,10 +73,22 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // The work offered follows the truck: its maker's service list, with steps for its engine and transmission.
+  const picked = trucks.find((t) => t.id === truck) ?? null;
+  const options = useMemo(() => workKindsFor(picked, profiles), [picked, profiles]);
+
   // The checklist follows the chosen work until someone edits it by hand.
   useEffect(() => {
-    if (!tasksEdited) setTasks(tasksForKinds(kinds));
-  }, [kinds, tasksEdited]);
+    if (!tasksEdited) setTasks(tasksForKindsIn(options, kinds));
+  }, [kinds, tasksEdited, options]);
+
+  // Choosing a different truck drops work that truck does not offer, and refreshes the checklist.
+  const pickTruck = (t: (typeof trucks)[number]) => {
+    if (t.id === truck) return;
+    const offered = new Set(workKindsFor(t, profiles).map((k) => k.key));
+    setKinds((prev) => prev.filter((k) => offered.has(k)));
+    setTruck(t.id);
+  };
 
   const shown = useMemo(() => trucks.filter((t) => `${t.unit_number} ${t.make ?? ''} ${t.model ?? ''}`.toLowerCase().includes(search.toLowerCase())), [trucks, search]);
   const toggleKind = (k: string) => setKinds((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
@@ -105,7 +119,7 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
   return (
     <Sheet open={open} onOpenChange={(v) => !actions.createJob.isPending && onOpenChange(v)}>
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
-        <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
+        <SheetHeader className="shrink-0 mx-0 mt-0 static border-b px-5 pt-5 pb-4 pr-12 text-left">
           <SheetTitle className="font-condensed text-2xl">New job</SheetTitle>
           <SheetDescription>Pick the truck and the work. The checklist is filled in for you and you can change it.</SheetDescription>
         </SheetHeader>
@@ -122,11 +136,12 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setTruck(t.id)}
+                  onClick={() => pickTruck(t)}
                   className={cn('min-h-[64px] rounded-lg border p-3 text-left transition-colors', truck === t.id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent')}
                 >
                   <span className="block font-condensed text-xl font-bold leading-none">{t.unit_number}</span>
                   <span className="block truncate text-xs text-muted-foreground">{[t.make, t.model].filter(Boolean).join(' ') || 'Truck'}</span>
+                  {buildLine(t) && <span className="block truncate text-xs text-muted-foreground">{buildLine(t)}</span>}
                   {t.busy && <span className="mt-1 block text-xs font-medium text-warning">Already has an open job</span>}
                 </button>
               ))}
@@ -136,8 +151,10 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
 
           <section className="space-y-2">
             <h3 className="text-sm font-semibold">2. What work?</h3>
+            {picked && buildLine(picked) && <p className="text-xs text-muted-foreground">Services for a {[picked.make, picked.model].filter(Boolean).join(' ')} with {buildLine(picked)}.</p>}
+            {picked && !picked.engine_make && <p className="text-xs text-muted-foreground">Add this truck's engine and transmission on the Trucks page to fine-tune these.</p>}
             <div className="flex flex-wrap gap-2">
-              {WORK_KINDS.map((k) => (
+              {[...options, ...kinds.filter((key) => !options.some((k) => k.key === key)).map((key) => ({ key, label: key.replace(/_/g, ' '), tasks: [] as string[] }))].map((k) => (
                 <button
                   key={k.key}
                   type="button"

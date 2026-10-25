@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, parseISO, subDays } from 'date-fns';
-import { History, NotebookPen, Search } from 'lucide-react';
+import { Archive, History, MoreHorizontal, NotebookPen, Pencil, RotateCcw, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { archiveWithUndo, restoreRecord } from '@/lib/soft-delete';
+import { EditHistorySheet, type HistoryEntry } from '@/components/shop/EditHistorySheet';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,37 +22,25 @@ import { LogWorkSheet } from '@/components/shop/LogWorkSheet';
 import { Button } from '@/components/ui/button';
 import { ShopEmpty } from '@/components/shop/shared';
 
-interface Entry {
-  id: string;
-  source: 'job' | 'log';
-  truckId: string;
-  unit: string;
-  date: string;
-  title: string;
-  kinds: string[];
-  vendor: string | null;
-  cost: number;
-  notes: string | null;
-  daysDown: number | null;
-}
+type Entry = HistoryEntry;
 
 const RANGES = [{ key: '30', label: '30 days', days: 30 }, { key: '90', label: '90 days', days: 90 }, { key: '365', label: 'This year', days: 365 }, { key: 'all', label: 'Everything', days: 0 }];
 
-function useHistory() {
+function useHistory(archived: boolean) {
   return useQuery({
-    queryKey: ['shop', 'history'],
+    queryKey: ['shop', 'history', archived ? 'archived' : 'current'],
     queryFn: async (): Promise<Entry[]> => {
       const [{ data: jobs, error: e1 }, { data: logs, error: e2 }] = await Promise.all([
-        supabase.from('work_orders').select('id, truck_id, vendor, entry_date, estimated_completion, completed_at, service_type, service_types, description, notes, final_cost, days_down, trucks (unit_number)').eq('status', 'completed').is('deleted_at', null).limit(2000),
-        supabase.from('maintenance_logs').select('id, truck_id, vendor, service_date, service_type, description, cost, trucks (unit_number)').is('deleted_at', null).limit(2000),
+        supabase.from('work_orders').select('id, truck_id, vendor, entry_date, estimated_completion, completed_at, service_type, service_types, description, notes, final_cost, days_down, odometer_reading, trucks (unit_number, make, model, engine_make, engine_model, transmission)').eq('status', 'completed').filter('deleted_at', archived ? 'not.is' : 'is', null).limit(2000),
+        supabase.from('maintenance_logs').select('id, truck_id, vendor, service_date, service_type, description, cost, trucks (unit_number, make, model, engine_make, engine_model, transmission)').filter('deleted_at', archived ? 'not.is' : 'is', null).limit(2000),
       ]);
       if (e1) throw e1;
       if (e2) throw e2;
       const fromJobs: Entry[] = (jobs ?? []).map((j) => {
         const kinds = (j.service_types && j.service_types.length > 0 ? j.service_types : [j.service_type]).filter(Boolean) as string[];
-        return { id: j.id, source: 'job', truckId: j.truck_id, unit: (j.trucks as any)?.unit_number ?? '—', date: j.estimated_completion || j.entry_date, title: jobTitle({ serviceType: j.service_type ?? '', serviceTypes: kinds }), kinds, vendor: j.vendor, cost: Number(j.final_cost) || 0, notes: j.notes || j.description, daysDown: j.days_down };
+        return { id: j.id, source: 'job', truckId: j.truck_id, unit: (j.trucks as any)?.unit_number ?? '—', date: j.estimated_completion || j.entry_date, title: jobTitle({ serviceType: j.service_type ?? '', serviceTypes: kinds }), kinds, vendor: j.vendor, cost: Number(j.final_cost) || 0, notes: j.notes || j.description, daysDown: j.days_down, odometer: j.odometer_reading, truck: j.trucks as any };
       });
-      const fromLogs: Entry[] = (logs ?? []).map((l) => ({ id: l.id, source: 'log', truckId: l.truck_id, unit: (l.trucks as any)?.unit_number ?? '—', date: l.service_date, title: jobTitle({ serviceType: l.service_type ?? '', serviceTypes: [] }), kinds: [l.service_type].filter(Boolean) as string[], vendor: l.vendor, cost: Number(l.cost) || 0, notes: l.description, daysDown: null }));
+      const fromLogs: Entry[] = (logs ?? []).map((l) => ({ id: l.id, source: 'log', truckId: l.truck_id, unit: (l.trucks as any)?.unit_number ?? '—', date: l.service_date, title: jobTitle({ serviceType: l.service_type ?? '', serviceTypes: [] }), kinds: [l.service_type].filter(Boolean) as string[], vendor: l.vendor, cost: Number(l.cost) || 0, notes: l.description, daysDown: null, odometer: null, truck: l.trucks as any }));
       return [...fromJobs, ...fromLogs].sort((a, b) => b.date.localeCompare(a.date));
     },
   });
@@ -56,7 +48,10 @@ function useHistory() {
 
 /** Everything ever done to the fleet, searchable by truck, kind of work and date, with what it cost. */
 export default function ShopHistoryPage() {
-  const { data = [], isLoading, error } = useHistory();
+  const qc = useQueryClient();
+  const [showArchived, setShowArchived] = useState(false);
+  const [editing, setEditing] = useState<Entry | null>(null);
+  const { data = [], isLoading, error } = useHistory(showArchived);
   const [search, setSearch] = useState('');
   const [truck, setTruck] = useState('__all__');
   const [kind, setKind] = useState('__all__');
@@ -70,6 +65,13 @@ export default function ShopHistoryPage() {
     const q = search.trim().toLowerCase();
     return data.filter((e) => (!since || e.date >= since) && (truck === '__all__' || e.truckId === truck) && (kind === '__all__' || e.kinds.some((k) => k.toLowerCase() === kind.toLowerCase())) && (!q || `${e.unit} ${e.title} ${e.vendor ?? ''} ${e.notes ?? ''}`.toLowerCase().includes(q)));
   }, [data, search, truck, kind, range]);
+
+  const refresh = () => { for (const key of [['shop'], ['pm-schedule'], ['service-history'], ['maintenance-cost-mtd'], ['cost-per-mile'], ['compliance-alerts'], ['active-work-orders']]) qc.invalidateQueries({ queryKey: key }); };
+  const table = (e: Entry) => (e.source === 'job' ? 'work_orders' : 'maintenance_logs') as 'work_orders' | 'maintenance_logs';
+  const archive = (e: Entry) => archiveWithUndo({ table: table(e), id: e.id, itemName: `${e.title}, truck ${e.unit}`, queryClient: qc, invalidateKeys: [['shop'], ['pm-schedule'], ['service-history'], ['maintenance-cost-mtd'], ['cost-per-mile'], ['compliance-alerts'], ['active-work-orders']] });
+  const restore = async (e: Entry) => {
+    try { await restoreRecord(table(e), e.id); toast.success('Restored to the history.'); refresh(); } catch (err: any) { toast.error(err.message ?? 'Could not restore'); }
+  };
 
   const total = shown.reduce((s, e) => s + e.cost, 0);
   const downs = shown.filter((e) => e.daysDown != null);
@@ -105,12 +107,15 @@ export default function ShopHistoryPage() {
         <div role="tablist" className="flex rounded-md bg-muted p-1">
           {RANGES.map((r) => <button key={r.key} role="tab" aria-selected={range === r.key} onClick={() => setRange(r.key)} className={cn('min-h-[40px] rounded-sm px-3 text-sm font-medium', range === r.key ? 'bg-background shadow' : 'text-muted-foreground')}>{r.label}</button>)}
         </div>
+        <Button variant={showArchived ? 'default' : 'outline'} className="h-11 gap-2" onClick={() => setShowArchived((v) => !v)}><Archive className="h-4 w-4" />{showArchived ? 'Back to history' : 'Archived'}</Button>
       </div>
+
+      {showArchived && <p className="mb-3 text-sm text-muted-foreground">These entries are archived. They do not count toward totals or service countdowns. Restore one to bring it back.</p>}
 
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? (
         <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
       ) : shown.length === 0 ? (
-        <ShopEmpty icon={History} title="Nothing in that range">Try a longer range or clear the filters.</ShopEmpty>
+        <ShopEmpty icon={History} title={showArchived ? 'Nothing archived' : 'Nothing in that range'}>{showArchived ? 'Entries you archive from the history show up here.' : 'Try a longer range or clear the filters.'}</ShopEmpty>
       ) : (
         <div className="space-y-5">
           {months.map(([month, list]) => (
@@ -126,9 +131,25 @@ export default function ShopHistoryPage() {
                       <div className="shrink-0 text-right"><p className="tabular-nums font-semibold">{e.cost ? money(e.cost) : '—'}</p>{e.daysDown != null && <p className="text-xs text-muted-foreground">{e.daysDown}d down</p>}</div>
                     </>
                   );
+                  const row = 'flex min-w-0 flex-1 items-center gap-3';
                   return (
-                    <li key={`${e.source}-${e.id}`}>
-                      {e.source === 'job' ? <Link to={`/shop/jobs/${e.id}`} className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-accent">{body}</Link> : <div className="flex items-center gap-3 rounded-lg border bg-card p-3">{body}</div>}
+                    <li key={`${e.source}-${e.id}`} className={cn('flex items-center gap-1 rounded-lg border bg-card pr-1', showArchived && 'opacity-80')}>
+                      {e.source === 'job' && !showArchived ? <Link to={`/shop/jobs/${e.id}`} className={cn(row, 'rounded-l-lg p-3 transition-colors hover:bg-accent')}>{body}</Link> : <div className={cn(row, 'p-3')}>{body}</div>}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label={`Actions for ${e.title}, truck ${e.unit}`}><MoreHorizontal className="h-5 w-5" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {showArchived ? (
+                            <DropdownMenuItem onClick={() => restore(e)}><RotateCcw className="mr-2 h-4 w-4" />Restore</DropdownMenuItem>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onClick={() => setEditing(e)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => archive(e)}><Archive className="mr-2 h-4 w-4" />Archive</DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </li>
                   );
                 })}
@@ -138,6 +159,7 @@ export default function ShopHistoryPage() {
         </div>
       )}
       <LogWorkSheet open={logOpen} onOpenChange={setLogOpen} />
+      <EditHistorySheet entry={editing} onOpenChange={(v) => !v && setEditing(null)} />
     </div>
   );
 }

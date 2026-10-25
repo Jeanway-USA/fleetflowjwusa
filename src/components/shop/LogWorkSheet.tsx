@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -13,7 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMyName } from '@/hooks/useShop';
 import { todayLocal } from '@/lib/datetime';
 import { findDuplicate, logCompletedWork, validateLog } from '@/lib/shop/log-work';
-import { WORK_KINDS } from '@/lib/shop/templates';
+import { useManufacturerPMProfiles } from '@/hooks/useMaintenanceData';
+import { workKindsFor } from '@/lib/shop/truckWork';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -44,11 +45,12 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
   const [saving, setSaving] = useState(false);
   const [dupe, setDupe] = useState<{ id: string; title: string } | null>(null);
 
+  const { data: profiles = [] } = useManufacturerPMProfiles();
   const { data: trucks = [] } = useQuery({
     queryKey: ['shop', 'trucks-for-log'],
     enabled: open,
     queryFn: async () => {
-      const { data } = await supabase.from('trucks').select('id, unit_number, make, model, current_odometer').is('deleted_at', null).order('unit_number');
+      const { data } = await supabase.from('trucks').select('id, unit_number, make, model, engine_make, engine_model, transmission, current_odometer').is('deleted_at', null).order('unit_number');
       return data ?? [];
     },
   });
@@ -71,13 +73,15 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
     if (open && !truck && trucks.length === 1) setTruck(trucks[0].id);
   }, [open, truck, trucks]);
 
+  const options = useMemo(() => workKindsFor(trucks.find((t) => t.id === truck) ?? null, profiles), [trucks, truck, profiles]);
+
   const toggle = (k: string) => {
     setDupe(null);
     setKinds((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k]));
   };
 
   const save = async (force: boolean) => {
-    const input = { orgId: orgId ?? '', userName: me, truckId: truck ?? '', date, kinds, title: WORK_KINDS.filter((k) => kinds.includes(k.key)).map((k) => k.label).join(' + '), description: what, doneBy, cost: num(cost), odometer: odo ? num(odo) : null, receipts };
+    const input = { orgId: orgId ?? '', userName: me, truckId: truck ?? '', date, kinds, title: options.filter((k) => kinds.includes(k.key)).map((k) => k.label).join(' + '), description: what, doneBy, cost: num(cost), odometer: odo ? num(odo) : null, receipts };
     const problem = validateLog(input);
     if (problem) return toast.error(problem);
     if (!orgId) return toast.error('Your organization has not finished loading.');
@@ -106,7 +110,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
   return (
     <Sheet open={open} onOpenChange={(v) => !saving && onOpenChange(v)}>
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
-        <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
+        <SheetHeader className="shrink-0 mx-0 mt-0 static border-b px-5 pt-5 pb-4 pr-12 text-left">
           <SheetTitle className="font-condensed text-2xl">Log work already done</SheetTitle>
           <SheetDescription>For work that is finished: yours, a vendor's, or from before you used the app. It goes into the truck's history and resets the service it covers.</SheetDescription>
         </SheetHeader>
@@ -135,7 +139,7 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
           <section>
             <Label>What was done?</Label>
             <div className="mb-2 flex flex-wrap gap-2">
-              {WORK_KINDS.map((k) => (
+              {[...options, ...kinds.filter((key) => !options.some((k) => k.key === key)).map((key) => ({ key, label: key.replace(/_/g, ' '), tasks: [] as string[] }))].map((k) => (
                 <button key={k.key} type="button" onClick={() => toggle(k.key)} className={cn('min-h-[44px] rounded-md border px-4 text-sm font-medium', kinds.includes(k.key) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent')}>{k.label}</button>
               ))}
             </div>
