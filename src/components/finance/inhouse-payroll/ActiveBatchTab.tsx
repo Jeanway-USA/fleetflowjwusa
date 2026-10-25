@@ -641,7 +641,7 @@ export function ActiveBatchTab() {
     missing.length > 0 && (
       <Badge
         variant="outline"
-        className="border-amber-500/60 text-amber-700 dark:text-amber-400 text-xs"
+        className="border-warning/60 text-warning text-xs"
         title={`Missing signed form(s): ${missing.join(', ')}. Withholding uses defaults until collected.`}
       >
         Missing: {missing.join(', ')}
@@ -731,7 +731,7 @@ export function ActiveBatchTab() {
               <table className="w-full text-[15px]">
                 <caption className="sr-only">W-2 payroll for {periodLabel}</caption>
                 <thead>
-                  <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b text-left text-[12px] font-semibold text-muted-foreground">
                     <th scope="col" className="py-2 pl-4">Employee</th>
                     <th scope="col" className="py-2 text-right">Gross</th>
                     <th scope="col" className="py-2 text-right">Federal</th>

@@ -59,7 +59,7 @@ function FleetRevenueLeaderboardCard({ selectedDriver }: { selectedDriver: strin
       <CardHeader className="flex flex-col sm:flex-row items-start justify-between gap-4 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
+            <Trophy className="h-5 w-5 text-warning" />
             Fleet Revenue Leaderboard
           </CardTitle>
           <CardDescription>Top drivers by gross generated and clean miles</CardDescription>
@@ -89,9 +89,9 @@ function FleetRevenueLeaderboardCard({ selectedDriver }: { selectedDriver: strin
                   className={`flex items-center gap-3 rounded-md border p-3 ${isHighlighted ? 'bg-primary/5 border-primary/30' : ''}`}
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                    i === 0 ? 'bg-yellow-400 text-yellow-900' :
-                    i === 1 ? 'bg-gray-300 text-gray-800' :
-                    i === 2 ? 'bg-amber-600 text-white' :
+ i === 0 ? 'bg-warning text-warning' :
+                    i === 1 ? 'bg-muted-foreground text-muted-foreground' :
+                    i === 2 ? 'bg-warning text-white' :
                     'bg-muted text-muted-foreground'
                   }`}>
                     {i + 1}
@@ -173,9 +173,9 @@ export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver 
                     <TableCell>
                       {globalIndex < 3 ? (
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                          globalIndex === 0 ? 'bg-yellow-400 text-yellow-900' :
-                          globalIndex === 1 ? 'bg-gray-300 text-gray-800' :
-                          'bg-amber-600 text-white'
+ globalIndex === 0 ? 'bg-warning text-warning' :
+                          globalIndex === 1 ? 'bg-muted-foreground text-muted-foreground' :
+                          'bg-warning text-white'
                         }`}>
                           {globalIndex + 1}
                         </div>

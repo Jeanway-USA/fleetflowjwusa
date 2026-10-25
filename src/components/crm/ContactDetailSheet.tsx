@@ -23,15 +23,15 @@ interface ContactDetailSheetProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  broker: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  agent: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  shipper: 'bg-green-500/10 text-green-600 border-green-500/30',
-  receiver: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
-  vendor: 'bg-red-500/10 text-red-600 border-red-500/30',
-  shop: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
-  warehouse: 'bg-teal-500/10 text-teal-600 border-teal-500/30',
-  terminal: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
-  both: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+  broker: 'bg-primary/10 text-primary border-primary/30',
+  agent: 'bg-warning/10 text-warning border-warning/30',
+  shipper: 'bg-success/10 text-success border-success/30',
+  receiver: 'bg-primary/10 text-primary border-primary/30',
+  vendor: 'bg-destructive/10 text-destructive border-destructive/30',
+  shop: 'bg-warning/10 text-warning border-warning/30',
+  warehouse: 'bg-success/10 text-success border-success/30',
+  terminal: 'bg-primary/10 text-primary border-primary/30',
+  both: 'bg-success/10 text-success border-success/30',
 };
 
 type Kind = 'broker' | 'agent' | 'facility' | 'vendor-roadside' | 'vendor-resource' | 'vendor-other';
@@ -55,7 +55,7 @@ function Field({ icon: Icon, label, value, href }: { icon?: any; label: string; 
     <div className="flex items-start gap-2">
       {Icon && <Icon className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />}
       <div className="min-w-0 flex-1">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-xs text-muted-foreground">{label}</div>
         <div className="text-sm text-foreground break-words">{value}</div>
       </div>
     </div>
@@ -130,26 +130,26 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {/* === Priority Dispatch panel === */}
           {showPriority && (
-            <section className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 space-y-2">
+            <section className="rounded-lg border border-success/40 bg-success/5 px-4 py-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/40 gap-1">
+                <Badge className="bg-success/15 text-success border-success/40 gap-1">
                   <Zap className="h-3 w-3" /> Priority Dispatch
                 </Badge>
-                <span className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                <span className="text-xs text-success/80">
                   {stats!.recentLoadCount60d} loads in last 60 days
                 </span>
               </div>
               {contact.phone && (
                 <a
                   href={`tel:${contact.phone}`}
-                  className="flex items-center gap-2 text-lg font-semibold text-emerald-700 dark:text-emerald-300 hover:underline"
+                  className="flex items-center gap-2 text-lg font-semibold text-success hover:underline"
                 >
                   <Phone className="h-5 w-5" /> {contact.phone}
                 </a>
               )}
               {stats!.topLane && (
                 <div className="text-xs text-muted-foreground">
-                  <span className="uppercase tracking-wide">Primary Lane · </span>
+                  <span className="">Primary Lane · </span>
                   <span className="text-foreground font-medium">{stats!.topLane}</span>
                 </div>
               )}
@@ -168,7 +168,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               <Field icon={MapPin} label="Address" value={addressLine || null} />
               {contact.tags && contact.tags.length > 0 && (
                 <div>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Tags</div>
+                  <div className="text-xs text-muted-foreground mb-1">Tags</div>
                   <div className="flex flex-wrap gap-1">
                     {contact.tags.map((t) => (
                       <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
@@ -185,9 +185,9 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           {kind === 'agent' && (
             <section className="space-y-3 pb-4 border-b border-border">
               {contact.agent_code && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-400">Agent Code</div>
-                  <div className="text-2xl font-mono font-bold tracking-widest text-amber-700 dark:text-amber-300">{contact.agent_code}</div>
+                <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+                  <div className="text-xs text-warning">Agent Code</div>
+                  <div className="text-2xl font-mono font-bold text-warning">{contact.agent_code}</div>
                 </div>
               )}
               <Field icon={Info} label="Agency Name" value={contact.company_name} />
@@ -225,11 +225,11 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           {kind === 'vendor-roadside' && (
             <section className="space-y-3 pb-4 border-b border-border">
               {contact.service_area && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-red-700 dark:text-red-400 flex items-center gap-1">
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                  <div className="text-xs text-destructive flex items-center gap-1">
                     <MapPinned className="h-3 w-3" /> Service Area
                   </div>
-                  <div className="text-base font-semibold text-red-700 dark:text-red-300 mt-0.5">{contact.service_area}</div>
+                  <div className="text-base font-semibold text-destructive mt-0.5">{contact.service_area}</div>
                 </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -268,7 +268,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               <Field icon={MapPin} label="Address" value={addressLine || null} />
               {contact.tags && contact.tags.length > 0 && (
                 <div>
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Tags</div>
+                  <div className="text-xs text-muted-foreground mb-1">Tags</div>
                   <div className="flex flex-wrap gap-1">
                     {contact.tags.map((t) => (
                       <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
@@ -324,7 +324,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
                             </div>
                             <div className="text-right shrink-0">
                               <div className="text-sm font-semibold tabular-nums">{lane.count}</div>
-                              <div className="text-xs uppercase tracking-wide text-muted-foreground">loads</div>
+                              <div className="text-xs text-muted-foreground">loads</div>
                             </div>
                           </div>
                         </li>

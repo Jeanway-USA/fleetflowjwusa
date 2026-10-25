@@ -222,8 +222,8 @@ export function BrokerDatabase() {
     if (!tags?.[0]) return null;
     const score = parseInt(tags[0]);
     if (isNaN(score)) return <Badge variant="secondary">{tags[0]}</Badge>;
-    if (score >= 80) return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Score: {score}</Badge>;
-    if (score >= 60) return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30">Score: {score}</Badge>;
+    if (score >= 80) return <Badge className="bg-success/10 text-success border-success/30">Score: {score}</Badge>;
+    if (score >= 60) return <Badge className="bg-warning/10 text-warning border-warning/30">Score: {score}</Badge>;
     return <Badge className="bg-destructive/10 text-destructive border-destructive/30">Score: {score}</Badge>;
   };
 
@@ -307,7 +307,7 @@ export function BrokerDatabase() {
               render: (b: BrokerContact) => {
                 const s = statsFor(b);
                 if (!s || s.recentLoadCount60d <= 5) return <span className="text-muted-foreground">—</span>;
-                return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Priority Dispatch</Badge>;
+                return <Badge className="bg-success/10 text-success border-success/30">Priority Dispatch</Badge>;
               },
             },
             { key: 'credit', header: 'Credit Score', hiddenOnMobile: true, render: (b: BrokerContact) => getCreditBadge(b.tags) || '—' },

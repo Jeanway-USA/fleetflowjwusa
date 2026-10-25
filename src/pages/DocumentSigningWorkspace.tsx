@@ -336,7 +336,7 @@ export default function DocumentSigningWorkspace() {
               const legacyPath = meta.legacy_file_path;
               if (!legacyPath) return null;
               return (
-                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="rounded-md border border-warning/40 bg-warning/5 p-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm">
                     <p className="font-medium">Backfilled from a previously signed document</p>
                     <p className="text-xs text-muted-foreground">
@@ -383,7 +383,7 @@ export default function DocumentSigningWorkspace() {
                   <div key={idx} className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2">
                       {done ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <CheckCircle2 className="h-4 w-4 text-success" />
                       ) : (
                         <span className="h-4 w-4 rounded-full border" />
                       )}
@@ -412,7 +412,7 @@ export default function DocumentSigningWorkspace() {
               <CardContent className="space-y-4">
                 {missingTokens.length > 0 && (
                   <div className="space-y-3">
-                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Label className="text-xs font-semibold text-muted-foreground">
                       Fill in
                     </Label>
                     {missingTokens.map((token) => (
@@ -435,7 +435,7 @@ export default function DocumentSigningWorkspace() {
 
                 {consentKeys.length > 0 && (
                   <div className="space-y-3">
-                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Label className="text-xs font-semibold text-muted-foreground">
                       Consents (required)
                     </Label>
                     {consentKeys.map((key) => (
@@ -464,7 +464,7 @@ export default function DocumentSigningWorkspace() {
 
 
                 <div className="space-y-3">
-                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Label className="text-xs font-semibold text-muted-foreground">
                     Signer details
                   </Label>
                   <div className="space-y-1">
@@ -531,10 +531,10 @@ export default function DocumentSigningWorkspace() {
           )}
 
           {instance.status === 'completed' && (
-            <Card className="bg-card border border-border rounded-lg border-green-500/40">
+            <Card className="bg-card border border-border rounded-lg border-success/40">
               <CardContent className="p-4 text-sm space-y-3">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <CheckCircle2 className="h-4 w-4 text-success" />
                   Fully signed on {instance.completed_at ? new Date(instance.completed_at).toLocaleString() : '—'}.
                 </div>
                 {instance.pdf_storage_path ? (

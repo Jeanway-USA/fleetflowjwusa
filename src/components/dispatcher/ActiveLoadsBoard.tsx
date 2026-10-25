@@ -67,10 +67,10 @@ interface ActiveLoad {
 }
 
 const detailStatusColors: Record<string, string> = {
-  pending: 'bg-amber-500',
-  assigned: 'bg-blue-500',
-  loading: 'bg-purple-500',
-  in_transit: 'bg-emerald-500',
+  pending: 'bg-warning',
+  assigned: 'bg-primary',
+  loading: 'bg-primary',
+  in_transit: 'bg-success',
   delivered: 'bg-success',
   cancelled: 'bg-destructive',
 };
@@ -250,12 +250,12 @@ export function ActiveLoadsBoard() {
         <>
           <StatusBadge status={load.status} />
           {group === 'past_due' && load.delivery_date && (
-            <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-destructive">
+            <span className="rounded-md bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
               Past due since {format(parseISO(load.delivery_date), 'MMM d')}
             </span>
           )}
           {load.has_statement_discrepancy && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-destructive">
+            <span className="inline-flex items-center gap-1 rounded-md bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
               <ShieldAlert className="h-3 w-3" /> Statement mismatch
             </span>
           )}
@@ -451,7 +451,7 @@ export function ActiveLoadsBoard() {
                 {/* Special Instructions */}
                 {selectedLoad.notes && (
                   <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-                    <p className="text-xs text-warning font-medium uppercase tracking-wide mb-2">Special Instructions</p>
+                    <p className="text-xs text-warning font-medium mb-2">Special Instructions</p>
                     <div className="max-h-40 overflow-y-auto pr-3">
                       {formatSpecialInstructions(selectedLoad.notes)}
                     </div>

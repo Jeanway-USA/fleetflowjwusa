@@ -464,7 +464,7 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
                   <p className="text-xs text-muted-foreground">Accessorials</p>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {extractedData.accessorials.map((acc, i) => (
-                      <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
+                      <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-primary/10 text-primary">
                         {acc.type}: {formatCurrencyValue(acc.amount)}
                       </span>
                     ))}

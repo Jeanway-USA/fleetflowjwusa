@@ -204,7 +204,7 @@ const CompanyInsights = () => {
   const years = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
 
   const ordinal = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
-  const th = 'py-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground';
+  const th = 'py-2 text-[12px] font-semibold   text-muted-foreground';
   const money = (v: number) => formatCurrency(v);
 
   const leaderboard = (caption: string, columns: string[], rows: React.ReactNode[][], empty: string) =>

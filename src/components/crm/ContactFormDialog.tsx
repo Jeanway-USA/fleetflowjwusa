@@ -264,7 +264,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
                   onChange={(e) => setForm({ ...form, agent_code: e.target.value.toUpperCase().slice(0, 3) })}
                   placeholder="JNS"
                   maxLength={3}
-                  className="font-mono uppercase"
+                  className="font-mono"
                   required
                 />
               </div>

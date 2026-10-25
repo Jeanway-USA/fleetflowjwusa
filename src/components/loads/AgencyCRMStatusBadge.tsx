@@ -28,7 +28,7 @@ export function AgencyCRMStatusBadge({ agencyCode, onBlockedChange }: Props) {
 
   if (state.status === 'not_found') {
     return (
-      <div className="mt-1 flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 px-2.5 py-1.5 text-xs text-blue-700 dark:text-blue-300">
+      <div className="mt-1 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs text-primary">
         <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
           <strong>✦ New Agency:</strong> Will auto-harvest as Safe in the CRM when this load is saved.
@@ -61,7 +61,7 @@ export function AgencyCRMStatusBadge({ agencyCode, onBlockedChange }: Props) {
 
   if (state.agentStatus === 'safe') {
     return (
-      <div className="mt-1 flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+      <div className="mt-1 flex items-start gap-2 rounded-md border border-success/40 bg-success/10 px-2.5 py-1.5 text-xs text-success">
         <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
           <strong>✓ CRM Approved: Safe</strong>

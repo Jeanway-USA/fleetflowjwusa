@@ -82,7 +82,7 @@ export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps
           variant="outline"
           onClick={handleClear}
           disabled={disabled || !hasSignature}
-          className="w-full sm:w-auto h-12 sm:h-10 bg-white text-slate-900 border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+          className="w-full sm:w-auto h-12 sm:h-10 bg-white text-muted-foreground border-border hover:bg-muted hover:text-muted-foreground"
         >
           <Eraser className="h-4 w-4 mr-1" />
           Clear

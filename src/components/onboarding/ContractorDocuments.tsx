@@ -130,7 +130,7 @@ function DocCardShell({
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <CardTitle className="text-base">{title}</CardTitle>
-            <Badge variant="secondary" className="uppercase tracking-wide text-xs">
+            <Badge variant="secondary" className=" text-xs">
               Required
             </Badge>
           </div>
@@ -295,7 +295,7 @@ export function ContractorDocuments({
                 <label
                   key={val}
                   htmlFor={`w9_tt_${val}`}
-                  className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-accent/40 flex-1 uppercase"
+                  className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-accent/40 flex-1"
                 >
                   <RadioGroupItem id={`w9_tt_${val}`} value={val} />
                   <span className="text-sm">{val}</span>
@@ -364,7 +364,7 @@ export function ContractorDocuments({
           title="Independent Owner-Operator Agreement"
           subtitle="Master agreement between you (Contractor) and the Carrier."
         >
-          <div className="max-h-64 overflow-y-auto rounded-md border bg-white p-4 text-sm text-slate-900 font-serif leading-relaxed">
+          <div className="max-h-64 overflow-y-auto rounded-md border bg-white p-4 text-sm text-muted-foreground font-serif leading-relaxed">
             <p className="mb-2 font-semibold">1. Independent Contractor Status.</p>
             <p className="mb-3">
               Contractor is an independent business entity, not an employee of Carrier. Contractor

@@ -156,7 +156,7 @@ export function FilingTable({
               badge = (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-700">
+                    <Badge className="gap-1 bg-success hover:bg-success">
                       <CheckCircle2 className="h-3 w-3" /> Completed
                     </Badge>
                   </TooltipTrigger>
@@ -171,7 +171,7 @@ export function FilingTable({
             } else if (days < 0) {
               badge = <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> Overdue</Badge>;
             } else if (days <= 30) {
-              badge = <Badge className="bg-amber-500 hover:bg-amber-600">Due in {days}d</Badge>;
+              badge = <Badge className="bg-warning hover:bg-warning">Due in {days}d</Badge>;
             } else {
               badge = <Badge variant="secondary">In {days}d</Badge>;
             }

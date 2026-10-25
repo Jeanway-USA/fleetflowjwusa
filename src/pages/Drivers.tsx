@@ -890,7 +890,7 @@ export default function Drivers() {
                       type="button"
                       onClick={() => setFormData({ ...formData, employment_type: 'w2_company' })}
                       className={`px-3 py-1.5 text-sm rounded ${
-                        (formData.employment_type || 'w2_company') === 'w2_company'
+ (formData.employment_type || 'w2_company') === 'w2_company'
                           ? 'bg-background shadow-sm font-medium'
                           : 'text-muted-foreground'
                       }`}
@@ -901,7 +901,7 @@ export default function Drivers() {
                       type="button"
                       onClick={() => setFormData({ ...formData, employment_type: '1099_contractor' })}
                       className={`px-3 py-1.5 text-sm rounded ${
-                        formData.employment_type === '1099_contractor'
+ formData.employment_type === '1099_contractor'
                           ? 'bg-background shadow-sm font-medium'
                           : 'text-muted-foreground'
                       }`}

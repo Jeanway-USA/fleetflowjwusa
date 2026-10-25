@@ -274,7 +274,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                   </div>
                   <div>
                     <p className="text-muted-foreground">YTD Deductions</p>
-                    <p className="font-semibold text-red-600">
+                    <p className="font-semibold text-destructive">
                       {formatCurrency(-Math.abs(ytdDed))}
                     </p>
                   </div>
@@ -523,16 +523,16 @@ function LineItemColumn({
   return (
     <div className="flex flex-col">
       <div className="px-3 py-2 border-b bg-muted/30">
-        <h4 className="text-xs font-bold tracking-wider text-muted-foreground">{title}</h4>
+        <h4 className="text-xs font-bold text-muted-foreground">{title}</h4>
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="py-1.5 px-3 text-xs uppercase tracking-wide text-muted-foreground">
+            <TableHead className="py-1.5 px-3 text-xs text-muted-foreground">
               Description
             </TableHead>
-            <TableHead className="py-1.5 px-3 text-right text-xs uppercase tracking-wide text-muted-foreground">
+            <TableHead className="py-1.5 px-3 text-right text-xs text-muted-foreground">
               Amount
             </TableHead>
             {editable && <TableHead className="w-8 py-1.5 px-2" />}
@@ -579,7 +579,7 @@ function LineItemColumn({
                   </TableCell>
                   <TableCell
                     className={`py-1.5 px-3 text-right font-medium tabular-nums ${
-                      negative ? 'text-destructive' : ''
+ negative ? 'text-destructive' : ''
                     }`}
                   >
                     {formatCurrency(negative ? -Math.abs(amt) : amt)}
@@ -618,7 +618,7 @@ function LineItemColumn({
             </button>
 
           ) : (
-            <div className="p-3 space-y-2 bg-muted/20">
+            <div className="p-3 space-y-2 bg-muted">
               {side === 'deductions' && (
                 <div>
                   <Label className="text-xs">Preset</Label>
@@ -778,7 +778,7 @@ function SummaryStat({
     <div className={`rounded-md border p-3 ${primary ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
-        className={`font-semibold ${primary ? 'text-primary text-lg' : ''} ${negative ? 'text-red-600' : ''}`}
+        className={`font-semibold ${primary ? 'text-primary text-lg' : ''} ${negative ? 'text-destructive' : ''}`}
       >
         {formatCurrency(value)}
       </p>
@@ -809,7 +809,7 @@ function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined 
       </div>
 
       <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm flex items-center justify-between gap-3 flex-wrap">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           Pay Calculation
         </span>
         <span className="font-semibold text-foreground">{breakdown.formulaLabel}</span>

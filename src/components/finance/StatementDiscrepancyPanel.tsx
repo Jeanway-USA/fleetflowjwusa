@@ -74,7 +74,7 @@ export function StatementDiscrepancyPanel({ discrepancies, title = 'Statement Di
               </TableCell>
               <TableCell className="text-right font-mono text-xs">{formatCurrency(Number(d.expected_amount))}</TableCell>
               <TableCell className="text-right font-mono text-xs">{formatCurrency(Number(d.actual_amount))}</TableCell>
-              <TableCell className={`text-right font-mono text-xs font-semibold ${Number(d.delta_amount) >= 0 ? 'text-destructive' : 'text-amber-600'}`}>
+              <TableCell className={`text-right font-mono text-xs font-semibold ${Number(d.delta_amount) >= 0 ? 'text-destructive' : 'text-warning'}`}>
                 {Number(d.delta_amount) >= 0 ? '+' : ''}{formatCurrency(Number(d.delta_amount))}
               </TableCell>
               <TableCell className="text-right">

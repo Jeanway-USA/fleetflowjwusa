@@ -327,7 +327,7 @@ export function SafetyBonusSettings() {
                   <div
                     key={tier.id ?? `new-${idx}`}
                     className={`rounded-md border border-border p-3 space-y-2 ${
-                      tier._toDelete ? 'opacity-50' : ''
+ tier._toDelete ? 'opacity-50' : ''
                     }`}
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">

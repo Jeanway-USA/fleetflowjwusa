@@ -344,7 +344,7 @@ function FederalTab({ year }: { year: number }) {
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
             <p className="text-2xl font-semibold mt-1">{formatCurrency(value)}</p>
           </div>
           <Icon className="h-5 w-5 text-muted-foreground" />
@@ -508,7 +508,7 @@ function W2Tab({ year }: { year: number }) {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span>{r.first_name} {r.last_name}</span>
                         {missing.length > 0 && (
-                          <span className="text-xs uppercase tracking-wide rounded border border-amber-500/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.5">
+                          <span className="text-xs rounded border border-warning/60 text-warning px-1.5 py-0.5">
                             Missing: {missing.join(', ')}
                           </span>
                         )}

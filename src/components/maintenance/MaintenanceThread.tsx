@@ -64,7 +64,7 @@ function MessageBubble({
             <Wrench className="h-3.5 w-3.5 text-primary" />
             <Badge
               variant="outline"
-              className="text-xs uppercase tracking-wide border-primary/40 text-primary bg-primary/10"
+              className="text-xs border-primary/40 text-primary bg-primary/10"
             >
               Recommendation
             </Badge>
@@ -96,7 +96,7 @@ function MessageBubble({
           <Badge
             variant="outline"
             className={cn(
-              'text-xs uppercase tracking-wide',
+              'text-xs  ',
               isDriverMsg
                 ? 'border-primary/40 text-primary bg-primary/5'
                 : 'border-border text-muted-foreground'
@@ -281,7 +281,7 @@ export function MaintenanceThread({
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-72 p-1">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground px-2 py-1.5">
+                <div className="text-xs text-muted-foreground px-2 py-1.5">
                   Quick recommendations
                 </div>
                 <div className="max-h-72 overflow-y-auto">

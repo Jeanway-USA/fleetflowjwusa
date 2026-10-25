@@ -125,7 +125,7 @@ export function DriverStatusGrid() {
   };
 
   const chip = (label: string, cls: string) => (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${cls}`}>{label}</span>
+    <span className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>
   );
   const range = (w: HometimeWindow) => `${format(parseISO(`${w.start_date}T00:00:00`), 'MMM d')} to ${format(parseISO(`${w.end_date}T00:00:00`), 'MMM d')}`;
 
@@ -136,7 +136,7 @@ export function DriverStatusGrid() {
   const entries: RosterEntry[] = (drivers ?? []).map((d) => {
     const eld = getEldSyncState(d.hos_last_updated);
     const creds = expiring(d);
-    const state = d.activeHometime ? chip('On hometime', 'bg-purple-500/15 text-purple-600') : d.activeLoad ? chip('On a load', 'bg-primary/15 text-primary') : chip('Available', 'bg-success/15 text-success');
+    const state = d.activeHometime ? chip('On hometime', 'bg-primary/15 text-primary') : d.activeLoad ? chip('On a load', 'bg-primary/15 text-primary') : chip('Available', 'bg-success/15 text-success');
     return {
       id: d.id,
       title: `${d.first_name} ${d.last_name}`,

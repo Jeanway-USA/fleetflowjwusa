@@ -83,7 +83,7 @@ export function DriverTaxDocuments({ driver }: Props) {
           {/* Upload form */}
           <div className="grid grid-cols-1 sm:grid-cols-[8rem_minmax(0,1fr)_auto] gap-2 items-end">
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider text-muted-foreground">
+              <label className="text-xs text-muted-foreground">
                 Tax Year
               </label>
               <Select value={year} onValueChange={setYear}>
@@ -100,7 +100,7 @@ export function DriverTaxDocuments({ driver }: Props) {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider text-muted-foreground">
+              <label className="text-xs text-muted-foreground">
                 PDF File
               </label>
               <Input
@@ -126,7 +126,7 @@ export function DriverTaxDocuments({ driver }: Props) {
 
           {/* List */}
           <div className="border-t border-border pt-3">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+            <p className="text-xs text-muted-foreground mb-2">
               Uploaded Documents
             </p>
             {isLoading ? (

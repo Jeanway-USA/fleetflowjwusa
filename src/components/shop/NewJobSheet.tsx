@@ -127,7 +127,7 @@ export function NewJobSheet({ open, onOpenChange, truckId, kind, description: st
                 >
                   <span className="block font-condensed text-xl font-bold leading-none">{t.unit_number}</span>
                   <span className="block truncate text-xs text-muted-foreground">{[t.make, t.model].filter(Boolean).join(' ') || 'Truck'}</span>
-                  {t.busy && <span className="mt-1 block text-xs font-medium text-orange-400">Already has an open job</span>}
+                  {t.busy && <span className="mt-1 block text-xs font-medium text-warning">Already has an open job</span>}
                 </button>
               ))}
               {shown.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No trucks match.</p>}

@@ -26,7 +26,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400">
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-success">
                 <CalendarRange className="h-3.5 w-3.5" />
                 🟢 OPEN WINDOW: {displayTime}
               </span>
@@ -43,7 +43,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400">
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                 <DoorOpen className="h-3.5 w-3.5" />
                 🔵 FCFS: opens at {time}
               </span>
@@ -56,7 +56,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 dark:text-orange-400">
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-warning">
         <Clock className="h-3.5 w-3.5" />
         🚨 STRICT APPT: {time}
       </span>
@@ -69,7 +69,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 text-xs gap-1">
+              <Badge variant="outline" className="bg-success/10 text-success border-success/20 text-xs gap-1">
                 <CalendarRange className="h-3 w-3" />
                 Window: {displayTime}
               </Badge>
@@ -86,7 +86,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 text-xs gap-1">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs gap-1">
                 <DoorOpen className="h-3 w-3" />
                 FCFS: {time}
               </Badge>
@@ -99,7 +99,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
       );
     }
     return (
-      <Badge variant="outline" className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 text-xs gap-1">
+      <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20 text-xs gap-1">
         <Clock className="h-3 w-3" />
         Appt: {time}
       </Badge>
@@ -112,7 +112,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+            <span className="inline-flex items-center gap-1 text-xs text-success">
               <CalendarRange className="h-3 w-3" />
               Window{endTime ? `: ${displayTime}` : ''}
             </span>
@@ -130,7 +130,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+            <span className="inline-flex items-center gap-1 text-xs text-primary">
               <DoorOpen className="h-3 w-3" />
               FCFS
             </span>
@@ -144,7 +144,7 @@ export function TimeTypeBadge({ timeType, time, endTime, variant = 'compact', la
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400">
+    <span className="inline-flex items-center gap-1 text-xs text-warning">
       <Clock className="h-3 w-3" />
       Appt
     </span>

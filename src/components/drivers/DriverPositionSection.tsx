@@ -173,13 +173,13 @@ export function DriverPositionSection({ driver, userId: userIdProp, onSuggestPac
 
         {currentPosition && !chosen && currentPosition.required_documents.length > 0 && (
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Required documents</p>
+            <p className="text-xs text-muted-foreground">Required documents</p>
             <ul className="space-y-1 text-sm">
               {currentPosition.required_documents.map((d) => {
                 const done = signed.includes(d.key);
                 return (
                   <li key={d.key} className="flex items-center gap-2">
-                    {done ? <Check className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+                    {done ? <Check className="h-4 w-4 text-success" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
                     <span className={done ? '' : 'text-muted-foreground'}>{d.label}</span>
                     {driverId && !done && <Badge variant="outline" className="text-xs">Not signed</Badge>}
                   </li>
@@ -191,7 +191,7 @@ export function DriverPositionSection({ driver, userId: userIdProp, onSuggestPac
 
         {current && currentPosition && steps.length > 0 && !chosen && (
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Onboarding checklist · {doneCount} of {steps.length}</p>
+            <p className="text-xs text-muted-foreground">Onboarding checklist · {doneCount} of {steps.length}</p>
             <ul>
               {steps.map((s) => (
                 <li key={s.id}>

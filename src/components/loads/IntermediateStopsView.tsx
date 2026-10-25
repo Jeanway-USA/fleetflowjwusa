@@ -100,7 +100,7 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
               {!isLast && (
                 <span
                   className={`absolute left-[10px] top-6 bottom-[-12px] w-px ${
-                    isCompleted ? 'bg-primary' : 'bg-border'
+ isCompleted ? 'bg-primary' : 'bg-border'
                   }`}
                   aria-hidden="true"
                 />
@@ -116,11 +116,11 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
 
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-xs font-semibold uppercase text-muted-foreground">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     Stop {stop.stop_number ?? idx + 1}
                   </span>
                   {stop.stop_type && (
-                    <span className="text-xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                       {stop.stop_type}
                     </span>
                   )}
@@ -160,7 +160,7 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
                         {stop.remaining_hos !== null ? `${stop.remaining_hos} hr` : 'Not logged'}
                       </span>
                       {hosLow && (
-                        <span className="ml-1 text-xs uppercase font-bold">Low</span>
+                        <span className="ml-1 text-xs font-bold">Low</span>
                       )}
                     </div>
                   </div>

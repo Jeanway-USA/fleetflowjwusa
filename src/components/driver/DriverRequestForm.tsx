@@ -133,7 +133,7 @@ export function DriverRequestForm({
             type="button"
             onClick={() => setRequestType(opt.value)}
             className={`flex items-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
-              requestType === opt.value
+ requestType === opt.value
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
             }`}

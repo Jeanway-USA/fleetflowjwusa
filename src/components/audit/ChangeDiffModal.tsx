@@ -64,10 +64,10 @@ export function ChangeDiffModal({ row, open, onOpenChange }: Props) {
                   {keys.map(k => (
                     <tr key={k} className="border-t align-top">
                       <td className="p-2 font-mono">{k}</td>
-                      <td className="p-2 font-mono bg-red-50 dark:bg-red-950/30 text-red-900 dark:text-red-200 break-all">
+                      <td className="p-2 font-mono bg-destructive text-destructive break-all">
                         {fmt(row.previous_values?.[k])}
                       </td>
-                      <td className="p-2 font-mono bg-green-50 dark:bg-green-950/30 text-green-900 dark:text-green-200 break-all">
+                      <td className="p-2 font-mono bg-success text-success break-all">
                         {fmt(row.new_values?.[k])}
                       </td>
                     </tr>

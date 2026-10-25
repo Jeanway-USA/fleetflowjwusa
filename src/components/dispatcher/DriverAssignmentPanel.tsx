@@ -162,7 +162,7 @@ export function DriverAssignmentPanel() {
                   onDragStart={() => handleDragStart(driver)}
                   onDragEnd={handleDragEnd}
                   className={`flex items-center gap-2 p-2 rounded-md border border-border bg-muted/30 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors ${
-                    draggedDriver?.id === driver.id ? 'opacity-50 ring-2 ring-primary' : ''
+ draggedDriver?.id === driver.id ? 'opacity-50 ring-2 ring-primary' : ''
                   }`}
                 >
                   <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -171,7 +171,7 @@ export function DriverAssignmentPanel() {
                       {driver.first_name} {driver.last_name}
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/20 shrink-0">
+                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/20 shrink-0">
                     Available
                   </Badge>
                 </div>
@@ -197,7 +197,7 @@ export function DriverAssignmentPanel() {
                   onDragOver={handleDragOver}
                   onDrop={() => handleDrop(load.id)}
                   className={`p-2 rounded-md border transition-all ${
-                    draggedDriver
+ draggedDriver
                       ? 'border-dashed border-primary bg-primary/5 ring-1 ring-primary/20'
                       : 'border-border bg-muted/30'
                   } ${assigningLoad === load.id ? 'opacity-50' : ''}`}
@@ -225,7 +225,7 @@ export function DriverAssignmentPanel() {
               ))
             ) : (
               <div className="text-center py-4 text-muted-foreground">
-                <Check className="h-5 w-5 mx-auto mb-1 text-green-500" />
+                <Check className="h-5 w-5 mx-auto mb-1 text-success" />
                 <p className="text-xs">All loads assigned</p>
               </div>
             )}

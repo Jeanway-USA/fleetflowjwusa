@@ -166,7 +166,7 @@ export function InvoicingTab() {
         <Card className="overflow-hidden">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-emerald-600 flex-shrink-0" />
+              <FileText className="h-8 w-8 text-success flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">Invoiced</p>
                 <p className="text-xl sm:text-2xl font-bold truncate">{invoicedLoads.length}</p>
@@ -177,7 +177,7 @@ export function InvoicingTab() {
         <Card className="overflow-hidden">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <Receipt className="h-8 w-8 text-amber-600 flex-shrink-0" />
+              <Receipt className="h-8 w-8 text-warning flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">Uninvoiced Revenue</p>
                 <p className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(uninvoicedLoads.reduce((sum, l) => sum + getTotal(l), 0))}</p>
@@ -268,7 +268,7 @@ export function InvoicingTab() {
                           {load.invoiced_at ? format(parseISO(load.invoiced_at), 'MMM d, yyyy') : '—'}
                         </TableCell>
                         <TableCell>
-                          <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Invoiced</Badge>
+                          <Badge className="bg-success/10 text-success border-success/30">Invoiced</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <Button size="sm" variant="outline" onClick={() => openEdit(load)}>

@@ -15,10 +15,10 @@ import { LANE_STYLE, ShopEmpty } from '@/components/shop/shared';
 import { TruckStatusControl } from '@/components/shop/job/TruckStatus';
 
 const STATUS: Record<string, { label: string; style: string }> = {
-  active: { label: 'On the road', style: 'text-emerald-400' },
+  active: { label: 'On the road', style: 'text-success' },
   in_shop: { label: 'In the shop', style: 'text-primary' },
-  out_of_service: { label: 'Out of service', style: 'text-red-400' },
-  pending_inspection: { label: 'Needs inspection', style: 'text-orange-300' },
+  out_of_service: { label: 'Out of service', style: 'text-destructive' },
+  pending_inspection: { label: 'Needs inspection', style: 'text-warning' },
 };
 
 /** Every truck at a glance: where it is, what is open on it, and a one-tap way to start a job. */

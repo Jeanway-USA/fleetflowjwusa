@@ -168,7 +168,7 @@ export function CommissionsTab({ filteredCommissions, commissionTotals, commissi
               <table className="w-full text-[15px]">
                 <caption className="sr-only">Agent commissions for the selected period</caption>
                 <thead>
-                  <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b text-left text-[12px] font-semibold text-muted-foreground">
                     <th scope="col" className="px-4 py-2">Agent</th>
                     <th scope="col" className="py-2 text-right">Rate</th>
                     <th scope="col" className="py-2 text-right">Amount</th>

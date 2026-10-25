@@ -21,12 +21,12 @@ export function PulseStrip({ summary, fleetSize, doneToday, wall }: { summary: B
         label="Trucks in the shop"
         value={summary.trucksDown}
         sub={fleetSize ? `of ${fleetSize} in the fleet${summary.longestDown && summary.longestDown.days > 0 ? `, longest ${summary.longestDown.unit} (${summary.longestDown.days}d)` : ''}` : undefined}
-        tone={summary.trucksDown > 0 ? 'text-foreground' : 'text-emerald-400'}
+        tone={summary.trucksDown > 0 ? 'text-foreground' : 'text-success'}
       />
       <Pulse wall={wall} label="On the lift" value={summary.perLane.working} sub={summary.unassigned > 0 ? `${summary.unassigned} job${summary.unassigned === 1 ? '' : 's'} with nobody on them` : 'Everyone has a job'} tone={LANE_STYLE.working.text} />
       <Pulse wall={wall} label="Waiting" value={summary.perLane.waiting} sub={summary.overdue > 0 ? `${summary.overdue} past the needed-by date` : 'Nothing overdue'} tone={summary.perLane.waiting > 0 ? LANE_STYLE.waiting.text : undefined} />
       <Pulse wall={wall} label="Ready to close" value={summary.perLane.ready} sub="All tasks done" tone={summary.perLane.ready > 0 ? LANE_STYLE.ready.text : undefined} />
-      <Pulse wall={wall} label="Finished today" value={doneToday} sub={`${formatMinutes(summary.laborMinutes)} labor, ${money(summary.partsCost)} parts on open jobs`} tone="text-emerald-400" />
+      <Pulse wall={wall} label="Finished today" value={doneToday} sub={`${formatMinutes(summary.laborMinutes)} labor, ${money(summary.partsCost)} parts on open jobs`} tone="text-success" />
     </div>
   );
 }

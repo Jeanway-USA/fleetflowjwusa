@@ -20,7 +20,7 @@ function Block({ icon: Icon, title, count, children, tone }: { icon: typeof Wren
       <header className="mb-2.5 flex items-center gap-2">
         <Icon className={cn('h-4 w-4', tone ?? 'text-muted-foreground')} />
         <h2 className="font-condensed text-lg font-bold leading-none">{title}</h2>
-        {count !== undefined && count > 0 && <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">{count}</span>}
+        {count !== undefined && count > 0 && <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">{count}</span>}
       </header>
       {children}
     </section>
@@ -48,7 +48,7 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
 
   return (
     <aside className="space-y-3">
-      <Block icon={AlertTriangle} title="Driver reports" count={newReports.length} tone="text-orange-400">
+      <Block icon={AlertTriangle} title="Driver reports" count={newReports.length} tone="text-warning">
         {newReports.length === 0 ? (
           <p className="text-xs text-muted-foreground">No new reports from drivers.</p>
         ) : (
@@ -72,7 +72,7 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
         )}
       </Block>
 
-      <Block icon={ClipboardList} title="Service due" count={pmList.length} tone="text-amber-300">
+      <Block icon={ClipboardList} title="Service due" count={pmList.length} tone="text-warning">
         {pmList.length === 0 ? (
           <p className="text-xs text-muted-foreground">No service coming due.</p>
         ) : (
@@ -94,7 +94,7 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
         )}
       </Block>
 
-      <Block icon={Package} title="Low on stock" count={lowList.length} tone="text-red-400">
+      <Block icon={Package} title="Low on stock" count={lowList.length} tone="text-destructive">
         {lowList.length === 0 ? (
           <p className="text-xs text-muted-foreground">Shelves are stocked.</p>
         ) : (
@@ -102,7 +102,7 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
             {lowList.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="min-w-0 truncate">{p.part_name}</span>
-                <span className={cn('shrink-0 tabular-nums text-xs font-semibold', Number(p.quantity_on_hand) === 0 ? 'text-red-400' : 'text-orange-300')}>
+                <span className={cn('shrink-0 tabular-nums text-xs font-semibold', Number(p.quantity_on_hand) === 0 ? 'text-destructive' : 'text-warning')}>
                   {Number(p.quantity_on_hand)} left / min {Number(p.min_threshold)}
                 </span>
               </li>
@@ -133,7 +133,7 @@ export function HeadsUpRail({ jobs, partsPath }: { jobs: ShopJob[]; partsPath: s
                     <span className="block truncate font-medium">{c.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">{j ? `Unit ${j.unit}, ${jobTitle(j)}` : 'Free'}</span>
                   </span>
-                  <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', j?.runningTimer?.userName === c.name ? 'bg-primary' : j ? 'bg-slate-400' : 'bg-emerald-500')} />
+                  <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', j?.runningTimer?.userName === c.name ? 'bg-primary' : j ? 'bg-muted-foreground' : 'bg-success')} />
                 </li>
               );
             })}

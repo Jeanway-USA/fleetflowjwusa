@@ -168,7 +168,7 @@ export function CSVImportDialog({ open, onOpenChange, tableName, fields, queryKe
         {step === 'upload' && (
           <div
             className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
-              dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+ dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
             }`}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -265,7 +265,7 @@ export function CSVImportDialog({ open, onOpenChange, tableName, fields, queryKe
                         ))}
                         <TableCell>
                           {valid
-                            ? <Check className="h-4 w-4 text-green-600" />
+                            ? <Check className="h-4 w-4 text-success" />
                             : <AlertTriangle className="h-4 w-4 text-destructive" />}
                         </TableCell>
                       </TableRow>

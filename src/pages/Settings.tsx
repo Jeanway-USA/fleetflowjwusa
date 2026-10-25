@@ -38,8 +38,8 @@ const GROUPS: Group[] = ['People', 'Company', 'Pay', 'You'];
 function AppearanceSection() {
   const { theme, setTheme } = useTheme();
   const choices = [
-    { value: 'light' as const, label: 'Light', Icon: Sun, page: 'bg-white border-gray-200', bar: 'bg-gray-200' },
-    { value: 'dark' as const, label: 'Dark', Icon: Moon, page: 'bg-zinc-900 border-zinc-700', bar: 'bg-zinc-700' },
+    { value: 'light' as const, label: 'Light', Icon: Sun, page: 'bg-white border-border', bar: 'bg-muted' },
+    { value: 'dark' as const, label: 'Dark', Icon: Moon, page: 'bg-muted-foreground border-border', bar: 'bg-muted-foreground' },
   ];
   return (
     <Card>

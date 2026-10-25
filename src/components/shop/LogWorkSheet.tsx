@@ -163,8 +163,8 @@ export function LogWorkSheet({ open, onOpenChange, truckId }: Props) {
           </section>
 
           {dupe && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-              <p className="font-medium text-amber-300">This may already be logged</p>
+            <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+              <p className="font-medium text-warning">This may already be logged</p>
               <p className="mt-0.5 text-muted-foreground">There is already a finished job on this truck for {date}: <Link className="text-primary underline" to={`/shop/jobs/${dupe.id}`}>{dupe.title}</Link>. Save it anyway only if it is a different job.</p>
             </div>
           )}

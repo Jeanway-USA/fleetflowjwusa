@@ -608,7 +608,7 @@ export function DataTable<T extends { id: string }>({
                     const isSorted = sortState?.key === key;
                     const SortIcon = !col.sortable ? null : (isSorted ? (sortState!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown);
                     return (
-                      <th key={i} className={cn(thClass, "text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ width: computedWidths[i] }}>
+                      <th key={i} className={cn(thClass, "text-left text-xs font-semibold   text-muted-foreground whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ width: computedWidths[i] }}>
                         {col.sortable ? (
                           <button
                             type="button"
@@ -846,7 +846,7 @@ export function DataTable<T extends { id: string }>({
           role="region"
           aria-label="Bulk actions"
         >
-          <div className="flex items-center gap-4 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
+          <div className="flex items-center gap-4 rounded-md border border-border bg-background px-4 py-2 shadow-lg">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-foreground">
                 {safeSelectedIds.size} selected

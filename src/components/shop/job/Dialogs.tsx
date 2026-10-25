@@ -38,7 +38,7 @@ export function BlockDialog({ detail, open, onOpenChange, touch }: { detail: Sho
         </DialogHeader>
         <div className="grid gap-2">
           {BLOCK_REASONS.map((r) => (
-            <button key={r} type="button" onClick={() => setReason(r)} className={cn('rounded-lg border px-4 text-left font-medium transition-colors', touch ? 'min-h-[60px] text-lg' : 'min-h-[48px]', reason === r ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500' : 'hover:bg-accent')}>
+            <button key={r} type="button" onClick={() => setReason(r)} className={cn('rounded-lg border px-4 text-left font-medium transition-colors', touch ? 'min-h-[60px] text-lg' : 'min-h-[48px]', reason === r ? 'border-warning bg-warning/10 ring-1 ring-warning' : 'hover:bg-accent')}>
               {r}
             </button>
           ))}
@@ -46,7 +46,7 @@ export function BlockDialog({ detail, open, onOpenChange, touch }: { detail: Sho
         <Textarea value={extra} onChange={(e) => setExtra(e.target.value)} rows={2} placeholder="Which part, or anything else (optional)" className={touch ? 'text-lg' : ''} />
         <div className="flex gap-2">
           <Button variant="outline" className="h-12 flex-1" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <LoadingButton loading={actions.block.isPending} disabled={actions.block.isPending} onClick={submit} className="h-12 flex-[2] bg-orange-500 text-white hover:bg-orange-600">Move to Waiting</LoadingButton>
+          <LoadingButton loading={actions.block.isPending} disabled={actions.block.isPending} onClick={submit} className="h-12 flex-[2] bg-warning text-white hover:bg-warning">Move to Waiting</LoadingButton>
         </div>
       </DialogContent>
     </Dialog>
@@ -85,7 +85,7 @@ export function FinishDialog({ detail, open, onOpenChange, onDone, touch }: { de
         </DialogHeader>
 
         {open_tasks > 0 && (
-          <p className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-300">{open_tasks} task{open_tasks === 1 ? ' is' : 's are'} not ticked yet. You can still finish.</p>
+          <p className="rounded-lg bg-warning/10 p-3 text-sm text-warning">{open_tasks} task{open_tasks === 1 ? ' is' : 's are'} not ticked yet. You can still finish.</p>
         )}
 
         <dl className="grid grid-cols-3 gap-2 text-center">
@@ -106,7 +106,7 @@ export function FinishDialog({ detail, open, onOpenChange, onDone, touch }: { de
 
         <div className="flex gap-2">
           <Button variant="outline" className="h-12 flex-1" onClick={() => onOpenChange(false)} disabled={actions.finish.isPending}>Not yet</Button>
-          <LoadingButton loading={actions.finish.isPending} disabled={actions.finish.isPending} onClick={submit} className="h-12 flex-[2] bg-emerald-600 text-white hover:bg-emerald-700">
+          <LoadingButton loading={actions.finish.isPending} disabled={actions.finish.isPending} onClick={submit} className="h-12 flex-[2] bg-success text-white hover:bg-success">
             <CheckCheck className="mr-2 h-5 w-5" />Finish the job
           </LoadingButton>
         </div>

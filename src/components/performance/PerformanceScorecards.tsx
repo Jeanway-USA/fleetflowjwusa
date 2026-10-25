@@ -143,9 +143,9 @@ export function PerformanceScorecards({ metrics, selectedDriver }: PerformanceSc
                   <BonusRing weeks={metric.bonusWeeks} />
                   {globalIndex < 3 && (
                     <Trophy className={`h-5 w-5 ${
-                      globalIndex === 0 ? 'text-yellow-500' :
-                      globalIndex === 1 ? 'text-gray-400' :
-                      'text-amber-600'
+ globalIndex === 0 ? 'text-warning' :
+                      globalIndex === 1 ? 'text-muted-foreground' :
+                      'text-warning'
                     }`} />
                   )}
                 </div>
@@ -162,7 +162,7 @@ export function PerformanceScorecards({ metrics, selectedDriver }: PerformanceSc
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/10 cursor-help">
+                        <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10 cursor-help">
                           Retention Review Required
                         </Badge>
                       </TooltipTrigger>

@@ -92,7 +92,7 @@ export function Roster({ entries, selectedIds, onToggle, empty, bordered = true 
                 <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                   {entry.facts.map((fact) => (
                     <div key={fact.label} className="min-w-0">
-                      <dt className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">{fact.label}</dt>
+                      <dt className="text-[12px] font-semibold text-muted-foreground">{fact.label}</dt>
                       <dd className={cn('text-[15px] font-medium', fact.tone && toneClass[fact.tone])}>{fact.value}</dd>
                     </div>
                   ))}

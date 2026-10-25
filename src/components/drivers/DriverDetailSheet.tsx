@@ -258,7 +258,7 @@ export function DriverDetailSheet({
             <div className="py-4 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Escrow Pool Balance</p>
+                  <p className="text-xs text-muted-foreground">Current Escrow Pool Balance</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Weekly Lease {formatCurrency(Number(leaseAgreement.weekly_lease_amount))} • {formatCurrency(Number(leaseAgreement.escrow_cpm_rate), { maximumFractionDigits: 4 })}/mi escrow • {leaseAgreement.total_weeks_remaining} weeks remaining
                   </p>

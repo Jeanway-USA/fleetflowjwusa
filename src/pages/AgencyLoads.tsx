@@ -159,11 +159,11 @@ export default function AgencyLoads() {
         <>
           <StatusBadge status={l.status} />
           {l.exception_status && l.exception_status !== 'normal' && (
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${l.exception_status === 'disrupted' ? 'bg-destructive/15 text-destructive' : 'bg-warning/15 text-warning'}`}>
+            <span className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${l.exception_status === 'disrupted' ? 'bg-destructive/15 text-destructive' : 'bg-warning/15 text-warning'}`}>
               {l.exception_status === 'disrupted' ? 'Disrupted' : 'Update pending'}
             </span>
           )}
-          {l.pay2day && <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary">Pay2Day</span>}
+          {l.pay2day && <span className="rounded-md bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">Pay2Day</span>}
         </>
       ),
       subtitle: (
