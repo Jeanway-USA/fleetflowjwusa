@@ -4,6 +4,7 @@
 // Includes caching to minimize API calls and respect rate limits.
 
 import { supabase } from '@/integrations/supabase/client';
+import { parseAddressParts, cityAndState, type Country } from '@/lib/address-parts';
 
 interface Coordinates {
   lat: number;
@@ -58,6 +59,17 @@ const cityFallbacks: Record<string, Coordinates> = {
   'el paso': { lat: 31.7619, lng: -106.4850 },
   'louisville': { lat: 38.2527, lng: -85.7585 },
   'olive branch': { lat: 34.9618, lng: -89.8295 },
+  'calgary': { lat: 51.0447, lng: -114.0719 },
+  'edmonton': { lat: 53.5461, lng: -113.4938 },
+  'vancouver': { lat: 49.2827, lng: -123.1207 },
+  'toronto': { lat: 43.6532, lng: -79.3832 },
+  'montreal': { lat: 45.5017, lng: -73.5673 },
+  'winnipeg': { lat: 49.8951, lng: -97.1384 },
+  'regina': { lat: 50.4452, lng: -104.6189 },
+  'saskatoon': { lat: 52.1332, lng: -106.6700 },
+  'ottawa': { lat: 45.4215, lng: -75.6972 },
+  'lethbridge': { lat: 49.6935, lng: -112.8418 },
+  'red deer': { lat: 52.2681, lng: -113.8112 },
   'lancaster': { lat: 32.5921, lng: -96.7561 },
 };
 
@@ -118,66 +130,24 @@ function extractCityState(address: string): string {
   return parts.slice(0, 2).join(', ');
 }
 
-// Extract city name from address for fallback lookup
+// Canadian cities in the fallback list, so a Canadian address never lands on a US city of the same name.
+const CANADIAN_FALLBACKS = new Set(['calgary', 'edmonton', 'vancouver', 'toronto', 'montreal', 'winnipeg', 'regina', 'saskatoon', 'ottawa', 'lethbridge', 'red deer']);
+
+// Find a known city for the last-resort lookup. Uses the parsed city when there is one (an exact match, in the right
+// country), and otherwise whole words only, so "Lancaster" never matches inside some other word.
 function extractCityFromAddress(address: string): string | null {
+  const { city, country } = parseAddressParts(address);
+  const allow = (name: string) => (country === 'ca' ? CANADIAN_FALLBACKS.has(name) : country === 'us' ? !CANADIAN_FALLBACKS.has(name) : true);
+  if (city) {
+    const exact = normalizeAddress(city);
+    return cityFallbacks[exact] && allow(exact) ? exact : null;
+  }
   const normalized = normalizeAddress(address);
-  
-  // Try to find a known city in the address
-  for (const city of Object.keys(cityFallbacks)) {
-    if (normalized.includes(city)) {
-      return city;
-    }
+  for (const name of Object.keys(cityFallbacks)) {
+    if (!allow(name)) continue;
+    if (new RegExp(`\\b${name}\\b`).test(normalized)) return name;
   }
-  
   return null;
-}
-
-// Split a full US address string into structured pieces so Nominatim can match
-// the street rather than only the city.
-// "Set Epes Yard, 4455 Lansing Dr, Winston Salem, NC 27105-2924"
-//   -> { street: '4455 Lansing Dr', city: 'Winston Salem', state: 'NC', postal: '27105' }
-function parseAddressParts(address: string): {
-  street?: string;
-  city?: string;
-  state?: string;
-  postal?: string;
-} {
-  const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
-  if (parts.length < 2) return {};
-
-  let state: string | undefined;
-  let postal: string | undefined;
-  let stateIdx = -1;
-
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const m = parts[i].match(/^([A-Za-z]{2})(?:\s+(\d{5})(?:-\d{4})?)?$/);
-    if (m) {
-      state = m[1].toUpperCase();
-      postal = m[2];
-      stateIdx = i;
-      break;
-    }
-    const m2 = parts[i].match(/^(.+?)\s+([A-Za-z]{2})(?:\s+(\d{5})(?:-\d{4})?)?$/);
-    if (m2) {
-      state = m2[2].toUpperCase();
-      postal = m2[3];
-      stateIdx = i;
-      break;
-    }
-  }
-
-  if (stateIdx === -1) return {};
-
-  const city = stateIdx > 0 ? parts[stateIdx - 1] : undefined;
-  // The street is the part before the city that starts with a house number.
-  let street: string | undefined;
-  for (let i = stateIdx - 2; i >= 0; i--) {
-    if (/^\d/.test(parts[i])) {
-      street = parts[i];
-      break;
-    }
-  }
-  return { street, city, state, postal };
 }
 
 // Shared Nominatim rate limiter (1 req/sec policy)
@@ -192,7 +162,7 @@ async function throttleNominatim() {
 async function nominatimQuery(params: Record<string, string>): Promise<Coordinates | null> {
   await throttleNominatim();
   try {
-    const qs = new URLSearchParams({ format: 'json', limit: '1', countrycodes: 'us', ...params });
+    const qs = new URLSearchParams({ format: 'json', limit: '1', countrycodes: 'us,ca', ...params });
     const response = await fetch(`https://nominatim.openstreetmap.org/search?${qs.toString()}`, {
       headers: { 'User-Agent': 'FleetManagementApp/1.0' },
     });
@@ -241,20 +211,22 @@ async function geocodeWithMapbox(
 
 // Step 2: Nominatim on the full structured address (street-level)
 async function geocodeStructuredWithNominatim(address: string): Promise<Coordinates | null> {
-  const { street, city, state, postal } = parseAddressParts(address);
+  const { street, city, state, postal, country } = parseAddressParts(address);
   if (!street || !city || !state) return null;
   return nominatimQuery({
     street,
     city,
     state,
+    countrycodes: country ?? 'us,ca',
     ...(postal ? { postalcode: postal } : {}),
   });
 }
 
 // Step 3: Nominatim on City, State only (legacy behavior — centroid)
 async function geocodeCityStateWithNominatim(address: string): Promise<Coordinates | null> {
-  const cityState = extractCityState(address);
-  return nominatimQuery({ q: cityState });
+  const found = cityAndState(address);
+  if (found) return nominatimQuery({ q: `${found.city}, ${found.state}`, countrycodes: found.country });
+  return nominatimQuery({ q: extractCityState(address) });
 }
 
 // Main geocoding function - synchronous for backward compatibility
