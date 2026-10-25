@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { uploadPathError } from './upload-path.ts';
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
@@ -401,16 +402,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      // IDOR guard for all uploads (built-in and Google Drive)
-      if (filePath.startsWith('gdrive:') || filePath.startsWith('http')) {
-        return new Response(JSON.stringify({ error: 'Invalid path' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const denied = assertOwnsPath(bucket, filePath);
+      // Drive document paths are relative to the authenticated org's root.
+      // Built-in uploads and all read/delete operations keep prefix ownership checks.
+      const denied = uploadPathError(bucket, filePath, orgId, callerId,
+        storageConfig?.provider === 'google_drive' && !!storageConfig.encrypted_credentials);
       if (denied) {
         return new Response(JSON.stringify({ error: denied }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: denied === 'Invalid path' ? 400 : 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -453,7 +451,8 @@ Deno.serve(async (req) => {
 
           // Create path subfolders
           const pathParts = filePath.split('/');
-          const fileName = pathParts.pop()!;
+          const fileName = pathParts.pop();
+          if (!fileName) throw new Error('Invalid path');
           let currentFolderId = bucketFolderId;
           for (const part of pathParts) {
             currentFolderId = await ensureFolderExists(accessToken, currentFolderId, part);
