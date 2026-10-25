@@ -119,7 +119,7 @@ serve(async (req) => {
       return_url: `${origin}/settings?tab=billing`,
     });
 
-    logStep("Portal session created", { url: portalSession.url });
+    logStep("Portal session created", { sessionId: portalSession.id });
 
     return new Response(JSON.stringify({ url: portalSession.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
