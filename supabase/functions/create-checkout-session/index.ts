@@ -218,7 +218,7 @@ serve(async (req) => {
       cancel_url: `${origin}/pricing`,
     });
 
-    logStep("Checkout session created", { sessionId: session.id, url: session.url });
+    logStep("Checkout session created", { sessionId: session.id });
 
     // Atomically increment the promo code usage counter. The conditional
     // WHERE ensures concurrent checkouts can't push times_used past max_uses.
