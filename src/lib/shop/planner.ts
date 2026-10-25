@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import type { TruckWithSchedules } from '@/hooks/useMaintenanceData';
+import type { ManufacturerService, TruckWithSchedules } from '@/hooks/useMaintenanceData';
 
 export type PlanStatus = 'overdue' | 'soon' | 'ok';
 
@@ -18,6 +18,31 @@ export interface PlannerItem {
   status: PlanStatus;
 }
 
+export type DutyCycle = 'normal' | 'heavy' | 'severe';
+
+/** Oil intervals shorten with harder work. Volvo and Mack publish 60,000 / 45,000 / 35,000 mi; the factors match those. */
+const DUTY_FACTOR: Record<DutyCycle, number> = { normal: 1, heavy: 0.75, severe: 0.6 };
+
+/** Whether a manufacturer service is the engine oil and filter service, the one that depends on engine and duty. */
+export function isOilService(make: string, code: string): boolean {
+  const m = make.trim().toLowerCase();
+  const c = code.toUpperCase();
+  if (m === 'freightliner' || m === 'western star') return c === 'PM_A';
+  if (m === 'international') return c === 'CLASS_B';
+  return c === 'PM_B';
+}
+
+/**
+ * The oil interval for one truck. A Cummins engine in a truck built by someone else follows Cummins' own table
+ * (about 60,000 mi at normal duty; verify), then the duty cycle shortens it. Other engines keep the make's interval.
+ */
+export function oilInterval(base: number, engine: string | null | undefined, duty: string | null | undefined): number {
+  const e = (engine ?? '').trim().toLowerCase();
+  const start = e === 'cummins' ? 60000 : base;
+  const factor = DUTY_FACTOR[(duty as DutyCycle) ?? 'normal'] ?? 1;
+  return Math.round((start * factor) / 1000) * 1000;
+}
+
 const SOON_MILES = 1000;
 const SOON_DAYS = 14;
 
@@ -30,6 +55,8 @@ export function statusFor(remaining: number, basis: 'miles' | 'days'): PlanStatu
 export function kindFor(code: string | null | undefined, name: string): string {
   const c = (code ?? '').toUpperCase();
   if (['M1', 'M2', 'M3', 'PM_A'].includes(c)) return c;
+  // Every other maker service is its own kind of job, so finishing it resets that service and not the oil change.
+  if (/^(PM_|CLASS_)/.test(c) || ['ANNUAL_DOT', 'AIR_DRYER', 'DPF_CLEAN', 'DEF_FILTER', 'COOLANT', 'TRANS_FLUID', 'AXLE_FLUID'].includes(c)) return c;
   const n = name.toLowerCase();
   if (/tire/.test(n)) return 'tire';
   if (/inspect/.test(n)) return 'inspection';
@@ -50,12 +77,31 @@ const item = (t: TruckWithSchedules, name: string, kind: string, basis: 'miles' 
   status: statusFor(interval - used, basis),
 });
 
+/**
+ * One maker service as a plan item. A service with both miles and months is due at whichever comes first, so the
+ * item shown is the one closer to its limit. Months only count once there is a record of when it was last done.
+ */
+function manufacturerItem(t: TruckWithSchedules, s: ManufacturerService, today: Date): PlannerItem | null {
+  const p = s.profile;
+  const kind = kindFor(p.service_code, p.service_name);
+  const miles = p.interval_miles ? (isOilService(t.make ?? '', p.service_code) ? oilInterval(p.interval_miles, t.engine_make, t.duty_cycle) : p.interval_miles) : null;
+  const candidates: PlannerItem[] = [];
+  if (miles) candidates.push(item(t, p.service_name, kind, 'miles', s.miles_since_service, miles));
+  if (p.interval_days) {
+    if (s.baseline.date) candidates.push(item(t, p.service_name, kind, 'days', differenceInCalendarDays(today, parseISO(s.baseline.date)), p.interval_days));
+    else if (!miles) candidates.push(item(t, p.service_name, kind, 'days', p.interval_days + 1, p.interval_days));
+  }
+  if (candidates.length === 0) return null;
+  return candidates.reduce((a, b) => (a.remaining / a.interval <= b.remaining / b.interval ? a : b));
+}
+
 /** Every service coming due on every truck, as one flat list the screen can sort and group. */
 export function buildPlanner(trucks: TruckWithSchedules[], today: Date = new Date()): PlannerItem[] {
   const out: PlannerItem[] = [];
   for (const t of trucks) {
     for (const s of t.manufacturer_services) {
-      out.push(item(t, s.profile.service_name, kindFor(s.profile.service_code, s.profile.service_name), 'miles', s.miles_since_service, s.profile.interval_miles || 25000));
+      const one = manufacturerItem(t, s, today);
+      if (one) out.push(one);
     }
     // Trucks without a manufacturer plan fall back to the plain oil change schedule.
     const oil = t.schedules.find((s) => s.service_name === 'Oil Change');

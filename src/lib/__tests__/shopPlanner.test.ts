@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPlanner, kindFor, planCounts, projectedDate, remainingLabel, sortPlan, statusFor } from '@/lib/shop/planner';
+import { buildPlanner, isOilService, kindFor, oilInterval, planCounts, projectedDate, remainingLabel, sortPlan, statusFor } from '@/lib/shop/planner';
 import type { TruckWithSchedules } from '@/hooks/useMaintenanceData';
 
 const today = new Date(2026, 9, 12);
@@ -78,5 +78,47 @@ describe('kinds and forecast', () => {
     expect(projectedDate({ remaining: 2000, basis: 'miles' }, 0, today)).toBeNull();
     expect(projectedDate({ remaining: 6, basis: 'days' }, 0, today)).toEqual(new Date(2026, 9, 18));
     expect(projectedDate({ remaining: -50, basis: 'miles' }, 100, today)).toEqual(today);
+  });
+});
+
+describe('maker services by engine, duty and time', () => {
+  const svc = (code: string, miles: number | null, days: number | null, since: number, date: string | null = null, make = 'Volvo') =>
+    ({ profile: { id: code, manufacturer: make, service_name: code, service_code: code, interval_miles: miles, interval_days: days, description: null, display_order: 1 }, schedule: null, miles_since_service: since, baseline: { workOrderId: null, date } });
+
+  it('knows which service is the oil service for each make', () => {
+    expect(isOilService('Freightliner', 'PM_A')).toBe(true);
+    expect(isOilService('Kenworth', 'PM_B')).toBe(true);
+    expect(isOilService('International', 'CLASS_B')).toBe(true);
+    expect(isOilService('Volvo', 'PM_C')).toBe(false);
+  });
+
+  it('shortens the oil interval for hard work and follows Cummins for a Cummins engine', () => {
+    expect(oilInterval(60000, null, 'normal')).toBe(60000);
+    expect(oilInterval(60000, null, 'heavy')).toBe(45000);
+    expect(oilInterval(60000, null, 'severe')).toBe(36000);
+    expect(oilInterval(75000, 'Cummins', 'normal')).toBe(60000);
+    expect(oilInterval(75000, 'Detroit', 'normal')).toBe(75000);
+  });
+
+  it('applies the duty cycle to the oil service only', () => {
+    const items = buildPlanner([truck({ make: 'Volvo', duty_cycle: 'heavy', manufacturer_services: [svc('PM_B', 60000, null, 40000), svc('PM_C', 150000, null, 40000)] })], today);
+    expect(items.map((i) => [i.name, i.interval])).toEqual([['PM_B', 45000], ['PM_C', 150000]]);
+  });
+
+  it('uses whichever of miles or months is closer to its limit, and months only once there is a record', () => {
+    const dated = buildPlanner([truck({ manufacturer_services: [svc('AIR_DRYER', 300000, 1095, 20000, '2023-10-01')] })], today);
+    expect(dated[0]).toMatchObject({ basis: 'days', kind: 'AIR_DRYER', status: 'overdue' });
+    const undated = buildPlanner([truck({ manufacturer_services: [svc('AIR_DRYER', 300000, 1095, 20000)] })], today);
+    expect(undated[0]).toMatchObject({ basis: 'miles', remaining: 280000 });
+  });
+
+  it('shows a months-only service such as the annual DOT inspection as overdue until it has a record', () => {
+    expect(buildPlanner([truck({ manufacturer_services: [svc('ANNUAL_DOT', null, 365, 0)] })], today)[0]).toMatchObject({ basis: 'days', status: 'overdue' });
+    expect(buildPlanner([truck({ manufacturer_services: [svc('ANNUAL_DOT', null, 365, 0, '2026-08-01')] })], today)[0]).toMatchObject({ status: 'ok', remaining: 365 - 72 });
+  });
+
+  it('gives each maker service its own kind of job', () => {
+    expect(kindFor('PM_B', 'PM B')).toBe('PM_B');
+    expect(kindFor('DPF_CLEAN', 'DPF ash cleaning')).toBe('DPF_CLEAN');
   });
 });

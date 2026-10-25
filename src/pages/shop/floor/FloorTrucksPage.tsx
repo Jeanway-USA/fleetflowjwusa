@@ -82,7 +82,7 @@ export default function FloorTrucksPage() {
 
       <Sheet open={!!open} onOpenChange={(v) => !v && setOpenId(null)}>
         <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
-          <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
+          <SheetHeader className="shrink-0 mx-0 mt-0 static border-b px-5 pt-5 pb-4 pr-12 text-left">
             <SheetTitle className="font-condensed text-4xl">{open?.unit_number}</SheetTitle>
             <SheetDescription>{[open?.year, open?.make, open?.model].filter(Boolean).join(' ')}{open?.current_odometer ? ` · ${open.current_odometer.toLocaleString()} mi` : ''}</SheetDescription>
           </SheetHeader>

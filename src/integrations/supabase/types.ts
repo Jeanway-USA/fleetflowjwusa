@@ -7381,6 +7381,9 @@ export type Database = {
           loan_balance: number | null
           loan_start_date: string | null
           loan_term_months: number | null
+          duty_cycle: string
+          engine_make: string | null
+          engine_model: string | null
           make: string | null
           model: string | null
           monthly_payment: number | null
@@ -7389,6 +7392,7 @@ export type Database = {
           original_loan_amount: number | null
           purchase_mileage: number | null
           status: string
+          transmission: string | null
           unit_number: string
           updated_at: string
           vin: string | null
@@ -7412,6 +7416,9 @@ export type Database = {
           loan_balance?: number | null
           loan_start_date?: string | null
           loan_term_months?: number | null
+          duty_cycle?: string
+          engine_make?: string | null
+          engine_model?: string | null
           make?: string | null
           model?: string | null
           monthly_payment?: number | null
@@ -7420,6 +7427,7 @@ export type Database = {
           original_loan_amount?: number | null
           purchase_mileage?: number | null
           status?: string
+          transmission?: string | null
           unit_number: string
           updated_at?: string
           vin?: string | null
@@ -7443,6 +7451,9 @@ export type Database = {
           loan_balance?: number | null
           loan_start_date?: string | null
           loan_term_months?: number | null
+          duty_cycle?: string
+          engine_make?: string | null
+          engine_model?: string | null
           make?: string | null
           model?: string | null
           monthly_payment?: number | null
@@ -7451,6 +7462,7 @@ export type Database = {
           original_loan_amount?: number | null
           purchase_mileage?: number | null
           status?: string
+          transmission?: string | null
           unit_number?: string
           updated_at?: string
           vin?: string | null
@@ -7940,6 +7952,7 @@ export type Database = {
           service_types?: string[] | null
           started_at?: string | null
           status?: string
+          transmission?: string | null
           truck_id: string
           updated_at?: string
           vendor?: string | null
@@ -7970,6 +7983,7 @@ export type Database = {
           service_types?: string[] | null
           started_at?: string | null
           status?: string
+          transmission?: string | null
           truck_id?: string
           updated_at?: string
           vendor?: string | null

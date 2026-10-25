@@ -35,6 +35,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { TruckLoanPaymentsSection } from '@/components/trucks/TruckLoanPaymentsSection';
 import { AmortizationCard } from '@/components/trucks/AmortizationCard';
 import { DriverAssignmentSelect } from '@/components/trucks/DriverAssignmentSelect';
+import { ENGINES, TRANSMISSIONS } from '@/lib/shop/truckWork';
 
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -72,6 +73,10 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     loan_start_date,
     lender_name,
   } = truck;
+  const engine_make = (truck as any).engine_make as string | null | undefined;
+  const duty_cycle = (truck as any).duty_cycle as string | undefined;
+  const engine_model = (truck as any).engine_model as string | null | undefined;
+  const transmission = (truck as any).transmission as string | null | undefined;
   const original_loan_amount = (truck as any).original_loan_amount as number | null | undefined;
 
   return {
@@ -93,6 +98,10 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     loan_term_months: loan_term_months ?? null,
     loan_start_date: loan_start_date ?? null,
     lender_name: lender_name ?? null,
+    engine_make: engine_make ?? null,
+    duty_cycle: duty_cycle ?? 'normal',
+    engine_model: engine_model ?? null,
+    transmission: transmission ?? null,
   } as Partial<TruckInsert>;
 };
 
@@ -507,6 +516,49 @@ export default function Trucks() {
                 <Input id="year" type="number" value={formData.year || ''} onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || undefined })} placeholder="2023" />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="engine_make">Engine maker</Label>
+                <Select value={(formData as any).engine_make || 'unknown'} onValueChange={(v) => setFormData({ ...formData, engine_make: v === 'unknown' ? null : v, engine_model: null } as Partial<TruckInsert>)}>
+                  <SelectTrigger id="engine_make"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unknown">Not sure</SelectItem>
+                    {Object.keys(ENGINES).map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="engine_model">Engine model</Label>
+                <Select disabled={!(formData as any).engine_make} value={(formData as any).engine_model || 'unknown'} onValueChange={(v) => setFormData({ ...formData, engine_model: v === 'unknown' ? null : v } as Partial<TruckInsert>)}>
+                  <SelectTrigger id="engine_model"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unknown">Not sure</SelectItem>
+                    {(ENGINES[(formData as any).engine_make as string] ?? []).map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="transmission">Transmission</Label>
+                <Select value={(formData as any).transmission || 'unknown'} onValueChange={(v) => setFormData({ ...formData, transmission: v === 'unknown' ? null : v } as Partial<TruckInsert>)}>
+                  <SelectTrigger id="transmission"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unknown">Not sure</SelectItem>
+                    {TRANSMISSIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="duty_cycle">How hard it works</Label>
+                <Select value={(formData as any).duty_cycle || 'normal'} onValueChange={(v) => setFormData({ ...formData, duty_cycle: v } as Partial<TruckInsert>)}>
+                  <SelectTrigger id="duty_cycle"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">Normal (long haul, good mpg)</SelectItem>
+                    <SelectItem value="heavy">Heavy (regional, heavy loads)</SelectItem>
+                    <SelectItem value="severe">Severe (lots of idling or hard use)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="vin">VIN</Label>
               <Input id="vin" value={formData.vin || ''} onChange={(e) => setFormData({ ...formData, vin: e.target.value })} placeholder="1FUJGBDV7CLBP8834" />
@@ -679,6 +731,8 @@ export default function Trucks() {
                     <div className="divide-y">
                       <StatementLine label="Driver" value={small(viewingTruck.drivers ? `${viewingTruck.drivers.first_name} ${viewingTruck.drivers.last_name}` : 'Unassigned')} />
                       <StatementLine label="Status" value={<StatusBadge status={viewingTruck.status} />} />
+                      <StatementLine label="Engine" value={small([(viewingTruck as any).engine_make, (viewingTruck as any).engine_model].filter(Boolean).join(' ') || 'Not set')} />
+                      <StatementLine label="Transmission" value={small((viewingTruck as any).transmission || 'Not set')} />
                       <StatementLine label="VIN" value={small(<span className="font-mono text-sm">{viewingTruck.vin || 'Not set'}</span>)} />
                       <StatementLine label="License plate" value={small(viewingTruck.license_plate ? `${viewingTruck.license_plate}${viewingTruck.license_plate_state ? ` (${viewingTruck.license_plate_state})` : ''}` : 'Not set')} />
                       <StatementLine label="Mileage when bought" value={small(viewingTruck.purchase_mileage != null ? Number(viewingTruck.purchase_mileage).toLocaleString() : 'Not set')} />
