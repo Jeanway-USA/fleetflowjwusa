@@ -165,42 +165,63 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     }
   };
 
+  // A PDF is read by an AI service and can take a minute. Every file is read at the same time, each with its own
+  // status and time limit, so one slow or stuck file can no longer freeze the whole import.
+  const PDF_TIMEOUT_MS = 150_000;
+
+  const withTimeout = <T,>(work: Promise<T>, ms: number, message: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(message)), ms);
+      work.then(
+        (v) => { clearTimeout(timer); resolve(v); },
+        (e) => { clearTimeout(timer); reject(e); },
+      );
+    });
+
+  const parseOne = async (sf: StagedFile): Promise<StagedFile> => {
+    try {
+      const isExcel = isExcelFile(sf.file);
+      let data: any;
+
+      if (isExcel) {
+        const buffer = await sf.file.arrayBuffer();
+        data = await parseLandstarXlsx(buffer);
+      } else {
+        const pdfBase64 = await convertFileToBase64(sf.file);
+        if (!pdfBase64 || pdfBase64.length < 100) throw new Error('Could not read PDF file.');
+        const { data: fnData, error: fnError } = await withTimeout(
+          supabase.functions.invoke('parse-landstar-statement', { body: { pdfBase64 } }),
+          PDF_TIMEOUT_MS,
+          'Reading this PDF took too long. Press Try again.',
+        );
+        if (fnError) throw new Error(fnError.message || 'Failed to parse statement');
+        if (fnData.error) throw new Error(fnData.error);
+        data = fnData;
+      }
+
+      // A PDF's real type is what the parser found, not what its filename suggested.
+      const type = isExcel ? sf.type : typeFromParsedPdf(data?.statement_type, sf.type);
+      return { ...sf, type, status: 'parsed', data, error: undefined };
+    } catch (err) {
+      return { ...sf, status: 'error', error: err instanceof Error ? err.message : 'Parse failed' };
+    }
+  };
+
   const processDocuments = async () => {
     if (stagedFiles.length === 0) return;
     setIsProcessing(true);
     setError(null);
 
-    const updatedFiles = [...stagedFiles];
-
-    for (let i = 0; i < updatedFiles.length; i++) {
-      const sf = updatedFiles[i];
-      if (sf.status === 'parsed') continue;
-
-      try {
-        const isExcel = isExcelFile(sf.file);
-        let data: any;
-
-        if (isExcel) {
-          const buffer = await sf.file.arrayBuffer();
-          data = await parseLandstarXlsx(buffer);
-        } else {
-          const pdfBase64 = await convertFileToBase64(sf.file);
-          if (!pdfBase64 || pdfBase64.length < 100) throw new Error('Could not read PDF file.');
-          const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-landstar-statement', {
-            body: { pdfBase64 },
-          });
-          if (fnError) throw new Error(fnError.message || 'Failed to parse statement');
-          if (fnData.error) throw new Error(fnData.error);
-          data = fnData;
-        }
-
-        // A PDF's real type is what the parser found, not what its filename suggested.
-        const type = isExcel ? sf.type : typeFromParsedPdf(data?.statement_type, sf.type);
-        updatedFiles[i] = { ...sf, type, status: 'parsed', data };
-      } catch (err) {
-        updatedFiles[i] = { ...sf, status: 'error', error: err instanceof Error ? err.message : 'Parse failed' };
-      }
-    }
+    // Mark what is about to be read, then read everything at once, updating each row the moment it finishes.
+    setStagedFiles((prev) => prev.map((f) => (f.status === 'parsed' ? f : { ...f, status: 'parsing', error: undefined })));
+    const updatedFiles = await Promise.all(
+      stagedFiles.map(async (sf) => {
+        if (sf.status === 'parsed') return sf;
+        const done = await parseOne(sf);
+        setStagedFiles((prev) => prev.map((p) => (p.file === done.file ? done : p)));
+        return done;
+      }),
+    );
 
     setStagedFiles(updatedFiles);
 
@@ -324,8 +345,16 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
                             <span className="text-xs text-muted-foreground truncate max-w-[160px]">
                               {staged.file.name}
                             </span>
+                            {staged.status === 'parsing' && (
+                              <Badge variant="outline" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Reading…</Badge>
+                            )}
                             {staged.status === 'error' && (
-                              <Badge variant="destructive" className="text-xs">Error</Badge>
+                              <>
+                                <Badge variant="destructive" className="text-xs" title={staged.error}>Error</Badge>
+                                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={isProcessing} onClick={(e) => { e.stopPropagation(); void processDocuments(); }}>
+                                  Try again
+                                </Button>
+                              </>
                             )}
                             {staged.status === 'parsed' && (
                               <Badge className="text-xs bg-success/20 text-success border-success/30">Parsed</Badge>
@@ -347,6 +376,19 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
                     );
                   })}
                 </div>
+
+                {isProcessing && (
+                  <p className="text-sm text-muted-foreground" aria-live="polite">
+                    Reading your files. The PDFs can take a minute or two. You can leave this window open.
+                  </p>
+                )}
+                {stagedFiles.some((f) => f.status === 'error') && !isProcessing && (
+                  <ul className="space-y-1 text-sm text-destructive">
+                    {stagedFiles.filter((f) => f.status === 'error').map((f) => (
+                      <li key={f.file.name}>{f.file.name}: {f.error}</li>
+                    ))}
+                  </ul>
+                )}
 
                 {/* Process Button */}
                 <div className="flex gap-2 justify-end">
