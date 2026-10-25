@@ -330,7 +330,7 @@ export function TeamManagementTab() {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
-      toast.success(`Password reset email sent to ${userToResetPassword.email}`);
+      toast.success(`Email sent to ${userToResetPassword.email}`);
       setResetPasswordDialogOpen(false);
       setUserToResetPassword(null);
     } catch (error: any) {
@@ -392,7 +392,7 @@ export function TeamManagementTab() {
             )}
             {hasPayrollAccess && <DropdownMenuItem onClick={() => { setPeopleSuggestedPackage(null); setPeopleUser(row); }}><Briefcase className="mr-2 h-4 w-4" /> Position & pay</DropdownMenuItem>}
             {hasPayrollAccess && row.role !== 'driver' && <DropdownMenuItem onClick={() => setOnboardingUser(row)}><ClipboardCheck className="mr-2 h-4 w-4" /> Onboarding</DropdownMenuItem>}
-            <DropdownMenuItem onClick={() => { setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}><KeyRound className="mr-2 h-4 w-4" /> Force password reset</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}><KeyRound className="mr-2 h-4 w-4" /> {isActive ? "Force password reset" : "Resend sign-in email"}</DropdownMenuItem>
             <DropdownMenuSeparator />
             {!row.deactivated && <DropdownMenuItem className="text-destructive" onClick={() => setUserToDeactivate(row)}><UserX className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>}
           </DropdownMenuContent>
@@ -662,9 +662,9 @@ export function TeamManagementTab() {
       <AlertDialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Force Password Reset</AlertDialogTitle>
+            <AlertDialogTitle>{userToResetPassword?.first_name ? "Force Password Reset" : "Resend sign-in email"}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will send a password reset email to{' '}
+              {userToResetPassword?.first_name ? "This will send a password reset email to" : "This will send an email with a link to set a password and sign in, to"}{' '}
               <span className="font-semibold">{userToResetPassword?.email}</span>.
             </AlertDialogDescription>
           </AlertDialogHeader>

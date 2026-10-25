@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useCallback } from 'react';
+import { ReactNode, Suspense, lazy, useEffect, useRef, useCallback, useState } from 'react';
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { TopBar } from './TopBar';
@@ -8,11 +8,45 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { CommandPalette } from '@/components/shared/CommandPalette';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { ProductTour } from '@/components/shared/ProductTour';
 import { useProductTour } from '@/hooks/useProductTour';
 import { getTourForRoute } from '@/lib/tour-steps';
+
+// The search palette and the guided tour are used occasionally, so they are not part of the first download. The palette
+// loads a moment after the page is up (or the instant someone asks for it); the tour only when a tour is running.
+const loadCommandPalette = () => import('@/components/shared/CommandPalette').then((m) => ({ default: m.CommandPalette }));
+const CommandPalette = lazy(loadCommandPalette);
+const ProductTour = lazy(() => import('@/components/shared/ProductTour').then((m) => ({ default: m.ProductTour })));
+
+function DeferredCommandPalette() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const schedule: (cb: () => void) => number =
+      typeof window.requestIdleCallback === 'function' ? (cb) => window.requestIdleCallback(cb, { timeout: 4000 }) : (cb) => window.setTimeout(cb, 2500);
+    const cancel: (id: number) => void = typeof window.cancelIdleCallback === 'function' ? window.cancelIdleCallback.bind(window) : window.clearTimeout.bind(window);
+    const idleId = schedule(() => { void loadCommandPalette().then(() => setReady(true)); });
+
+    // Asked for before it has loaded: load it, then open it.
+    const openWhenLoaded = () => {
+      if (ready) return;
+      void loadCommandPalette().then(() => {
+        setReady(true);
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-command-palette')), 80);
+      });
+    };
+    const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openWhenLoaded(); } };
+    window.addEventListener('open-command-palette', openWhenLoaded);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      cancel(idleId);
+      window.removeEventListener('open-command-palette', openWhenLoaded);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [ready]);
+
+  return ready ? <Suspense fallback={null}><CommandPalette /></Suspense> : null;
+}
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -106,16 +140,18 @@ function DashboardLayoutInner({ children, signOut }: {
         </div>
       </main>
       <MobileTabBar />
-      <CommandPalette />
-      {tourDef && (
-        <ProductTour
-          steps={tourDef.steps}
-          currentStep={tour.currentStep}
-          isActive={tour.isActive}
-          onNext={handleTourNext}
-          onPrev={tour.prevStep}
-          onSkip={handleTourSkip}
-        />
+      <DeferredCommandPalette />
+      {tourDef && tour.isActive && (
+        <Suspense fallback={null}>
+          <ProductTour
+            steps={tourDef.steps}
+            currentStep={tour.currentStep}
+            isActive={tour.isActive}
+            onNext={handleTourNext}
+            onPrev={tour.prevStep}
+            onSkip={handleTourSkip}
+          />
+        </Suspense>
       )}
     </div>
   );

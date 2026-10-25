@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import * as XLSX from 'xlsx';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -85,11 +86,11 @@ export default function FleetLoads() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = usePersistedState<string>('loads.month', 'all');
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('loads.status', 'all');
   const [showRateConUpload, setShowRateConUpload] = useState(false);
-  const [searchInput, setSearchInput] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = usePersistedState<string>('loads.search', '');
+  const [searchTerm, setSearchTerm] = useState(searchInput);
   const debouncedSetSearch = useDebouncedCallback((v: string) => setSearchTerm(v.trim().toLowerCase()), 300);
   const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
   const [pendingIntermediateStops, setPendingIntermediateStops] = useState<any[]>([]);

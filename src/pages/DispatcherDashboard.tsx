@@ -19,6 +19,7 @@ const FleetMapView = lazy(() =>
   import('@/components/dispatcher/FleetMapView').then(m => ({ default: m.FleetMapView })),
 );
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
+import { DeferredMap } from '@/components/shared/DeferredMap';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
 import { UnassignedLoadsDrawer } from '@/components/dispatcher/UnassignedLoadsDrawer';
 import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
@@ -181,9 +182,11 @@ export default function DispatcherDashboard() {
           <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
             <div className="flex h-full flex-col lg:col-span-2" data-tour="fleet-map">
               <ErrorBoundary compact>
-                <Suspense fallback={<MapSkeleton height={360} />}>
-                  <FleetMapView />
-                </Suspense>
+                <DeferredMap height={360}>
+                  <Suspense fallback={<MapSkeleton height={360} />}>
+                    <FleetMapView />
+                  </Suspense>
+                </DeferredMap>
               </ErrorBoundary>
             </div>
             <div className="flex h-full flex-col">

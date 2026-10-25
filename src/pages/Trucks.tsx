@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useHighlightRow } from '@/hooks/useHighlightRow';
@@ -106,8 +107,8 @@ export default function Trucks() {
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
   
   const [csvImportOpen, setCsvImportOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = usePersistedState<string>('trucks.search', '');
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('trucks.status', 'all');
 
 
   const truckFields = [

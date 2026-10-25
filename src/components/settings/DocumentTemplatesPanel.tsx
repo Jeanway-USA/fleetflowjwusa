@@ -275,6 +275,40 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
     },
   });
 
+  // Start a new template from an existing one (a new year's agreement, say). The copy is switched off, so nothing changes
+  // for the people being onboarded until the copy is edited and turned on.
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      const source = templates.find((t) => t.id === selectedId);
+      if (!source || !orgId) throw new Error("No template selected");
+      const taken = new Set(templates.map((t) => t.document_type));
+      let type = `${source.document_type}_copy`;
+      for (let n = 2; taken.has(type); n++) type = `${source.document_type}_copy${n}`;
+      const { data, error } = await supabase
+        .from("document_templates")
+        .insert({
+          org_id: orgId,
+          document_type: type,
+          name: source.name ? `${source.name} (copy)` : null,
+          content: source.content,
+          is_active: false,
+          applies_to: source.applies_to ?? "shared",
+          signatory_roles: source.signatory_roles && source.signatory_roles.length > 0 ? source.signatory_roles : ["driver"],
+          created_by: user?.id ?? null,
+        } as never)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as DocumentTemplate;
+    },
+    onSuccess: (row) => {
+      toast.success("Copy created and switched off. Edit it, then turn it on under Active.");
+      queryClient.invalidateQueries({ queryKey: ["document_templates", orgId] });
+      setSelectedId(row.id);
+    },
+    onError: (err: Error) => toast.error(err.message || "Could not copy the template"),
+  });
+
   const archiveMutation = useMutation({
     mutationFn: async (archive: boolean) => {
       if (!selectedId) throw new Error("No template selected");
@@ -544,6 +578,10 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                       </div>
 
                       <div className="flex flex-wrap justify-end gap-2">
+                        <Button variant="outline" className="h-12" onClick={() => duplicateMutation.mutate()} disabled={duplicateMutation.isPending}>
+                          {duplicateMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Copy className="h-4 w-4 mr-2" />}
+                          Duplicate
+                        </Button>
                         {!selected.archived_at && (
                           <Button variant="outline" className="h-12" onClick={() => setArchiveOpen(true)} disabled={archiveMutation.isPending}>
                             <Archive className="h-4 w-4 mr-2" />
