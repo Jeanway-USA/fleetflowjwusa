@@ -559,6 +559,9 @@ export default function Drivers() {
   return (
     <>
       <PageHeader title="Drivers" description="Manage your drivers" action={{ label: 'Add Driver', onClick: () => openDialog() }}>
+        <Button variant="outline" className="h-11 sm:h-10" onClick={() => navigate('/drivers/review')}>
+          <FileSignature className="h-4 w-4 mr-2" /> Review documents
+        </Button>
         <Button variant="outline" className="h-11 sm:h-10" onClick={() => setCsvImportOpen(true)}>
           <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
         </Button>

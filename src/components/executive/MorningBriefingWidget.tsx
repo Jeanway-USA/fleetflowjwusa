@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { countAwaitingReview } from '@/lib/onboarding/reviewQueue';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -153,7 +154,7 @@ export function MorningBriefingWidget() {
       if (roles.includes('owner') || roles.includes('payroll_admin')) {
         const [onboarding, awaitingReview] = await Promise.all([
           supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('org_id', orgId).eq('requires_onboarding', true).eq('onboarding_completed', false),
-          supabase.from('driver_signed_documents').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('review_status', 'pending'),
+          countAwaitingReview(orgId),
         ]);
         if ((onboarding.count ?? 0) > 0) {
           results.push({
@@ -166,15 +167,15 @@ export function MorningBriefingWidget() {
             route: '/settings?tab=team',
           });
         }
-        if ((awaitingReview.count ?? 0) > 0) {
+        if (awaitingReview > 0) {
           results.push({
             key: 'documents-to-review',
             label: 'Documents Awaiting Review',
-            count: awaitingReview.count ?? 0,
+            count: awaitingReview,
             icon: ClipboardCheck,
             colorClass: 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20',
             action: 'navigate',
-            route: '/drivers',
+            route: '/drivers/review',
           });
         }
       }

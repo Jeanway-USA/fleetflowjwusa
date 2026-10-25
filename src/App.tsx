@@ -29,6 +29,7 @@ const Finance = lazy(() => import("./pages/Finance"));
 const CompanyInsights = lazy(() => import("./pages/CompanyInsights"));
 const MaintenanceRedirect = lazy(() => import("./pages/shop/MaintenanceRedirect"));
 const ShopPartsPage = lazy(() => import("./pages/shop/ShopPartsPage"));
+const DocumentReview = lazy(() => import("./pages/DocumentReview"));
 const ShopPlannerPage = lazy(() => import("./pages/shop/ShopPlannerPage"));
 const ShopHistoryPage = lazy(() => import("./pages/shop/ShopHistoryPage"));
 const ShopHoursPage = lazy(() => import("./pages/shop/ShopHoursPage"));
@@ -177,6 +178,11 @@ const App = () => {
                     <Route path="/trailers" element={
                       <ProtectedRoute allowedRoles={['owner', 'safety', 'maintenance']} requiredFeature="trailers">
                         <Trailers />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/drivers/review" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']} requiredFeature="drivers">
+                        <DocumentReview />
                       </ProtectedRoute>
                     } />
                     <Route path="/drivers" element={
