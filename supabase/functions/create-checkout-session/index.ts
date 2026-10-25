@@ -197,7 +197,7 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: {
-              name: `Fleet Flow TMS - ${tier.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} (${isAnnual ? "Annual" : "Monthly"})`,
+              name: `Fleet Flow TMS - ${tier.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())} (${isAnnual ? "Annual" : "Monthly"})`,
               metadata: { tier },
             },
             unit_amount: unitAmount,
