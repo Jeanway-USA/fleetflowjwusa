@@ -788,7 +788,7 @@ export function SettlementsTab() {
 
               {/* Gross Revenue Section */}
               <div className="mt-4 mb-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Gross Revenue</h4>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-2">Gross Revenue</h4>
                 {revenueItems.length > 0 ? (
                   <div className="space-y-0">
                     {revenueItems.map((item, i) => (
@@ -818,7 +818,7 @@ export function SettlementsTab() {
 
               {/* Itemized Deductions Section */}
               <div className="mt-4 mb-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Deductions</h4>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-2">Deductions</h4>
                 {(() => {
                   const advances = [
                     { label: 'Fuel Advances', value: viewingSettlement.fuel_advances },

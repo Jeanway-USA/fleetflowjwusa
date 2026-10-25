@@ -78,7 +78,7 @@ export function PayBreakdown({
 
       {employeeLines.length > 0 && (
         <div className="mt-2 border-t border-border/60 pt-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Taxes withheld
           </p>
           {employeeLines.map((l) => (
@@ -117,7 +117,7 @@ export function PayBreakdown({
 
       {showEmployer && employerLines.length > 0 && (
         <div className="mt-3 rounded-md bg-muted/40 p-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Employer liability (not withheld from pay)
           </p>
           {employerLines.map((l) => (

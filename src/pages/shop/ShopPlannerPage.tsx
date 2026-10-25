@@ -18,9 +18,9 @@ import { StatStrip } from '@/components/shared/StatStrip';
 import { ShopEmpty } from '@/components/shop/shared';
 
 const TONE: Record<PlanStatus, { text: string; bar: string; label: string }> = {
-  overdue: { text: 'text-red-400', bar: 'bg-red-500', label: 'Overdue' },
-  soon: { text: 'text-orange-300', bar: 'bg-orange-500', label: 'Due soon' },
-  ok: { text: 'text-emerald-400', bar: 'bg-emerald-500', label: 'On track' },
+  overdue: { text: 'text-destructive', bar: 'bg-destructive', label: 'Overdue' },
+  soon: { text: 'text-warning', bar: 'bg-warning', label: 'Due soon' },
+  ok: { text: 'text-success', bar: 'bg-success', label: 'On track' },
 };
 
 type View = 'attention' | 'trucks' | 'forecast';
@@ -117,7 +117,7 @@ export default function ShopPlannerPage() {
         <ul className="space-y-2">
           {forecast.map(({ i, when }) => (
             <li key={`${i.truckId}-${i.name}`} className="flex items-center gap-4 rounded-lg border bg-card p-3.5">
-              <div className="w-16 shrink-0 text-center"><p className="font-condensed text-3xl font-bold leading-none">{format(when, 'd')}</p><p className="text-xs uppercase text-muted-foreground">{format(when, 'MMM')}</p></div>
+              <div className="w-16 shrink-0 text-center"><p className="font-condensed text-3xl font-bold leading-none">{format(when, 'd')}</p><p className="text-xs text-muted-foreground">{format(when, 'MMM')}</p></div>
               <span className="w-16 shrink-0 font-condensed text-2xl font-bold">{i.unit}</span>
               <span className="min-w-0 flex-1 truncate">{i.name}</span>
               <span className={cn('shrink-0 text-sm font-semibold tabular-nums', TONE[i.status].text)}>{remainingLabel(i)}</span>

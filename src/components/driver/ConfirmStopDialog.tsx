@@ -103,7 +103,7 @@ export function ConfirmStopDialog({ open, onOpenChange, stop, onConfirmed }: Con
 
         {stop && (
           <div className="rounded-md border bg-muted/40 p-3 space-y-1">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">
+            <p className="text-xs font-semibold text-muted-foreground">
               Stop {stop.stop_number ?? '-'}{stop.stop_type ? ` · ${stop.stop_type}` : ''}
             </p>
             {stop.facility_name && (

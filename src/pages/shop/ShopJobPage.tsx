@@ -61,7 +61,7 @@ export default function ShopJobPage() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-condensed text-5xl font-bold leading-none">{job.unit}</span>
             <PriorityTag priority={job.priority} />
-            <span className={cn('rounded-md px-2.5 py-1 text-xs font-semibold', done ? 'bg-emerald-500/15 text-emerald-300' : cn(LANE_STYLE[lane].tint, LANE_STYLE[lane].text))}>{done ? 'Finished' : laneInfo.title}</span>
+            <span className={cn('rounded-md px-2.5 py-1 text-xs font-semibold', done ? 'bg-success/15 text-success' : cn(LANE_STYLE[lane].tint, LANE_STYLE[lane].text))}>{done ? 'Finished' : laneInfo.title}</span>
           </div>
           <p className="mt-1 text-lg font-medium">{jobTitle(job)}</p>
           <p className="text-sm text-muted-foreground">{[job.truckName, job.odometer ? `${job.odometer.toLocaleString()} mi` : null, `In ${format(parseISO(job.entryDate), 'MMM d')}`].filter(Boolean).join(' · ')}</p>
@@ -87,11 +87,11 @@ export default function ShopJobPage() {
           {!done && (
             <div className="grid gap-2">
               {job.status !== 'parts_ordered' && (
-                <Button variant="outline" className="h-12 gap-2 border-orange-500/50 text-orange-300 hover:bg-orange-500/10" onClick={() => setBlockOpen(true)}>
+                <Button variant="outline" className="h-12 gap-2 border-warning/50 text-warning hover:bg-warning/10" onClick={() => setBlockOpen(true)}>
                   <PauseCircle className="h-5 w-5" />Waiting on something
                 </Button>
               )}
-              <Button className="h-12 gap-2 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => setFinishOpen(true)}>
+              <Button className="h-12 gap-2 bg-success text-white hover:bg-success" onClick={() => setFinishOpen(true)}>
                 <CheckCheck className="h-5 w-5" />Finish the job
               </Button>
             </div>

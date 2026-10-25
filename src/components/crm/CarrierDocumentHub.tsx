@@ -192,7 +192,7 @@ export function CarrierDocumentHub() {
                   <p className="font-medium text-sm leading-tight">{dt.label}</p>
                   {doc ? (
                     <>
-                      <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30">
+                      <Badge variant="outline" className="bg-success/10 text-success border-success/30">
                         Uploaded {format(new Date(doc.created_at), 'MMM d, yyyy')}
                       </Badge>
                       <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>

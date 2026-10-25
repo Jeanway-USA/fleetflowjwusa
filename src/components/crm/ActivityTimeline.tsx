@@ -18,11 +18,11 @@ const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
 };
 
 const ACTIVITY_COLORS: Record<string, string> = {
-  call: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
-  email: 'bg-purple-500/10 text-purple-500 border-purple-500/30',
+  call: 'bg-primary/10 text-primary border-primary/30',
+  email: 'bg-primary/10 text-primary border-primary/30',
   note: 'bg-muted text-muted-foreground border-border',
-  meeting: 'bg-green-500/10 text-green-500 border-green-500/30',
-  load_booked: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
+  meeting: 'bg-success/10 text-success border-success/30',
+  load_booked: 'bg-warning/10 text-warning border-warning/30',
 };
 
 interface ActivityTimelineProps {

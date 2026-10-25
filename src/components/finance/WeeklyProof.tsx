@@ -163,7 +163,7 @@ export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
       id: w.week,
       title: w.week === 'undated' ? 'No settlement date' : `Settled ${format(parseISO(w.week), 'EEE, MMM d')}`,
       chips: (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${w.proven ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+        <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold ${w.proven ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
           {w.proven ? 'Proven' : 'To check'}
         </span>
       ),

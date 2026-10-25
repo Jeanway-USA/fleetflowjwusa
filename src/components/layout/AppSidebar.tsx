@@ -135,7 +135,7 @@ const NAV_BUTTON_CLASS =
   "[&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:text-sidebar-foreground/60 data-[active=true]:[&>svg]:text-sidebar-primary";
 
 const GROUP_LABEL_CLASS =
-  "text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50";
+  "text-xs font-semibold   text-sidebar-foreground/50";
 
 function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, currentPath }: CollapsibleNavGroupProps) {
   if (items.length === 0) return null;

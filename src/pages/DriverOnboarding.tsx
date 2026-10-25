@@ -1117,7 +1117,7 @@ export default function DriverOnboarding() {
   const stepRevisionNotes = isCredentialsStep ? credentialsRevisionNotes : null;
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-background">
+    <div className="min-h-screen bg-muted dark:bg-background">
     <div className="container max-w-4xl py-10 pb-32">
 
 
@@ -1306,11 +1306,11 @@ export default function DriverOnboarding() {
           </span>
           {isDocumentsStep && (
             documentsValid ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+              <span className="text-success font-semibold mt-0.5">
                 Ready to submit!
               </span>
             ) : (
-              <span className="text-orange-600 dark:text-orange-400 font-medium mt-0.5">
+              <span className="text-warning font-medium mt-0.5">
                 Complete all documents to continue
               </span>
             )

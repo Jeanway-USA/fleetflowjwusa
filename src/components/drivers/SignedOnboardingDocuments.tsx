@@ -145,9 +145,9 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
   }
 
   const outstandingSection = outstanding.length > 0 ? (
-    <div className="rounded-md border-2 border-amber-500/50 bg-amber-500/5 p-3 space-y-2">
+    <div className="rounded-md border-2 border-warning/50 bg-warning/5 p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        <AlertTriangle className="h-4 w-4 text-warning" />
         <p className="font-semibold text-sm">Outstanding documents ({outstanding.length})</p>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -162,9 +162,9 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
               <FileSignature className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="font-medium truncate">{friendly}</span>
               {t.builtin ? (
-                <Badge variant="outline" className="text-xs uppercase">Built-in</Badge>
+                <Badge variant="outline" className="text-xs">Built-in</Badge>
               ) : (
-                <Badge variant="outline" className="text-xs uppercase">
+                <Badge variant="outline" className="text-xs">
                   {t.applies_to === 'shared' ? 'All' : t.applies_to === 'w2' ? 'W-2' : '1099'}
                 </Badge>
               )}
@@ -238,7 +238,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
                         <Eye className="mr-1.5 h-4 w-4" />
                         Preview
                       </Button>
-                      <Button size="sm" onClick={() => openSignedUrl(downloadPath, downloadName, 'download')}>
+                      <Button size="sm" variant="outline" onClick={() => openSignedUrl(downloadPath, downloadName, 'download')}>
                         <Download className="mr-1.5 h-4 w-4" />
                         Download
                       </Button>
@@ -302,7 +302,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-emerald-500/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                    className="border-success/60 text-success hover:bg-success/10"
                     disabled={reviewMutation.isPending}
                     onClick={() => reviewMutation.mutate({ id: d.id, status: 'approved', notes: null })}
                   >
@@ -355,7 +355,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
 
 function StatusPill({ status }: { status: ReviewStatus }) {
   if (status === 'approved') {
-    return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs">Approved</Badge>;
+    return <Badge className="bg-success/15 text-success border-success/30 text-xs">Approved</Badge>;
   }
   if (status === 'revision_requested') {
     return <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-xs">Revision requested</Badge>;

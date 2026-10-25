@@ -230,7 +230,7 @@ export function DriverSettlementsTab() {
   };
 
   const chip = (active: boolean, label: string, onClick: () => void) => (
-    <Button key={label} variant={active ? 'default' : 'outline'} className="h-11 rounded-full px-4 capitalize" aria-pressed={active} onClick={onClick}>
+    <Button key={label} variant={active ? 'default' : 'outline'} className="h-11 rounded-md px-4 capitalize" aria-pressed={active} onClick={onClick}>
       {label}
     </Button>
   );
@@ -294,7 +294,7 @@ export function DriverSettlementsTab() {
               <table className="w-full text-[15px]">
                 <caption className="sr-only">Driver settlement statements</caption>
                 <thead>
-                  <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b text-left text-[12px] font-semibold text-muted-foreground">
                     <th scope="col" className="px-4 py-2">Driver</th>
                     <th scope="col" className="py-2">Pay period</th>
                     <th scope="col" className="py-2 text-right">Gross pay</th>

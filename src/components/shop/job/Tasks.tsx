@@ -31,7 +31,7 @@ export function Tasks({ detail, touch }: { detail: ShopJobDetail; touch?: boolea
       {tasks.length === 0 && <ShopEmpty title="No tasks yet">Add the steps for this job. Ticking them all moves the job to Ready to close.</ShopEmpty>}
       <ul className="space-y-2">
         {tasks.map((t) => (
-          <li key={t.id} className={cn('flex items-stretch overflow-hidden rounded-lg border bg-card', t.is_done && 'bg-emerald-500/5')}>
+          <li key={t.id} className={cn('flex items-stretch overflow-hidden rounded-lg border bg-card', t.is_done && 'bg-success/5')}>
             <button
               type="button"
               disabled={locked || actions.toggleTask.isPending}
@@ -39,7 +39,7 @@ export function Tasks({ detail, touch }: { detail: ShopJobDetail; touch?: boolea
               className={cn('flex flex-1 items-center gap-3 text-left transition-colors hover:bg-accent/50 disabled:opacity-60', touch ? 'min-h-[68px] px-4' : 'min-h-[48px] px-3')}
               aria-pressed={t.is_done}
             >
-              <span className={cn('flex shrink-0 items-center justify-center rounded-md border-2 transition-colors', touch ? 'h-9 w-9' : 'h-6 w-6', t.is_done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-muted-foreground/50')}>
+              <span className={cn('flex shrink-0 items-center justify-center rounded-md border-2 transition-colors', touch ? 'h-9 w-9' : 'h-6 w-6', t.is_done ? 'border-success bg-success text-white' : 'border-muted-foreground/50')}>
                 {t.is_done && <Check className={touch ? 'h-6 w-6' : 'h-4 w-4'} strokeWidth={3} />}
               </span>
               <span className="min-w-0 flex-1">

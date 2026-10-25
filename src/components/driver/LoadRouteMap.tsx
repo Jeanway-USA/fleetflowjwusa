@@ -180,7 +180,7 @@ export function LoadRouteMap({ origin, destination, notes, loadId, liveGeometry 
       {isLive && (
         <Badge
           variant="outline"
-          className="absolute top-2 right-2 z-[400] bg-background/90 text-green-600 border-green-500/30 gap-1"
+          className="absolute top-2 right-2 z-[400] bg-background/90 text-success border-success/30 gap-1"
         >
           <Radio className="h-3 w-3 animate-pulse" />
           Live route
@@ -232,9 +232,9 @@ export function LoadRouteMap({ origin, destination, notes, loadId, liveGeometry 
             <Popup>
               <div className="text-sm min-w-[160px]">
                 <p className="font-medium">Stop {gs.stop.stopNumber} ({gs.stop.stopType})</p>
-                <p className="text-xs text-gray-600">{gs.stop.facilityName}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{gs.stop.address}</p>
-                {gs.stop.date && <p className="text-xs text-gray-400">{gs.stop.date}</p>}
+                <p className="text-xs text-muted-foreground">{gs.stop.facilityName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{gs.stop.address}</p>
+                {gs.stop.date && <p className="text-xs text-muted-foreground">{gs.stop.date}</p>}
               </div>
             </Popup>
           </Marker>

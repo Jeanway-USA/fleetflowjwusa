@@ -176,7 +176,7 @@ export default function AcceptInvite() {
           <Card className="border-border bg-card">
             <CardContent className="pt-6">
               <div className="flex flex-col items-center text-center space-y-4">
-                <CheckCircle className="h-16 w-16 text-green-500" />
+                <CheckCircle className="h-16 w-16 text-success" />
                 <h2 className="text-xl font-semibold">
                   {acceptState.orgName ? `Welcome to ${acceptState.orgName}!` : 'Welcome!'}
                 </h2>
@@ -234,7 +234,7 @@ export default function AcceptInvite() {
         <Card className="border-border bg-card">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center space-y-4">
-              <CheckCircle className="h-16 w-16 text-green-500" />
+              <CheckCircle className="h-16 w-16 text-success" />
               <h2 className="text-xl font-semibold">Account Ready!</h2>
               <p className="text-muted-foreground">Your password has been set. Sign in to access your account.</p>
               <Button

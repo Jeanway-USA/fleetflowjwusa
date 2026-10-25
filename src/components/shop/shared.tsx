@@ -15,18 +15,18 @@ export function useNow(ms = 1000): Date {
 
 /** The colour each lane wears, as a soft tint. Kept in one place so every screen agrees. */
 export const LANE_STYLE: Record<Lane, { tint: string; dot: string; text: string }> = {
-  queue: { tint: 'bg-slate-500/10', dot: 'bg-slate-400', text: 'text-slate-300' },
+  queue: { tint: 'bg-muted', dot: 'bg-muted-foreground', text: 'text-muted-foreground' },
   working: { tint: 'bg-primary/10', dot: 'bg-primary', text: 'text-primary' },
-  waiting: { tint: 'bg-orange-500/10', dot: 'bg-orange-500', text: 'text-orange-400' },
-  ready: { tint: 'bg-emerald-500/10', dot: 'bg-emerald-500', text: 'text-emerald-400' },
+  waiting: { tint: 'bg-warning/10', dot: 'bg-warning', text: 'text-warning' },
+  ready: { tint: 'bg-success/10', dot: 'bg-success', text: 'text-success' },
 };
 
 export function PriorityTag({ priority, className }: { priority: Priority; className?: string }) {
   if (priority === 'normal') return null;
   const style =
-    priority === 'critical' ? 'bg-red-500/15 text-red-400 ring-red-500/40' : priority === 'high' ? 'bg-amber-500/15 text-amber-300 ring-amber-500/40' : 'bg-slate-500/15 text-slate-300 ring-slate-500/30';
+    priority === 'critical' ? 'bg-destructive/15 text-destructive ring-destructive/40' : priority === 'high' ? 'bg-warning/15 text-warning ring-warning/40' : 'bg-muted text-muted-foreground ring-border/30';
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1', style, className)}>
+    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold   ring-1', style, className)}>
       {priority === 'critical' ? <Flame className="h-3 w-3" /> : priority === 'high' ? <AlertTriangle className="h-3 w-3" /> : <CircleDot className="h-3 w-3" />}
       {PRIORITY_LABEL[priority]}
     </span>
@@ -48,7 +48,7 @@ export function TaskBar({ done, total, className }: { done: number; total: numbe
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-        <div className={cn('h-full rounded-full transition-all', done === total ? 'bg-emerald-500' : 'bg-primary')} style={{ width: `${pct}%` }} />
+        <div className={cn('h-full rounded-full transition-all', done === total ? 'bg-success' : 'bg-primary')} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs tabular-nums text-muted-foreground">{done}/{total}</span>
     </div>
@@ -59,7 +59,7 @@ export function DownChip({ job, className }: { job: ShopJob; className?: string 
   const d = daysDown(job);
   const hot = d >= 5;
   return (
-    <span className={cn('inline-flex items-center gap-1 text-xs tabular-nums', hot ? 'font-semibold text-red-400' : 'text-muted-foreground', className)} title="Days this truck has been in the shop">
+    <span className={cn('inline-flex items-center gap-1 text-xs tabular-nums', hot ? 'font-semibold text-destructive' : 'text-muted-foreground', className)} title="Days this truck has been in the shop">
       <Clock3 className="h-3 w-3" />
       {d === 0 ? 'In today' : `${d}d down`}
     </span>

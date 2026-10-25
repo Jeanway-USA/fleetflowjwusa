@@ -225,7 +225,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   className={`w-full p-3 text-left hover:bg-muted/50 transition-colors flex gap-3 ${
-                    !notification.is_read ? 'bg-primary/5' : ''
+ !notification.is_read ? 'bg-primary/5' : ''
                   } ${expandedId === notification.id ? 'bg-muted/40' : ''}`}
                 >
                   <div className="mt-0.5">
@@ -238,12 +238,12 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
                       </p>
                       {!hasRedirect(notification.notification_type) && (
                         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${
-                          expandedId === notification.id ? 'rotate-180' : ''
+ expandedId === notification.id ? 'rotate-180' : ''
                         }`} />
                       )}
                     </div>
                     <p className={`text-xs text-muted-foreground mt-0.5 ${
-                      expandedId === notification.id ? 'whitespace-pre-wrap' : 'truncate'
+ expandedId === notification.id ? 'whitespace-pre-wrap' : 'truncate'
                     }`}>
                       {notification.message}
                     </p>

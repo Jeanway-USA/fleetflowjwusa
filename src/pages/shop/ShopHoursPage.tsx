@@ -97,7 +97,7 @@ export default function ShopHoursPage() {
       ) : (
         <>
           {totals.review > 0 && (
-            <p className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+            <p className="flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               {totals.review} {totals.review === 1 ? 'entry was' : 'entries were'} stopped automatically after running too long. Check them below: hourly pay will not be made until they are checked.
             </p>
@@ -123,9 +123,9 @@ export default function ShopHoursPage() {
                   return (
                     <Fragment key={r.userId}>
                       <TableRow className="cursor-pointer" onClick={() => setOpen(isOpen ? null : r.userId)}>
-                        <TableCell className="font-medium">{r.userName ?? 'Unnamed'} {r.reviewCount > 0 && <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-300">{r.reviewCount} to check</Badge>}</TableCell>
+                        <TableCell className="font-medium">{r.userName ?? 'Unnamed'} {r.reviewCount > 0 && <Badge variant="outline" className="ml-2 border-warning/50 text-warning">{r.reviewCount} to check</Badge>}</TableCell>
                         <TableCell className="text-right tabular-nums">{hrs(r.regularMinutes)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.overtimeMinutes > 0 ? <span className="font-semibold text-amber-300">{hrs(r.overtimeMinutes)}</span> : '0.00'}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.overtimeMinutes > 0 ? <span className="font-semibold text-warning">{hrs(r.overtimeMinutes)}</span> : '0.00'}</TableCell>
                         <TableCell className="text-right font-semibold tabular-nums">{hrs(r.totalMinutes)}</TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">{hrs(r.jobMinutes)}</TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">{hrs(r.unassignedMinutes)}</TableCell>
@@ -136,7 +136,7 @@ export default function ShopHoursPage() {
                           <TableCell colSpan={7} className="bg-muted/30">
                             <div className="grid gap-6 py-2 lg:grid-cols-2">
                               <div>
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shifts</p>
+                                <p className="mb-2 text-xs font-semibold text-muted-foreground">Shifts</p>
                                 <ul className="space-y-2">
                                   {mine.map((s) => (
                                     <li key={s.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
@@ -144,7 +144,7 @@ export default function ShopHoursPage() {
                                         {format(new Date(s.startedAt), 'EEE MMM d, h:mm a')} to {s.endedAt ? format(new Date(s.endedAt), 'h:mm a') : 'now'}
                                       </span>
                                       <span className="text-muted-foreground">{formatMinutes(paidShiftMinutes(s, weekStart, now.getTime()))} paid{s.mealMinutes > 0 ? ` · lunch ${s.mealMinutes}m (paid)` : ''}</span>
-                                      {s.needsReview && <Badge variant="outline" className="border-amber-500/50 text-amber-300">{s.autoStopped ? 'Stopped automatically' : 'Check'}</Badge>}
+                                      {s.needsReview && <Badge variant="outline" className="border-warning/50 text-warning">{s.autoStopped ? 'Stopped automatically' : 'Check'}</Badge>}
                                       <span className="ml-auto flex gap-1">
                                         {s.needsReview && <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => review.mutate({ kind: 'shift', id: s.id, action: 'accept' }, { onSuccess: () => toast.success('Accepted as recorded'), onError: (e: any) => toast.error(e.message) })}><Check className="h-3.5 w-3.5" />Right as is</Button>}
                                         {s.endedAt && <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => openEdit({ kind: 'shift', id: s.id, who: r.userName ?? 'Mechanic', startedAt: s.startedAt, endedAt: s.endedAt!, mealMinutes: s.mealMinutes })}><Pencil className="h-3.5 w-3.5" />Fix</Button>}
@@ -155,7 +155,7 @@ export default function ShopHoursPage() {
                                 </ul>
                               </div>
                               <div>
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Where the job hours went</p>
+                                <p className="mb-2 text-xs font-semibold text-muted-foreground">Where the job hours went</p>
                                 {r.byJob.length === 0 ? <p className="text-sm text-muted-foreground">No job timers this week.</p> : (
                                   <ul className="space-y-1 text-sm">
                                     {r.byJob.map((j) => <li key={j.workOrderId} className="flex justify-between gap-3"><span className="truncate">{jobName(j.workOrderId)}</span><span className="tabular-nums text-muted-foreground">{formatMinutes(j.minutes)}</span></li>)}
@@ -164,7 +164,7 @@ export default function ShopHoursPage() {
                                 {theirTimers.some((t) => t.needsReview) && (
                                   <div className="mt-3 space-y-2">
                                     {theirTimers.filter((t) => t.needsReview && t.endedAt).map((t) => (
-                                      <div key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
+                                      <div key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm">
                                         <span>Job timer {format(new Date(t.startedAt), 'EEE h:mm a')} stopped automatically</span>
                                         <span className="ml-auto flex gap-1">
                                           <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => review.mutate({ kind: 'job_timer', id: t.id, action: 'accept' }, { onError: (e: any) => toast.error(e.message) })}><Check className="h-3.5 w-3.5" />Right as is</Button>

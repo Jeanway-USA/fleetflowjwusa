@@ -85,7 +85,7 @@ function PartDialog({ part, open, onOpenChange }: { part: Part | null; open: boo
   };
 
   const Field = ({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) => (
-    <label className={cn('block space-y-1.5', className)}><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>{children}</label>
+    <label className={cn('block space-y-1.5', className)}><span className="text-xs font-medium text-muted-foreground">{label}</span>{children}</label>
   );
 
   return (
@@ -209,10 +209,10 @@ export default function ShopPartsPage() {
                   {p.reorder_requested_at && <p className="mt-0.5 flex items-center gap-1 text-xs text-primary"><ShoppingCart className="h-3 w-3" />Reorder requested</p>}
                 </div>
                 <div className="w-40 shrink-0">
-                  <p className={cn('font-condensed text-3xl font-bold leading-none tabular-nums', state === 'out' ? 'text-red-400' : state === 'low' ? 'text-orange-300' : '')}>
+                  <p className={cn('font-condensed text-3xl font-bold leading-none tabular-nums', state === 'out' ? 'text-destructive' : state === 'low' ? 'text-warning' : '')}>
                     {Number(p.quantity_on_hand)} <span className="text-sm font-normal text-muted-foreground">{p.unit}</span>
                   </p>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full', state === 'out' ? 'bg-red-500' : state === 'low' ? 'bg-orange-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} /></div>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full', state === 'out' ? 'bg-destructive' : state === 'low' ? 'bg-warning' : 'bg-success')} style={{ width: `${pct}%` }} /></div>
                   <p className="mt-1 text-xs text-muted-foreground">Reorder at {Number(p.min_threshold)}{p.unit_cost ? ` · ${money(Number(p.unit_cost))} each` : ''}</p>
                 </div>
                 <div className="flex flex-wrap gap-1.5">

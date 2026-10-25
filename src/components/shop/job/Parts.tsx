@@ -82,7 +82,7 @@ export function PartPicker({ jobId, open, onOpenChange, touch, initialPart }: { 
                         <span className={cn('block truncate font-medium', touch && 'text-lg')}>{p.part_name}</span>
                         <span className="block truncate text-xs text-muted-foreground">{[p.part_number, p.category].filter(Boolean).join(' · ') || 'No part number'}</span>
                       </span>
-                      <span className={cn('shrink-0 text-right text-sm tabular-nums', out ? 'font-semibold text-red-400' : low ? 'font-semibold text-orange-300' : 'text-muted-foreground')}>
+                      <span className={cn('shrink-0 text-right text-sm tabular-nums', out ? 'font-semibold text-destructive' : low ? 'font-semibold text-warning' : 'text-muted-foreground')}>
                         {out ? 'Out of stock' : `${Number(p.quantity_on_hand)} ${p.unit}`}
                         {low && <span className="block text-xs">low</span>}
                       </span>

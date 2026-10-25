@@ -76,7 +76,7 @@ export function YearLedger() {
       title: row.category.label,
       subtitle: [row.category.note, `${row.lines} ${row.lines === 1 ? 'line' : 'lines'}`].filter(Boolean).join('. '),
       chips: row.difference === null ? undefined : (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${off ? 'bg-destructive/15 text-destructive' : 'bg-success/15 text-success'}`}>
+        <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold ${off ? 'bg-destructive/15 text-destructive' : 'bg-success/15 text-success'}`}>
           {off ? 'Off' : 'Matches'}
         </span>
       ),

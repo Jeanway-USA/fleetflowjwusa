@@ -47,7 +47,7 @@ export function FloorLayout() {
             <p className="text-xs text-muted-foreground">{format(now, 'EEEE, MMM d · h:mm a')}</p>
           </div>
           {mine && (
-            <Link to={`/shop/floor/jobs/${mine.id}`} className="flex items-center gap-2 rounded-full bg-primary/15 px-4 py-2 text-primary ring-1 ring-primary/40">
+            <Link to={`/shop/floor/jobs/${mine.id}`} className="flex items-center gap-2 rounded-md bg-primary/15 px-4 py-2 text-primary ring-1 ring-primary/40">
               <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary" />
               <span className="text-sm font-semibold">Unit {mine.unit}</span>
               <RunningClock since={mine.runningTimer!.startedAt} className="text-sm font-bold" />

@@ -236,7 +236,7 @@ export function SafetyBonusPayouts() {
             <table className="w-full text-[15px]">
               <caption className="sr-only">Safety bonus payouts for {periodLabel}</caption>
               <thead>
-                <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b text-left text-[12px] font-semibold text-muted-foreground">
                   <th scope="col" className="px-4 py-2">Driver</th>
                   <th scope="col" className="py-2 text-right">Safe miles</th>
                   <th scope="col" className="py-2 text-right">Earned</th>

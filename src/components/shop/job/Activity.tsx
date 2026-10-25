@@ -34,7 +34,7 @@ function Row({ e }: { e: ShopEvent }) {
   const Icon = e.kind === 'timer' && e.body?.startsWith('Paused') ? Pause : ICON[e.kind] ?? MessageSquare;
   return (
     <li className="flex gap-3">
-      <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full', e.kind === 'blocked' ? 'bg-orange-500/15 text-orange-300' : 'bg-muted text-muted-foreground')}>
+      <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full', e.kind === 'blocked' ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground')}>
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1 pb-1">

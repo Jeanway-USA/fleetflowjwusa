@@ -34,7 +34,7 @@ export default function FloorPartsPage() {
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find a part" className="h-14 pl-12 sm:pl-12 text-lg" />
         </div>
-        <button type="button" onClick={() => setLowOnly((v) => !v)} aria-pressed={lowOnly} className={cn('min-h-[56px] rounded-lg border px-5 text-base font-semibold', lowOnly ? 'border-orange-500 bg-orange-500/10 text-orange-300' : 'hover:bg-accent')}>Low stock only</button>
+        <button type="button" onClick={() => setLowOnly((v) => !v)} aria-pressed={lowOnly} className={cn('min-h-[56px] rounded-lg border px-5 text-base font-semibold', lowOnly ? 'border-warning bg-warning/10 text-warning' : 'hover:bg-accent')}>Low stock only</button>
       </div>
 
       {isLoading ? <p className="text-muted-foreground">Loading the shelf…</p> : shown.length === 0 ? (
@@ -51,7 +51,7 @@ export default function FloorPartsPage() {
                     <span className="block truncate text-lg font-medium">{p.part_name}</span>
                     <span className="block truncate text-sm text-muted-foreground">{[p.part_number, p.category].filter(Boolean).join(' · ')}</span>
                   </span>
-                  <span className={cn('shrink-0 text-right font-condensed text-3xl font-bold tabular-nums', out ? 'text-red-400' : low ? 'text-orange-300' : '')}>
+                  <span className={cn('shrink-0 text-right font-condensed text-3xl font-bold tabular-nums', out ? 'text-destructive' : low ? 'text-warning' : '')}>
                     {Number(p.quantity_on_hand)}
                     <span className="block font-sans text-xs font-normal text-muted-foreground">{out ? 'out' : low ? 'low' : p.unit}</span>
                   </span>

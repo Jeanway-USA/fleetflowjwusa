@@ -271,7 +271,7 @@ export default function Onboarding() {
                 <div key={label} className="flex items-center gap-2">
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                      i + 1 < step
+ i + 1 < step
                         ? 'bg-primary text-primary-foreground'
                         : i + 1 === step
                         ? 'bg-primary text-primary-foreground'
@@ -282,7 +282,7 @@ export default function Onboarding() {
                   </div>
                   <span
                     className={`text-sm font-medium hidden sm:inline ${
-                      i + 1 <= step ? 'text-foreground' : 'text-muted-foreground'
+ i + 1 <= step ? 'text-foreground' : 'text-muted-foreground'
                     }`}
                   >
                     {label}
@@ -312,7 +312,7 @@ export default function Onboarding() {
                         type="button"
                         onClick={() => setTmsMode('landstar')}
                         className={`p-4 rounded-lg border-2 text-left transition-all ${
-                          tmsMode === 'landstar'
+ tmsMode === 'landstar'
                             ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                             : 'border-border hover:border-primary/40'
                         }`}
@@ -326,7 +326,7 @@ export default function Onboarding() {
                         type="button"
                         onClick={() => setTmsMode('independent')}
                         className={`p-4 rounded-lg border-2 text-left transition-all ${
-                          tmsMode === 'independent'
+ tmsMode === 'independent'
                             ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                             : 'border-border hover:border-primary/40'
                         }`}

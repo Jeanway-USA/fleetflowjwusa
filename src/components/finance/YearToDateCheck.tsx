@@ -169,7 +169,7 @@ export function YearToDateCheck({ loads }: YearToDateCheckProps) {
               <table className="w-full text-[15px]">
                 <caption className="sr-only">Delivered loads in {year} with a running total of your revenue</caption>
                 <thead className="sticky top-0 bg-card">
-                  <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b text-left text-[12px] font-semibold text-muted-foreground">
                     <th scope="col" className="py-2">Delivered</th>
                     <th scope="col" className="py-2">Trip</th>
                     <th scope="col" className="py-2">Route</th>

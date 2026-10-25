@@ -140,7 +140,7 @@ export function StateFilingRegistry() {
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {overdue > 0 && <Badge variant="destructive">{overdue} overdue</Badge>}
-                    {dueSoon > 0 && <Badge className="bg-amber-500 hover:bg-amber-600">{dueSoon} due soon</Badge>}
+                    {dueSoon > 0 && <Badge className="bg-warning hover:bg-warning">{dueSoon} due soon</Badge>}
                     <span className="text-muted-foreground">{pending} pending</span>
                   </div>
                 </button>

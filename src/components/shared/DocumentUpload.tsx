@@ -65,9 +65,9 @@ export function DocumentUpload({
         {(!isOnline || isSyncing) && (
           <div
             className={`flex items-center gap-2 text-xs rounded-md px-3 py-1.5 border ${
-              !isOnline
-                ? 'bg-amber-50 border-amber-200 text-amber-800'
-                : 'bg-sky-50 border-sky-200 text-sky-800'
+ !isOnline
+                ? 'bg-warning border-warning text-warning'
+                : 'bg-primary border-primary text-primary'
             }`}
           >
             {!isOnline ? (

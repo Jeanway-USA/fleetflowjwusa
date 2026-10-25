@@ -213,7 +213,7 @@ export function MorningBriefingWidget() {
               key={m.key}
               onClick={() => handleClick(m)}
               className={cn(
-                'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer',
+                'inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer',
                 m.colorClass
               )}
             >

@@ -100,11 +100,11 @@ export function StatusHistoryLog({ loadId, pickupDate, pickupTime, deliveryDate,
     const diffMinutes = differenceInMinutes(actualDate, scheduled);
     
     if (diffMinutes <= 15) {
-      return { status: 'on-time', label: 'On Time', color: 'text-green-500' };
+      return { status: 'on-time', label: 'On Time', color: 'text-success' };
     } else if (diffMinutes <= 60) {
-      return { status: 'slightly-late', label: `${formatTimeDiff(diffMinutes)} late`, color: 'text-yellow-500' };
+      return { status: 'slightly-late', label: `${formatTimeDiff(diffMinutes)} late`, color: 'text-warning' };
     } else {
-      return { status: 'late', label: `${formatTimeDiff(diffMinutes)} late`, color: 'text-red-500' };
+      return { status: 'late', label: `${formatTimeDiff(diffMinutes)} late`, color: 'text-destructive' };
     }
   };
 

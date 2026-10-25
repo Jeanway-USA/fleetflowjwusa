@@ -58,7 +58,7 @@ function barClass(load: { status: string; delivery_date: string | null }, today:
 
 // Diagonal striping used to lock hometime cells.
 const HOMETIME_STRIPE =
-  'bg-[image:repeating-linear-gradient(45deg,hsl(var(--muted-foreground)/0.18)_0_6px,transparent_6px_12px)] bg-purple-500/10 dark:bg-purple-400/10';
+  'bg-[image:repeating-linear-gradient(45deg,hsl(var(--muted-foreground)/0.18)_0_6px,transparent_6px_12px)] bg-primary/10';
 
 function parseDate(d: string | null | undefined) {
   if (!d) return null;
@@ -568,7 +568,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
       <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm border border-primary/40 bg-primary/35" /> Booked, not started</span>
       <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm bg-destructive" /> Past due</span>
       <span className="flex items-center gap-1.5"><span className={`inline-block h-3 w-4 rounded-sm ${HOMETIME_STRIPE}`} /> Hometime</span>
-      <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm border border-dashed border-amber-500 bg-amber-400/40" /> Free to reload</span>
+      <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm border border-dashed border-warning bg-warning/40" /> Free to reload</span>
     </div>
   );
 
@@ -585,7 +585,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
             <div className="font-condensed text-lg font-bold leading-tight">{driver.first_name} {driver.last_name}</div>
             {mine.length === 0 && away.length === 0 && <div className="text-[13px] text-muted-foreground">Nothing scheduled in this window.</div>}
             {away.map(h => (
-              <div key={h.start_date} className="mt-1 flex items-center gap-1.5 text-[13px] text-purple-600">
+              <div key={h.start_date} className="mt-1 flex items-center gap-1.5 text-[13px] text-primary">
                 <Home className="h-3.5 w-3.5" /> Hometime {format(parseDate(h.start_date)!, 'MMM d')} to {format(parseDate(h.end_date)!, 'MMM d')}
               </div>
             ))}
@@ -625,7 +625,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                   style={{ gridTemplateColumns: `160px repeat(${WINDOW_DAYS}, minmax(56px, 1fr))` }}
                 >
                   {/* Header row */}
-                  <div className="border-b border-border p-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Driver</div>
+                  <div className="border-b border-border p-2 text-xs font-semibold text-muted-foreground">Driver</div>
                   {days.map((day, idx) => {
                     const today = isSameDay(day, new Date());
                     const weekend = day.getDay() === 0 || day.getDay() === 6;
@@ -656,7 +656,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                             const s = parseDate(h.start_date);
                             const e = parseDate(h.end_date);
                             return s && e && new Date() >= s && new Date() <= e;
-                          }) && <Home className="h-3 w-3 shrink-0 text-purple-500" aria-label="On hometime" />}
+                          }) && <Home className="h-3 w-3 shrink-0 text-primary" aria-label="On hometime" />}
                         </div>
 
                         {days.map((day, dayIdx) => {
@@ -673,14 +673,14 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                               onDrop={onHometime ? undefined : (e) => handleDrop(driver.id, dayIdx, e)}
                               className={[
                                 'relative border-b border-l border-border transition-colors',
-                                onHometime ? `${HOMETIME_STRIPE} pointer-events-none` : onLoad ? 'bg-primary/5' : outboundHit ? 'bg-amber-100/30 dark:bg-amber-900/10' : '',
+                                onHometime ? `${HOMETIME_STRIPE} pointer-events-none` : onLoad ? 'bg-primary/5' : outboundHit ? 'bg-warning/30' : '',
                                 draggedLoad && !onHometime ? 'hover:bg-primary/10' : '',
                                 today && !onHometime ? 'bg-primary/10' : '',
                               ].join(' ')}
                             >
                               {outbound && dayIdx + 2 === outbound.startCol && (
                                 <div
-                                  className="pointer-events-none absolute inset-y-1 left-0.5 right-0.5 z-[5] flex items-center truncate rounded border border-dashed border-amber-500/70 bg-amber-100/50 px-1 text-xs font-medium text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
+                                  className="pointer-events-none absolute inset-y-1 left-0.5 right-0.5 z-[5] flex items-center truncate rounded border border-dashed border-warning/70 bg-warning/50 px-1 text-xs font-medium text-warning"
                                   style={{ width: `calc(${outbound.span * 100}% - 4px)` }}
                                   title={`Free to reload near ${outbound.region}`}
                                 >
@@ -767,7 +767,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                         onDragStart={() => handleDragStart(load)}
                         onDragEnd={handleDragEnd}
                         className={`flex cursor-grab items-center gap-1.5 rounded-md border border-border bg-muted/30 p-2 text-xs transition-colors hover:bg-muted/50 active:cursor-grabbing ${
-                          draggedLoad?.id === load.id ? 'opacity-50 ring-2 ring-primary' : ''
+ draggedLoad?.id === load.id ? 'opacity-50 ring-2 ring-primary' : ''
                         } ${assigningLoad === load.id ? 'pointer-events-none opacity-50' : ''}`}
                       >
                         <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />

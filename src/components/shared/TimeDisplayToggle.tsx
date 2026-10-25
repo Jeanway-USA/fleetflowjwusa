@@ -23,7 +23,7 @@ export function TimeDisplayToggle() {
             type="button"
             onClick={() => setMode('company')}
             className={cn(
-              'rounded-full px-2.5 py-1 font-medium transition-colors',
+              'rounded-md px-2.5 py-1 font-medium transition-colors',
               mode === 'company'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'
@@ -36,7 +36,7 @@ export function TimeDisplayToggle() {
             type="button"
             onClick={() => setMode('local')}
             className={cn(
-              'rounded-full px-2.5 py-1 font-medium transition-colors',
+              'rounded-md px-2.5 py-1 font-medium transition-colors',
               mode === 'local'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'

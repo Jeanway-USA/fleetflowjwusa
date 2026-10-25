@@ -185,7 +185,7 @@ export function ExpensesList(props: ExpensesListProps) {
             <table className="w-full text-[15px]">
               <caption className="sr-only">Expenses for the selected period</caption>
               <thead>
-                <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b text-left text-[12px] font-semibold text-muted-foreground">
                   <th scope="col" className="w-12 py-2 pl-4">
                     <Checkbox checked={allSelected} onCheckedChange={onToggleAll} aria-label="Select all expenses in this period" />
                   </th>
@@ -196,7 +196,7 @@ export function ExpensesList(props: ExpensesListProps) {
                       aria-sort={sortField === c.field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       className={cn('py-2', c.align === 'right' && 'text-right', c.field === 'gallons' && 'pr-8')}
                     >
-                      <button type="button" className={cn('inline-flex min-h-9 items-center uppercase tracking-wider hover:text-foreground', c.align === 'right' && 'flex-row-reverse')} onClick={() => onSort(c.field)}>
+                      <button type="button" className={cn('inline-flex min-h-9 items-center   hover:text-foreground', c.align === 'right' && 'flex-row-reverse')} onClick={() => onSort(c.field)}>
                         {c.label}
                         <SortMark field={c.field} />
                       </button>

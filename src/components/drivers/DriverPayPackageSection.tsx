@@ -244,7 +244,7 @@ export function DriverPayPackageSection({ driver, userId, suggestedPackageId }: 
 
       {assignments.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Assignment history</p>
+          <p className="text-xs text-muted-foreground">Assignment history</p>
           <ul className="divide-y rounded-lg border text-sm">
             {assignments.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 p-2">
@@ -264,7 +264,7 @@ export function DriverPayPackageSection({ driver, userId, suggestedPackageId }: 
       {hasPayrollAccess && current && driverId && (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">One-period overrides</p>
+            <p className="text-xs text-muted-foreground">One-period overrides</p>
             <Button variant="outline" className="min-h-[44px]" onClick={() => setOverrideOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" />Add
             </Button>

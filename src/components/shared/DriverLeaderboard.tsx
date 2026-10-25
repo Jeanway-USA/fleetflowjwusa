@@ -20,9 +20,9 @@ interface DriverRanking {
 }
 
 const RANK_STYLES = [
-  { bg: 'bg-yellow-400/15 border-yellow-400/50', text: 'text-yellow-600 dark:text-yellow-400', icon: Trophy, label: '1st' },
+  { bg: 'bg-warning/15 border-warning/50', text: 'text-warning', icon: Trophy, label: '1st' },
   { bg: 'bg-muted/60 border-muted-foreground/30', text: 'text-muted-foreground', icon: Medal, label: '2nd' },
-  { bg: 'bg-amber-700/15 border-amber-700/40', text: 'text-amber-700 dark:text-amber-500', icon: Award, label: '3rd' },
+  { bg: 'bg-warning/15 border-warning/40', text: 'text-warning', icon: Award, label: '3rd' },
 ];
 
 function PodiumCard({ rank, name, value, label }: { rank: number; name: string; value: string; label: string }) {
@@ -140,7 +140,7 @@ export function DriverLeaderboard({ readOnly, variant = 'card' }: DriverLeaderbo
     <Card className="bg-card border border-border rounded-lg">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <Trophy className="h-4 w-4 text-yellow-500" />
+          <Trophy className="h-4 w-4 text-warning" />
           Driver Leaderboard — {monthLabel}
         </CardTitle>
       </CardHeader>

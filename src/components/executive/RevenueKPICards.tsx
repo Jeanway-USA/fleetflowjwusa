@@ -92,11 +92,11 @@ function KPICard({
         )}
         <div className="flex items-center gap-1 text-sm">
           {change.isPositive ? (
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <TrendingUp className="h-4 w-4 text-success" />
           ) : (
             <TrendingDown className="h-4 w-4 text-destructive" />
           )}
-          <span className={cn(change.isPositive ? 'text-green-500' : 'text-destructive')}>
+          <span className={cn(change.isPositive ? 'text-success' : 'text-destructive')}>
             {change.value.toFixed(1)}%
           </span>
           <span className="text-muted-foreground">vs prior period</span>

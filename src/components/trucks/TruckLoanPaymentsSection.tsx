@@ -101,7 +101,7 @@ export function TruckLoanPaymentsSection({ truckId, loanBalance, originalLoanAmo
         <CardTitle className="text-base flex items-center justify-between">
           <span>Loan Balance</span>
           {isPaidOff ? (
-            <Badge className="bg-green-600/10 text-green-700 border border-green-600/20 hover:bg-green-600/10">
+            <Badge className="bg-success/10 text-success border border-success/20 hover:bg-success/10">
               <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Paid Off
             </Badge>
           ) : (
@@ -126,7 +126,7 @@ export function TruckLoanPaymentsSection({ truckId, loanBalance, originalLoanAmo
           <div className="space-y-1">
             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
               <div
-                className={`h-full ${isPaidOff ? 'bg-green-600' : 'bg-primary'}`}
+                className={`h-full ${isPaidOff ? 'bg-success' : 'bg-primary'}`}
                 style={{ width: `${progress}%` }}
               />
             </div>

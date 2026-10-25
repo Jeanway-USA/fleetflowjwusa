@@ -25,7 +25,7 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
     return (
       <div className={cn('flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4', className)}>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Shift clock</p>
+          <p className="text-xs font-medium text-muted-foreground">Shift clock</p>
           <p className={cn('font-condensed font-bold leading-none', touch ? 'text-4xl' : 'text-2xl')}>Not clocked in</p>
         </div>
         <LoadingButton loading={actions.clockIn.isPending} disabled={actions.clockIn.isPending} className={cn('bg-primary text-primary-foreground hover:bg-primary/90', btn)} onClick={() => actions.clockIn.mutate(undefined, { onError: fail })}>
@@ -41,9 +41,9 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
   const warn = state !== 'ok';
 
   return (
-    <div className={cn('rounded-lg border p-4', onMeal ? 'border-orange-500/50 bg-orange-500/10' : 'border-emerald-500/40 bg-emerald-500/10', className)}>
+    <div className={cn('rounded-lg border p-4', onMeal ? 'border-warning/50 bg-warning/10' : 'border-success/40 bg-success/10', className)}>
       {warn && (
-        <p className="mb-3 flex items-start gap-2 rounded-lg bg-red-500/15 px-3 py-2 text-sm font-medium text-red-300">
+        <p className="mb-3 flex items-start gap-2 rounded-lg bg-destructive/15 px-3 py-2 text-sm font-medium text-destructive">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           {state === 'stopped'
             ? `This shift ran past ${STOP_AFTER_HOURS} hours, so it was stopped and sent for review.`
@@ -52,8 +52,8 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{onMeal ? 'At lunch' : 'You are clocked in'}</p>
-          <p className={cn('font-condensed font-bold leading-none', touch ? 'text-6xl' : 'text-4xl', onMeal ? 'text-orange-300' : 'text-emerald-300')}>
+          <p className="text-xs font-medium text-muted-foreground">{onMeal ? 'At lunch' : 'You are clocked in'}</p>
+          <p className={cn('font-condensed font-bold leading-none', touch ? 'text-6xl' : 'text-4xl', onMeal ? 'text-warning' : 'text-success')}>
             {onMeal ? formatMinutes(mealRunning) : <RunningClock since={shift.startedAt} />}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -72,7 +72,7 @@ export function ShiftClock({ touch, className }: { touch?: boolean; className?: 
               <Coffee className="h-5 w-5" />Lunch
             </Button>
           )}
-          <LoadingButton loading={actions.clockOut.isPending} disabled={actions.clockOut.isPending} className={cn('bg-slate-700 text-white hover:bg-slate-600', btn)} onClick={() => actions.clockOut.mutate(undefined, { onError: fail })}>
+          <LoadingButton loading={actions.clockOut.isPending} disabled={actions.clockOut.isPending} className={cn('bg-muted-foreground text-white hover:bg-muted-foreground', btn)} onClick={() => actions.clockOut.mutate(undefined, { onError: fail })}>
             <LogOut className="h-5 w-5" />Clock out
           </LoadingButton>
         </div>

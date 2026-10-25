@@ -120,7 +120,7 @@ export default function ShopHistoryPage() {
                 {list.map((e) => {
                   const body = (
                     <>
-                      <div className="w-14 shrink-0 text-center"><p className="font-condensed text-2xl font-bold leading-none">{format(parseISO(e.date), 'd')}</p><p className="text-xs uppercase text-muted-foreground">{format(parseISO(e.date), 'EEE')}</p></div>
+                      <div className="w-14 shrink-0 text-center"><p className="font-condensed text-2xl font-bold leading-none">{format(parseISO(e.date), 'd')}</p><p className="text-xs text-muted-foreground">{format(parseISO(e.date), 'EEE')}</p></div>
                       <span className="w-16 shrink-0 font-condensed text-2xl font-bold">{e.unit}</span>
                       <div className="min-w-0 flex-1"><p className="truncate font-medium">{e.title}</p><p className="truncate text-xs text-muted-foreground">{[e.vendor, e.notes].filter(Boolean).join(' · ') || (e.source === 'log' ? 'Logged service' : 'Shop job')}</p></div>
                       <div className="shrink-0 text-right"><p className="tabular-nums font-semibold">{e.cost ? money(e.cost) : '—'}</p>{e.daysDown != null && <p className="text-xs text-muted-foreground">{e.daysDown}d down</p>}</div>

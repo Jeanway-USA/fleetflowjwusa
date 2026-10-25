@@ -38,11 +38,11 @@ function calculateHealthScore(data: HealthData): number {
 
 function getHealthStatus(score: number): { label: string; color: string; bgColor: string } {
   if (score >= 80) {
-    return { label: 'Excellent', color: 'text-green-500', bgColor: 'bg-green-500/10' };
+    return { label: 'Excellent', color: 'text-success', bgColor: 'bg-success/10' };
   } else if (score >= 60) {
     return { label: 'Good', color: 'text-primary', bgColor: 'bg-primary/10' };
   } else if (score >= 40) {
-    return { label: 'Needs Attention', color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' };
+    return { label: 'Needs Attention', color: 'text-warning', bgColor: 'bg-warning/10' };
   } else {
     return { label: 'Critical', color: 'text-destructive', bgColor: 'bg-destructive/10' };
   }
@@ -110,12 +110,12 @@ export function CompanyHealthScore({ data, isLoading }: CompanyHealthScoreProps)
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className={`text-2xl font-bold ${status.color}`}>{score}</span>
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Score</span>
+            <span className="text-xs text-muted-foreground">Score</span>
           </div>
         </div>
         
         {/* Status Badge */}
-        <div className={`mt-3 px-3 py-1 rounded-full ${status.bgColor}`}>
+        <div className={`mt-3 px-3 py-1 rounded-md ${status.bgColor}`}>
           <span className={`text-xs font-semibold ${status.color}`}>{status.label}</span>
         </div>
 
@@ -135,7 +135,7 @@ export function CompanyHealthScore({ data, isLoading }: CompanyHealthScoreProps)
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Growth</span>
-            <span className={`font-medium ${data.revenueGrowth >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+            <span className={`font-medium ${data.revenueGrowth >= 0 ? 'text-success' : 'text-destructive'}`}>
               {data.revenueGrowth >= 0 ? '+' : ''}{data.revenueGrowth.toFixed(0)}%
             </span>
           </div>

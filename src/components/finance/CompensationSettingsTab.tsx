@@ -227,7 +227,7 @@ export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabP
         )}
 
         <div className="border-t py-3">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[13px] font-semibold text-muted-foreground">
             Example: a {formatCurrency(EXAMPLE.linehaul)} load with a {formatCurrency(EXAMPLE.fuelSurcharge)} fuel surcharge
           </p>
           <p className="mt-1 text-[15px] tabular-nums">

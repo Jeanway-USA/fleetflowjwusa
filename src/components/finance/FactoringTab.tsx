@@ -272,7 +272,7 @@ export function FactoringTab() {
                                   <Tooltip>
                                     <TooltipTrigger asChild>{checkbox}</TooltipTrigger>
                                     <TooltipContent side="right" className="flex items-center gap-1.5">
-                                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                                      <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                                       POD required before factoring
                                     </TooltipContent>
                                   </Tooltip>
@@ -284,10 +284,10 @@ export function FactoringTab() {
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <span className="flex items-center gap-1 text-xs">
-                                    <FileCheck2 className={`h-3.5 w-3.5 ${docs.hasRateCon ? 'text-green-600' : 'text-muted-foreground'}`} />
+                                    <FileCheck2 className={`h-3.5 w-3.5 ${docs.hasRateCon ? 'text-success' : 'text-muted-foreground'}`} />
                                   </span>
                                   <span className="flex items-center gap-1 text-xs">
-                                    <Camera className={`h-3.5 w-3.5 ${docs.hasPOD ? 'text-green-600' : 'text-destructive'}`} />
+                                    <Camera className={`h-3.5 w-3.5 ${docs.hasPOD ? 'text-success' : 'text-destructive'}`} />
                                     {missingPOD && (
                                       <Badge variant="destructive" className="text-xs px-1.5 py-0 h-4">Missing</Badge>
                                     )}

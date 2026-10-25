@@ -42,15 +42,15 @@ const SCOPE_TABS = [
 ] as const;
 
 const TYPE_COLORS: Record<string, string> = {
-  broker: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  agent: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  shipper: 'bg-green-500/10 text-green-600 border-green-500/30',
-  receiver: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
-  vendor: 'bg-red-500/10 text-red-600 border-red-500/30',
-  shop: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
-  warehouse: 'bg-teal-500/10 text-teal-600 border-teal-500/30',
-  terminal: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
-  both: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+  broker: 'bg-primary/10 text-primary border-primary/30',
+  agent: 'bg-warning/10 text-warning border-warning/30',
+  shipper: 'bg-success/10 text-success border-success/30',
+  receiver: 'bg-primary/10 text-primary border-primary/30',
+  vendor: 'bg-destructive/10 text-destructive border-destructive/30',
+  shop: 'bg-warning/10 text-warning border-warning/30',
+  warehouse: 'bg-success/10 text-success border-success/30',
+  terminal: 'bg-primary/10 text-primary border-primary/30',
+  both: 'bg-success/10 text-success border-success/30',
 };
 
 // --- Render helpers ---

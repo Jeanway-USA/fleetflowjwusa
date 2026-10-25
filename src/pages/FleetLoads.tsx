@@ -929,7 +929,7 @@ export default function FleetLoads() {
         <>
           <StatusBadge status={load.status} />
           {load.is_in_bond && (
-            <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-destructive" title={load.cf_7512_number ? `CF 7512: ${load.cf_7512_number}` : 'In-bond shipment'}>
+            <span className="rounded-md bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive" title={load.cf_7512_number ? `CF 7512: ${load.cf_7512_number}` : 'In-bond shipment'}>
               In-bond
             </span>
           )}
@@ -1218,7 +1218,7 @@ export default function FleetLoads() {
                             onChange={(e) => set({ agency_code: e.target.value.toUpperCase().slice(0, 3) })}
                             placeholder="JNS"
                             maxLength={3}
-                            className="font-mono uppercase"
+                            className="font-mono"
                           />
                           <AgencyCRMStatusBadge agencyCode={formData.agency_code} onBlockedChange={setAgencyBlocked} />
                         </Field>

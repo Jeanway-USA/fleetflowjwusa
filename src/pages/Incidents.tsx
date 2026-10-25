@@ -56,10 +56,10 @@ const incidentTypes = [
 ];
 
 const severityLevels = [
-  { value: 'minor', label: 'Minor', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'moderate', label: 'Moderate', color: 'bg-orange-100 text-orange-800' },
-  { value: 'major', label: 'Major', color: 'bg-red-100 text-red-800' },
-  { value: 'critical', label: 'Critical', color: 'bg-red-500 text-white' },
+  { value: 'minor', label: 'Minor', color: 'bg-warning text-warning' },
+  { value: 'moderate', label: 'Moderate', color: 'bg-warning text-warning' },
+  { value: 'major', label: 'Major', color: 'bg-destructive text-destructive' },
+  { value: 'critical', label: 'Critical', color: 'bg-destructive text-white' },
 ];
 
 const statusOptions = [

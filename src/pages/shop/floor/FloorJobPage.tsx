@@ -85,11 +85,11 @@ export default function FloorJobPage() {
         <div className="fixed inset-x-0 bottom-[72px] z-20 border-t bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 md:left-28">
           <div className="mx-auto flex max-w-4xl gap-3">
             {job.status !== 'parts_ordered' && (
-              <Button variant="outline" className="h-16 flex-1 gap-2 border-orange-500/50 text-lg text-orange-300 hover:bg-orange-500/10" onClick={() => setBlockOpen(true)}>
+              <Button variant="outline" className="h-16 flex-1 gap-2 border-warning/50 text-lg text-warning hover:bg-warning/10" onClick={() => setBlockOpen(true)}>
                 <PauseCircle className="h-6 w-6" />Waiting
               </Button>
             )}
-            <Button className="h-16 flex-[2] gap-2 bg-emerald-600 text-lg text-white hover:bg-emerald-700" onClick={() => setFinishOpen(true)}>
+            <Button className="h-16 flex-[2] gap-2 bg-success text-lg text-white hover:bg-success" onClick={() => setFinishOpen(true)}>
               <CheckCheck className="h-6 w-6" />Finish job
             </Button>
           </div>

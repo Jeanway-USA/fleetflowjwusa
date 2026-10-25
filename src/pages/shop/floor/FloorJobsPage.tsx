@@ -29,10 +29,10 @@ function Tile({ job, mine, onTake }: { job: ShopJob; mine: boolean; onTake: () =
       </div>
       <p className="mt-3 text-xl font-semibold leading-snug">{jobTitle(job)}</p>
       {job.description && <p className="mt-1 line-clamp-2 text-base text-muted-foreground">{job.description}</p>}
-      {job.blockedReason && lane === 'waiting' && <p className="mt-2 rounded-lg bg-orange-500/10 px-3 py-2 text-base font-medium text-orange-300">{job.blockedReason}</p>}
+      {job.blockedReason && lane === 'waiting' && <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-base font-medium text-warning">{job.blockedReason}</p>}
       <TaskBar done={job.tasksDone} total={job.tasksTotal} className="mt-4 [&_span]:text-sm" />
       <div className="mt-4 flex items-center gap-3">
-        {job.runningTimer && <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1.5 text-base font-bold text-primary"><Timer className="h-4 w-4" /><RunningClock since={job.runningTimer.startedAt} /></span>}
+        {job.runningTimer && <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-3 py-1.5 text-base font-bold text-primary"><Timer className="h-4 w-4" /><RunningClock since={job.runningTimer.startedAt} /></span>}
         {!mine && job.assignedName && <span className="text-sm text-muted-foreground">{job.assignedName}</span>}
         <div className="ml-auto flex gap-2">
           {open && <Button className="h-14 gap-2 px-5 text-base bg-primary text-primary-foreground hover:bg-primary/90" onClick={onTake}><Hand className="h-5 w-5" />Take it</Button>}

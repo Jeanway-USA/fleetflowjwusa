@@ -28,7 +28,7 @@ export function JobCard({ job, to, large }: { job: ShopJob; to: string; large?: 
       {job.description && <p className={cn('mt-0.5 line-clamp-2 text-muted-foreground', large ? 'text-base' : 'text-xs')}>{job.description}</p>}
 
       {job.blockedReason && lane === 'waiting' && (
-        <p className="mt-2 flex items-start gap-1.5 rounded-md bg-orange-500/10 px-2 py-1.5 text-xs font-medium text-orange-300">
+        <p className="mt-2 flex items-start gap-1.5 rounded-md bg-warning/10 px-2 py-1.5 text-xs font-medium text-warning">
           <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
           {job.blockedReason}
         </p>
@@ -42,7 +42,7 @@ export function JobCard({ job, to, large }: { job: ShopJob; to: string; large?: 
           <span className={cn('truncate', !job.assignedName && 'text-muted-foreground')}>{job.assignedName ?? 'Unassigned'}</span>
         </span>
         {job.runningTimer && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
+          <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
             <Timer className="h-3 w-3" />
             <RunningClock since={job.runningTimer.startedAt} />
           </span>

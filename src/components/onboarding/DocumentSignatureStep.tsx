@@ -157,7 +157,7 @@ export function TemplateBlock({
           <AlertDescription className="mt-1 whitespace-pre-wrap">{revisionNote}</AlertDescription>
         </Alert>
       )}
-      <div className="rounded-sm bg-white text-slate-900 shadow-lg p-6 md:p-10 font-serif leading-relaxed">
+      <div className="rounded-sm bg-white text-muted-foreground shadow-lg p-6 md:p-10 font-serif leading-relaxed">
         <DocumentTemplateRenderer
           content={template.content}
           driverAddress={tState.driverAddress}
@@ -211,7 +211,7 @@ function SectionHeader({
       <div className="flex items-center gap-2">
         <h3 className="text-lg font-semibold">{title}</h3>
         {badge && (
-          <Badge variant="outline" className="uppercase tracking-wide text-xs">
+          <Badge variant="outline" className=" text-xs">
             {badge}
           </Badge>
         )}

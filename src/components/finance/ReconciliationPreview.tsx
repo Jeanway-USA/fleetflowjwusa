@@ -444,7 +444,7 @@ export function ReconciliationPreview({
                 {row.merged ? (
                   <Tooltip>
                     <TooltipTrigger>
-                      <Badge className="text-xs bg-blue-500/20 text-blue-600 border-blue-300 dark:text-blue-400 cursor-help">
+                      <Badge className="text-xs bg-primary/20 text-primary border-primary cursor-help">
                         Merged
                       </Badge>
                     </TooltipTrigger>
@@ -602,7 +602,7 @@ export function ReconciliationPreview({
             {expenseRows.length} expenses
           </Badge>
           {advanceRows.length > 0 && (
-            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
+            <Badge variant="outline" className="gap-1 text-warning border-warning">
               <Banknote className="h-3 w-3" />
               {advanceRows.length} advances
             </Badge>
@@ -614,13 +614,13 @@ export function ReconciliationPreview({
             </Badge>
           )}
           {mergedCount > 0 && (
-            <Badge className="gap-1 bg-blue-500/20 text-blue-600 border-blue-300 dark:text-blue-400">
+            <Badge className="gap-1 bg-primary/20 text-primary border-primary">
               <CheckCircle className="h-3 w-3" />
               {mergedCount} merged
             </Badge>
           )}
           {duplicateCount > 0 && (
-            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
+            <Badge variant="outline" className="gap-1 text-warning border-warning">
               <AlertTriangle className="h-3 w-3" />
               {duplicateCount} already imported
             </Badge>
@@ -707,7 +707,7 @@ export function ReconciliationPreview({
           </div>
           <div className="rounded-lg border p-3 space-y-1 border-dashed">
             <p className="text-xs text-muted-foreground">Advances Taken</p>
-            <p className="text-lg font-mono font-semibold text-amber-600">{formatCurrency(advancesTotal)}</p>
+            <p className="text-lg font-mono font-semibold text-warning">{formatCurrency(advancesTotal)}</p>
             <p className="text-xs text-muted-foreground">Non-P&L</p>
           </div>
         </div>
@@ -733,7 +733,7 @@ export function ReconciliationPreview({
           </TabsContent>
 
           <TabsContent value="advances">
-            {renderTable(advanceRows, setAdvanceRows, 'advances', 'text-amber-600')}
+            {renderTable(advanceRows, setAdvanceRows, 'advances', 'text-warning')}
             <p className="text-xs text-muted-foreground mt-2">
               Advances are early access to funds (Non-P&L). They do not count toward your net expense total.
             </p>
