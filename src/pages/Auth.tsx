@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { signInErrorMessage } from '@/lib/signInError';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { Helmet } from 'react-helmet-async';
@@ -64,7 +65,7 @@ export default function Auth() {
     try {
       const { error } = await signIn(submittedEmail, submittedPassword);
       if (error) {
-        toast.error(error.message.includes('Invalid login') ? 'Invalid email or password' : error.message);
+        toast.error(signInErrorMessage(error));
       } else {
         toast.success('Welcome back!');
         navigate(safeRedirect, { replace: true });
