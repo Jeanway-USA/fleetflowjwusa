@@ -7370,6 +7370,8 @@ export type Database = {
           current_odometer: number | null
           deleted_at: string | null
           down_payment: number | null
+          duty_cycle: string
+          engine_make: string | null
           financing_fees: number | null
           id: string
           interest_rate: number | null
@@ -7401,6 +7403,8 @@ export type Database = {
           current_odometer?: number | null
           deleted_at?: string | null
           down_payment?: number | null
+          duty_cycle?: string
+          engine_make?: string | null
           financing_fees?: number | null
           id?: string
           interest_rate?: number | null
@@ -7432,6 +7436,8 @@ export type Database = {
           current_odometer?: number | null
           deleted_at?: string | null
           down_payment?: number | null
+          duty_cycle?: string
+          engine_make?: string | null
           financing_fees?: number | null
           id?: string
           interest_rate?: number | null
