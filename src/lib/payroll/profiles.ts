@@ -63,6 +63,8 @@ export async function resolveDriverTaxProfiles(
       extraWithholding: Number(w4?.extra_withholding) || 0,
       workState: (st?.work_state ?? d.tax_state ?? null) || null,
       residenceState: (st?.residence_state ?? d.tax_state ?? null) || null,
+      // Drivers run in several states, so only the state they live in taxes their income (49 U.S.C. 14503).
+      sitState: ((st?.residence_state ?? d.tax_state ?? null) || (st?.work_state ?? null)) || null,
       stateExempt: !!st?.exempt,
       stateAllowances: Number(st?.allowances) || 0,
       stateAdditionalWithholding: Number(st?.additional_withholding) || 0,

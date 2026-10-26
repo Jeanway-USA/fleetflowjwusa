@@ -87,6 +87,8 @@ export async function applyW2WithholdingToSettlements(
       profile,
       config: ctx.config,
       state,
+      sitStateCode: profile.sitState ?? null,
+      sitStateConfig: (profile.sitState && ctx.statesByCode.get(profile.sitState.toUpperCase())) || null,
       ytd: ytdMap.get(row.driver_id) ?? EMPTY_YTD,
       payFrequency: ctx.payFrequency,
     });

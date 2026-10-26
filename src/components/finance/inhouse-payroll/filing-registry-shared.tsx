@@ -4,11 +4,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertTriangle, CheckCircle2, Lock, Ban } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
+import { quarterDue } from '@/lib/tax/dates';
 
 export interface Deadline {
   form: string;
   scope: string;
+  /** The day to act by. Already moved past weekends and legal holidays. */
   dueDate: Date;
+  /** The calendar date before moving. A saved "filed" record is matched on this, so moving a date never loses one. */
+  keyDate?: Date;
   jurisdiction: string;
 }
 
@@ -21,39 +25,28 @@ export interface CompletionRow {
 }
 
 export const keyFor = (d: Deadline) =>
-  `${d.form}|${d.scope}|${d.dueDate.toISOString().slice(0, 10)}`;
+  `${d.form}|${d.scope}|${(d.keyDate ?? d.dueDate).toISOString().slice(0, 10)}`;
+
+/** "YYYY-MM-DD" as a local date at noon, so no time zone can show it on the wrong day. */
+const localDay = (iso: string) => new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)), 12);
+
+const nominal = (year: number, q: 1 | 2 | 3 | 4) => ({ 1: `${year}-04-30`, 2: `${year}-07-31`, 3: `${year}-10-31`, 4: `${year + 1}-01-31` }[q]);
 
 // ---------------- Federal deadlines ----------------
-export function buildFederalDeadlines(today: Date): Deadline[] {
-  const y = today.getFullYear();
+/** Federal deadlines for a tax year, with due dates moved past weekends and holidays (Pub 15 calendar). */
+export function buildFederalDeadlines(taxYear: number): Deadline[] {
+  const y = taxYear;
   const list: Deadline[] = [];
-
-  const q941 = [
-    { end: new Date(y, 2, 31), due: new Date(y, 3, 30) },
-    { end: new Date(y, 5, 30), due: new Date(y, 6, 31) },
-    { end: new Date(y, 8, 30), due: new Date(y, 9, 31) },
-    { end: new Date(y, 11, 31), due: new Date(y + 1, 0, 31) },
-  ];
-  q941.forEach((q) => list.push({
+  const ends: Record<number, Date> = { 1: new Date(y, 2, 31), 2: new Date(y, 5, 30), 3: new Date(y, 8, 30), 4: new Date(y, 11, 31) };
+  ([1, 2, 3, 4] as const).forEach((q) => list.push({
     form: 'Form 941',
-    scope: `Employer quarterly payroll (through ${format(q.end, 'MMM d')})`,
-    dueDate: q.due,
+    scope: `Employer quarterly payroll (through ${format(ends[q], 'MMM d')})`,
+    dueDate: localDay(quarterDue(y, q)),
+    keyDate: localDay(nominal(y, q)),
     jurisdiction: 'Federal (IRS)',
   }));
-
-  list.push({
-    form: 'Form 940',
-    scope: `Annual FUTA reconciliation (${y})`,
-    dueDate: new Date(y + 1, 0, 31),
-    jurisdiction: 'Federal (IRS)',
-  });
-  list.push({
-    form: 'W-2 / 1099-NEC',
-    scope: `Recipient copies & filing (${y})`,
-    dueDate: new Date(y + 1, 0, 31),
-    jurisdiction: 'Federal / SSA',
-  });
-
+  list.push({ form: 'Form 940', scope: `Annual FUTA reconciliation (${y})`, dueDate: localDay(quarterDue(y, 4)), keyDate: localDay(`${y + 1}-01-31`), jurisdiction: 'Federal (IRS)' });
+  list.push({ form: 'W-2 / 1099-NEC', scope: `Recipient copies & filing (${y})`, dueDate: localDay(quarterDue(y, 4)), keyDate: localDay(`${y + 1}-01-31`), jurisdiction: 'Federal / SSA' });
   return list.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 }
 
@@ -65,6 +58,7 @@ interface StateFormMeta {
 const STATE_FORMS: Record<string, StateFormMeta> = {
   TX: { sutaForm: 'Form C-3', agency: 'Texas TWC' },
   FL: { sutaForm: 'Form RT-6', agency: 'Florida DOR' },
+  WA: { sutaForm: 'Quarterly report', agency: 'Washington ESD' },
 };
 
 export interface StateInput {
@@ -72,16 +66,11 @@ export interface StateInput {
   hasStateIncomeTax?: boolean;
 }
 
-/** Returns deadlines grouped by state code. */
-export function buildStateDeadlines(today: Date, states: StateInput[]): Record<string, Deadline[]> {
-  const y = today.getFullYear();
-  const quarters = [
-    { label: 'Q1', due: new Date(y, 3, 30) },
-    { label: 'Q2', due: new Date(y, 6, 31) },
-    { label: 'Q3', due: new Date(y, 9, 31) },
-    { label: 'Q4', due: new Date(y + 1, 0, 31) },
-  ];
-
+/**
+ * Deadlines grouped by state code. Texas and Washington file on the last day of the month after each quarter. Other states
+ * are shown with that same date as a placeholder: each state sets its own, so confirm it with the state agency.
+ */
+export function buildStateDeadlines(taxYear: number, states: StateInput[]): Record<string, Deadline[]> {
   const out: Record<string, Deadline[]> = {};
   for (const s of states) {
     const code = s.code.toUpperCase();
@@ -89,23 +78,10 @@ export function buildStateDeadlines(today: Date, states: StateInput[]): Record<s
     const jurisdiction = meta?.agency ?? `${code} state agency`;
     const sutaForm = meta?.sutaForm ?? 'SUTA Return';
     const list: Deadline[] = [];
-
-    quarters.forEach((q) => list.push({
-      form: sutaForm,
-      scope: `${code} SUTA (${q.label} ${y})`,
-      dueDate: q.due,
-      jurisdiction,
-    }));
-
-    if (s.hasStateIncomeTax) {
-      quarters.forEach((q) => list.push({
-        form: 'State Withholding',
-        scope: `${code} SIT (${q.label} ${y})`,
-        dueDate: q.due,
-        jurisdiction,
-      }));
-    }
-
+    ([1, 2, 3, 4] as const).forEach((q) => {
+      list.push({ form: sutaForm, scope: `${code} SUTA (Q${q} ${taxYear})`, dueDate: localDay(quarterDue(taxYear, q)), keyDate: localDay(nominal(taxYear, q)), jurisdiction });
+      if (s.hasStateIncomeTax) list.push({ form: 'State Withholding', scope: `${code} SIT (Q${q} ${taxYear})`, dueDate: localDay(quarterDue(taxYear, q)), keyDate: localDay(nominal(taxYear, q)), jurisdiction });
+    });
     out[code] = list.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
   }
   return out;
