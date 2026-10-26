@@ -8557,6 +8557,7 @@ export type Database = {
         }[]
       }
       get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
+      get_employee_ssn: { Args: { _employee_id: string }; Returns: string }
       get_public_load_by_tracking: {
         Args: { _tracking_id: string }
         Returns: Json
