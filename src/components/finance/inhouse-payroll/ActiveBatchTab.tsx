@@ -325,6 +325,8 @@ export function ActiveBatchTab() {
       profile: { ...profile, employmentClass: 'w2' },
       config: config.config,
       state: stateCfg,
+      sitStateCode: profile.sitState ?? null,
+      sitStateConfig: (profile.sitState && config.statesByCode.get(profile.sitState.toUpperCase())) || null,
       ytd: {
         ...EMPTY_YTD,
         gross: ytdGross,

@@ -40,6 +40,8 @@ export interface PayeeTaxProfile {
   /** State withholding form values. */
   workState: string | null;
   residenceState: string | null;
+  /** The state that taxes this person's income. A driver who runs in several states is taxed by the state they live in. */
+  sitState?: string | null;
   stateExempt: boolean;
   stateAllowances: number;
   stateAdditionalWithholding: number;
@@ -53,6 +55,8 @@ export interface StateTaxConfig {
   suta_wage_base: number;
   has_state_income_tax: boolean;
   sit_rate: number;
+  /** True when the unemployment rate is the new-employer default, not the one the state assigned in its letter. */
+  rate_assumed?: boolean;
 }
 
 export interface PayeeYtd {
@@ -103,6 +107,8 @@ export interface TaxCalculationResult {
   totalEmployerLiability: number;
   otherDeductions: number;
   netPay: number;
+  /** Things the person running payroll must know, such as a state whose income tax is not calculated. */
+  warnings?: string[];
   /** Immutable audit snapshot persisted alongside the pay record. */
   audit: TaxAuditSnapshot;
 }

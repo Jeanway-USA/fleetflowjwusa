@@ -7,6 +7,7 @@ import {
   type TaxYearConfig,
 } from '@/lib/payroll/taxTables';
 import type { PayFrequency, StateTaxConfig } from '@/lib/payroll/types';
+import { resolveState, STATE_CODES } from '@/lib/tax/states';
 
 export interface TaxYearContext {
   orgId: string;
@@ -39,7 +40,8 @@ export function useTaxYearConfig(taxYear: number = CURRENT_TAX_YEAR) {
 
       let row: any = existing;
       if (!row) {
-        const defaults = defaultTaxYearConfig(taxYear);
+        // tables_year only exists in code: it is not a column.
+        const { tables_year: _tablesYear, ...defaults } = defaultTaxYearConfig(taxYear);
         const { data: inserted, error: insErr } = await supabase
           .from('tax_year_configs')
           .insert({ org_id: orgId!, ...(defaults as any) })
@@ -49,22 +51,9 @@ export function useTaxYearConfig(taxYear: number = CURRENT_TAX_YEAR) {
         row = inserted ?? { ...defaults, id: null };
       }
 
-      const config: TaxYearConfig = {
-        tax_year: row.tax_year,
-        fit_tables: row.fit_tables,
-        fit_tables_multiple_jobs: row.fit_tables_multiple_jobs,
-        standard_deduction: row.standard_deduction,
-        dependent_credit_qualifying_child: Number(row.dependent_credit_qualifying_child),
-        dependent_credit_other: Number(row.dependent_credit_other),
-        social_security_rate: Number(row.social_security_rate),
-        social_security_wage_base: Number(row.social_security_wage_base),
-        medicare_rate: Number(row.medicare_rate),
-        additional_medicare_rate: Number(row.additional_medicare_rate),
-        additional_medicare_threshold: Number(row.additional_medicare_threshold),
-        futa_rate: Number(row.futa_rate),
-        futa_wage_base: Number(row.futa_wage_base),
-        is_locked: !!row.is_locked,
-      };
+      // Federal law is read from code (IRS Pub 15-T and Pub 15, 2026), never from the stored row, so an old
+      // stored copy can not change what is withheld. Only the lock flag is read from the database.
+      const config: TaxYearConfig = { ...defaultTaxYearConfig(taxYear), is_locked: !!row.is_locked };
 
       // Pay frequency + default state still live on payroll_settings.
       const { data: settings } = await supabase
@@ -79,14 +68,20 @@ export function useTaxYearConfig(taxYear: number = CURRENT_TAX_YEAR) {
         .select('*')
         .eq('org_id', orgId!);
 
+      // Every state is covered, even one the owner never opened: published wage bases and new-employer rates come from
+      // the built-in table, and only an assigned rate the owner saved overrides the default.
+      const savedByCode = new Map<string, any>((states ?? []).map((r: any) => [String(r.state_code).toUpperCase(), r]));
       const statesByCode = new Map<string, StateTaxConfig>();
-      for (const s of (states ?? []) as any[]) {
-        statesByCode.set(s.state_code, {
-          state_code: s.state_code,
-          suta_rate: Number(s.suta_rate) || 0,
-          suta_wage_base: Number(s.suta_wage_base) || 0,
-          has_state_income_tax: !!s.has_state_income_tax,
-          sit_rate: Number(s.sit_rate) || 0,
+      for (const code of STATE_CODES) {
+        const r = resolveState(code, savedByCode.get(code));
+        if (!r) continue;
+        statesByCode.set(code, {
+          state_code: code,
+          suta_rate: r.sutaRate,
+          suta_wage_base: r.sutaWageBase,
+          has_state_income_tax: r.sitEstimateRate > 0,
+          sit_rate: r.sitEstimateRate,
+          rate_assumed: r.rateAssumed,
         });
       }
 

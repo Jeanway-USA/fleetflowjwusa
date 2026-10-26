@@ -9,7 +9,8 @@ import {
   type TaxCalculationResult,
   type TaxLine,
 } from './types';
-import type { FitBracket, FitTableSet, TaxYearConfig } from './taxTables';
+import { stateInfo, WA_2026 } from '@/lib/tax/states';
+import { WORKSHEET_1A_STANDARD_ADJUSTMENT_2026, type FitBracket, type FitTableSet, type TaxYearConfig } from './taxTables';
 
 export const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -37,47 +38,54 @@ export interface FitComputation {
 }
 
 /**
- * IRS Pub 15-T, Worksheet 1A — Percentage Method, annual payroll period,
- * Form W-4 from 2020 or later.
+ * IRS Pub 15-T (2026), Worksheet 1A: Employer's Withholding Worksheet for Percentage Method Tables for Automated
+ * Payroll Systems, annual payroll period. Step numbers in the comments are the worksheet's own.
  *
- * The annual rate schedules already embed the standard deduction, so it is
- * never subtracted separately here.
+ * With a Form W-4 from 2020 or later, line 1g subtracts $8,600 ($12,900 if married filing jointly) unless the
+ * Step 2 box is checked, because the 2026 tables no longer carry the standard deduction. With no Form W-4 the
+ * employee is treated as single with no adjustments (lines 1j to 1l with zero allowances).
  */
 export function computeFederalIncomeTax(params: {
   grossTaxablePay: number;
   profile: Pick<
     PayeeTaxProfile,
     'filingStatus' | 'multipleJobs' | 'dependentsAmount' | 'otherIncome' | 'deductions' | 'extraWithholding'
-  >;
+  > & { usedDefaults?: boolean };
   config: TaxYearConfig;
   payFrequency: PayFrequency;
 }): FitComputation {
   const { profile, config } = params;
   const periods = PAY_PERIODS_PER_YEAR[params.payFrequency] ?? 52;
   const gross = Math.max(0, Number(params.grossTaxablePay) || 0);
+  const noW4 = !!profile.usedDefaults;
+  const status = noW4 ? 'single' : profile.filingStatus;
 
-  // Step 1 — Adjust the employee's payment amount.
-  const annualWages = round2(gross * periods + Math.max(0, profile.otherIncome || 0));
-  const adjustedAnnualWage = Math.max(0, round2(annualWages - Math.max(0, profile.deductions || 0)));
+  // Step 1: adjust the payment amount (lines 1a to 1i, or 1j to 1l when there is no W-4).
+  const annualized = round2(gross * periods);
+  const annualWages = noW4 ? annualized : round2(annualized + Math.max(0, profile.otherIncome || 0));
+  const useMultipleJobs = !noW4 && !!profile.multipleJobs;
+  const standardAdjustment = noW4 || useMultipleJobs ? 0 : WORKSHEET_1A_STANDARD_ADJUSTMENT_2026[status];
+  const adjustedAnnualWage = noW4 ? annualized : Math.max(0, round2(annualWages - Math.max(0, profile.deductions || 0) - standardAdjustment));
 
-  // Step 2 — Figure the tentative withholding amount.
-  const useMultipleJobs = !!profile.multipleJobs;
+  // Step 2: tentative withholding amount (lines 2a to 2h).
   const tables: FitTableSet = useMultipleJobs
     ? (config.fit_tables_multiple_jobs as FitTableSet)
     : (config.fit_tables as FitTableSet);
-  const brackets = tables?.[profile.filingStatus] ?? [];
+  const brackets = tables?.[status] ?? [];
   const bracket = lookupBracket(brackets, adjustedAnnualWage);
   const tentativeAnnualTax = bracket
     ? Math.max(0, round2(bracket.base + (adjustedAnnualWage - bracket.over) * bracket.rate))
     : 0;
 
-  // Step 3 — Account for tax credits (Form W-4, Step 3).
-  const dependentCredit = Math.max(0, Number(profile.dependentsAmount) || 0);
+  // Step 3: account for tax credits (Form W-4, Step 3). Not available without a W-4.
+  const dependentCredit = noW4 ? 0 : Math.max(0, Number(profile.dependentsAmount) || 0);
+  // Rounded once, at the end, so cents never drift across the worksheet's lines.
+  const afterCreditsPerPeriod = Math.max(0, round2((tentativeAnnualTax - dependentCredit) / periods));
   const annualTaxAfterCredits = Math.max(0, round2(tentativeAnnualTax - dependentCredit));
 
-  // Step 4 — Figure the final amount to withhold.
-  const perPeriod = round2(annualTaxAfterCredits / periods);
-  const extraWithholding = Math.max(0, Number(profile.extraWithholding) || 0);
+  // Step 4: final amount to withhold (line 4b).
+  const perPeriod = afterCreditsPerPeriod;
+  const extraWithholding = noW4 ? 0 : Math.max(0, Number(profile.extraWithholding) || 0);
 
   return {
     tableSet: useMultipleJobs ? 'multiple_jobs' : 'standard',
@@ -105,6 +113,15 @@ export interface CalculatePayrollTaxParams {
   state?: StateTaxConfig | null;
   ytd?: PayeeYtd;
   payFrequency: PayFrequency;
+  /**
+   * The state whose income tax is withheld, when it differs from `state`. Drivers who run in two or more states are
+   * taxed only by the state they live in (49 U.S.C. 14503), while unemployment tax follows their base of operations.
+   */
+  sitStateCode?: string | null;
+  /** The saved settings of that state (used only for an owner-set flat estimate). */
+  sitStateConfig?: StateTaxConfig | null;
+  /** How many people the employer has. Washington's employer share of paid leave starts at 50. */
+  employerHeadcount?: number;
 }
 
 /**
@@ -174,11 +191,12 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
 
   const employeeLines: TaxLine[] = [];
   const employerLines: TaxLine[] = [];
+  let sit = 0;
 
   // --- Federal income tax (Pub 15-T) ---
   const fit = computeFederalIncomeTax({
     grossTaxablePay: gross,
-    profile,
+    profile: { ...profile, usedDefaults: profile.usedDefaults },
     config: cfg,
     payFrequency: params.payFrequency,
   });
@@ -187,7 +205,7 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
     label: 'Federal income tax',
     amount: fit.total,
     side: 'employee',
-    note: fit.bracket
+    note: profile.usedDefaults ? 'No Form W-4 on file: withheld as single with no adjustments (Pub 15-T, 2026)' : fit.bracket
       ? `Pub 15-T ${fit.tableSet === 'multiple_jobs' ? 'multiple-jobs' : 'standard'} table, ${(fit.bracket.rate * 100).toFixed(0)}% bracket over $${fit.bracket.over.toLocaleString()}`
       : 'Pub 15-T percentage method',
   });
@@ -251,25 +269,54 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
   }
 
   // --- State income tax (employee) ---
-  let sit = 0;
-  if (state?.has_state_income_tax && state.sit_rate > 0 && !profile.stateExempt) {
-    const annualWages = gross * periods;
-    const allowanceReduction = Math.max(0, profile.stateAllowances) * STATE_ALLOWANCE_VALUE;
-    const annualTaxable = Math.max(0, annualWages - allowanceReduction);
-    sit = round2(
-      (annualTaxable * state.sit_rate) / periods + Math.max(0, profile.stateAdditionalWithholding),
-    );
-    employeeLines.push({
-      key: 'state_income_tax',
-      label: `${state.state_code} income tax`,
-      amount: sit,
-      rate: state.sit_rate,
-      taxableWages: round2(annualTaxable / periods),
-      side: 'employee',
-      note: profile.stateAllowances
-        ? `${profile.stateAllowances} allowance(s) applied`
-        : undefined,
-    });
+  const warnings: string[] = [];
+  const sitCode = (params.sitStateCode ?? profile.sitState ?? state?.state_code ?? '').toUpperCase();
+  const sitInfo = stateInfo(sitCode);
+  if (sitInfo && sitInfo.sit !== 'none' && !profile.stateExempt) {
+    // Only states with a published, verified method are calculated exactly. For any other state the owner may enter a
+    // flat estimate in the state's settings; it is labeled an estimate everywhere. Without one, nothing is withheld
+    // and the run is warned, instead of guessing.
+    const sitCfg = params.sitStateConfig ?? (state && state.state_code.toUpperCase() === sitCode ? state : null);
+    const est = sitCfg && sitCfg.has_state_income_tax && sitCfg.sit_rate > 0 ? sitCfg : null;
+    if (est) {
+      const annualWages = gross * periods;
+      const allowanceReduction = Math.max(0, profile.stateAllowances) * STATE_ALLOWANCE_VALUE;
+      const annualTaxable = Math.max(0, annualWages - allowanceReduction);
+      sit = round2((annualTaxable * est.sit_rate) / periods + Math.max(0, profile.stateAdditionalWithholding));
+      employeeLines.push({
+        key: 'state_income_tax',
+        label: `${sitInfo.code} income tax (estimate)`,
+        amount: sit,
+        rate: est.sit_rate,
+        taxableWages: round2(annualTaxable / periods),
+        side: 'employee',
+        note: 'A flat estimate you set, not the state\'s official method. Check it against the state\'s withholding tables.',
+      });
+      warnings.push(`${sitInfo.name} income tax is a flat estimate, not the state's official withholding method.`);
+    } else {
+      warnings.push(`${sitInfo.name} income tax is not calculated automatically. Withhold it using the state's official tables and enter the amount, or set an estimate in the state's settings.`);
+    }
+  }
+  if (profile.usedDefaults) warnings.push('No Form W-4 on file: federal tax was withheld as single with no adjustments.');
+
+  // --- State programs the engine can calculate (Washington paid leave and long-term care) ---
+  const stateCode = (state?.state_code ?? '').toUpperCase();
+  if (stateCode === 'WA') {
+    const pfmlRoom = Math.max(0, cfg.social_security_wage_base - Math.max(0, ytd.socialSecurityWages));
+    const pfmlWages = round2(Math.min(gross, pfmlRoom));
+    const pfmlTotal = round2(pfmlWages * WA_2026.pfmlTotalRate);
+    const pfmlEmployee = round2(pfmlTotal * WA_2026.pfmlEmployeeShare);
+    const pfmlEmployer = (params.employerHeadcount ?? 0) >= WA_2026.employerShareMinHeadcount ? round2(pfmlTotal - pfmlEmployee) : 0;
+    if (pfmlEmployee > 0) {
+      employeeLines.push({ key: 'wa_pfml', label: 'WA Paid Family & Medical Leave', amount: pfmlEmployee, rate: WA_2026.pfmlTotalRate * WA_2026.pfmlEmployeeShare, taxableWages: pfmlWages, side: 'employee', note: 'Withheld after tax; stays in W-2 wages' });
+    }
+    if (pfmlEmployer > 0) {
+      employerLines.push({ key: 'wa_pfml_employer', label: 'WA Paid Leave (employer share)', amount: pfmlEmployer, rate: WA_2026.pfmlTotalRate * (1 - WA_2026.pfmlEmployeeShare), taxableWages: pfmlWages, side: 'employer' });
+    }
+    const cares = round2(gross * WA_2026.caresRate);
+    if (cares > 0) {
+      employeeLines.push({ key: 'wa_cares', label: 'WA Cares Fund', amount: cares, rate: WA_2026.caresRate, taxableWages: gross, side: 'employee', note: 'Withheld after tax; stays in W-2 wages. Skip only for an employee with a state exemption.' });
+    }
   }
 
   // --- Employer unemployment: FUTA + state SUTA ---
@@ -288,6 +335,11 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
   }
 
   let suta = 0;
+  if (state && !(state.suta_rate > 0) && stateInfo(state.state_code)) {
+    warnings.push(`No unemployment rate is known for ${stateInfo(state.state_code)!.name}: enter the rate from the state's letter so it is accrued.`);
+  } else if (state?.rate_assumed) {
+    warnings.push(`${state.state_code} unemployment tax uses the new-employer rate. Enter your assigned rate when the state sends it.`);
+  }
   if (state && state.suta_rate > 0 && state.suta_wage_base > 0) {
     const remaining = Math.max(0, state.suta_wage_base - Math.max(0, ytd.gross));
     const taxable = round2(Math.min(gross, remaining));
@@ -318,6 +370,7 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
     totalEmployerLiability,
     otherDeductions,
     netPay,
+    warnings,
     audit: {
       ...baseAudit,
       fit: {
