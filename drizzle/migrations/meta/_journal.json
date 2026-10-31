@@ -134,6 +134,13 @@
       "when": 1792989424713,
       "tag": "0018_apply_tax_hub",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793484696397,
+      "tag": "0019_apply_pay_runs",
+      "breakpoints": true
     }
   ]
 }

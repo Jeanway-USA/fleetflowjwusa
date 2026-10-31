@@ -5674,6 +5674,180 @@ export type Database = {
         }
         Relationships: []
       }
+      pay_run_items: {
+        Row: {
+          created_at: string
+          deductions: number
+          gross: number
+          id: string
+          net: number
+          non_taxable: number
+          org_id: string
+          payee_key: string
+          payee_name: string
+          run_id: string
+          source: string
+          source_id: string
+          taxes: number
+          warnings: Json
+        }
+        Insert: {
+          created_at?: string
+          deductions?: number
+          gross?: number
+          id?: string
+          net?: number
+          non_taxable?: number
+          org_id: string
+          payee_key: string
+          payee_name: string
+          run_id: string
+          source: string
+          source_id: string
+          taxes?: number
+          warnings?: Json
+        }
+        Update: {
+          created_at?: string
+          deductions?: number
+          gross?: number
+          id?: string
+          net?: number
+          non_taxable?: number
+          org_id?: string
+          payee_key?: string
+          payee_name?: string
+          run_id?: string
+          source?: string
+          source_id?: string
+          taxes?: number
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_run_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_run_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "pay_run_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_run_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "pay_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_runs: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          driver_period_end: string | null
+          driver_period_start: string | null
+          id: string
+          note: string | null
+          org_id: string
+          paid_at: string | null
+          paid_by: string | null
+          pay_date: string
+          run_type: string
+          staff_period_end: string | null
+          staff_period_start: string | null
+          status: string
+          totals: Json
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_period_end?: string | null
+          driver_period_start?: string | null
+          id?: string
+          note?: string | null
+          org_id: string
+          paid_at?: string | null
+          paid_by?: string | null
+          pay_date: string
+          run_type?: string
+          staff_period_end?: string | null
+          staff_period_start?: string | null
+          status?: string
+          totals?: Json
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_period_end?: string | null
+          driver_period_start?: string | null
+          id?: string
+          note?: string | null
+          org_id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          pay_date?: string
+          run_type?: string
+          staff_period_end?: string | null
+          staff_period_start?: string | null
+          status?: string
+          totals?: Json
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "pay_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_settings: {
         Row: {
           additional_medicare_rate: number
@@ -6654,6 +6828,8 @@ export type Database = {
           period_start: string
           snapshot: Json | null
           status: string
+          tax_calculation: Json | null
+          tax_withholding: number
           updated_at: string
           user_id: string
           version_id: string | null
@@ -6684,6 +6860,8 @@ export type Database = {
           period_start: string
           snapshot?: Json | null
           status?: string
+          tax_calculation?: Json | null
+          tax_withholding?: number
           updated_at?: string
           user_id: string
           version_id?: string | null
@@ -6714,6 +6892,8 @@ export type Database = {
           period_start?: string
           snapshot?: Json | null
           status?: string
+          tax_calculation?: Json | null
+          tax_withholding?: number
           updated_at?: string
           user_id?: string
           version_id?: string | null
@@ -8837,6 +9017,8 @@ export type Database = {
           period_start: string
           snapshot: Json | null
           status: string
+          tax_calculation: Json | null
+          tax_withholding: number
           updated_at: string
           user_id: string
           version_id: string | null
