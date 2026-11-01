@@ -2439,6 +2439,7 @@ export type Database = {
           hire_date: string | null
           hos_last_updated: string | null
           id: string
+          landstar_approved_on: string | null
           landstar_operator_id: string | null
           last_name: string
           license_expiry: string | null
@@ -2487,6 +2488,7 @@ export type Database = {
           hire_date?: string | null
           hos_last_updated?: string | null
           id?: string
+          landstar_approved_on?: string | null
           landstar_operator_id?: string | null
           last_name: string
           license_expiry?: string | null
@@ -2535,6 +2537,7 @@ export type Database = {
           hire_date?: string | null
           hos_last_updated?: string | null
           id?: string
+          landstar_approved_on?: string | null
           landstar_operator_id?: string | null
           last_name?: string
           license_expiry?: string | null
@@ -6725,6 +6728,79 @@ export type Database = {
             columns: ["setting_id"]
             isOneToOne: false
             referencedRelation: "safety_bonus_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      safety_files: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          doc_date: string | null
+          expires_on: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          kind: string
+          note: string | null
+          org_id: string
+          subject_id: string
+          subject_type: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          doc_date?: string | null
+          expires_on?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          kind: string
+          note?: string | null
+          org_id: string
+          subject_id: string
+          subject_type: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          doc_date?: string | null
+          expires_on?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          kind?: string
+          note?: string | null
+          org_id?: string
+          subject_id?: string
+          subject_type?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_files_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_files_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "safety_files_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
