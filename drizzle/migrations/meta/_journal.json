@@ -141,6 +141,13 @@
       "when": 1793484696397,
       "tag": "0019_apply_pay_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793491228007,
+      "tag": "0020_apply_deductions",
+      "breakpoints": true
     }
   ]
 }
