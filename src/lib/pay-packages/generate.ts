@@ -14,8 +14,18 @@ export interface PackageContext {
 }
 
 /** Loads everything needed to decide, for a set of drivers, who is paid by a package. */
+/**
+ * A package given to a person's login (Team, Position & pay) belongs to their driver record when they have one. Settlements
+ * look packages up by driver, so without this a driver whose package was assigned through their login was silently paid the old way.
+ */
+export function attachLoginsToDrivers(assignments: PayPackageAssignment[], drivers: Array<{ id: string; user_id: string | null }>): PayPackageAssignment[] {
+  const byUser = new Map(drivers.filter((d) => d.user_id).map((d) => [d.user_id as string, d.id]));
+  return assignments.map((a) => (!a.driver_id && a.user_id && byUser.has(a.user_id) ? { ...a, driver_id: byUser.get(a.user_id) as string } : a));
+}
+
 export async function loadPackageContext(): Promise<PackageContext> {
-  const [assignments, overrides] = await Promise.all([fetchAssignments(), fetchOverrides()]);
+  const [rawAssignments, overrides, { data: drivers }] = await Promise.all([fetchAssignments(), fetchOverrides(), db.from('drivers').select('id, user_id').not('user_id', 'is', null).is('deleted_at', null)]);
+  const assignments = attachLoginsToDrivers(rawAssignments, (drivers ?? []) as Array<{ id: string; user_id: string | null }>);
   const versionsByPackage = await fetchAllVersions(Array.from(new Set(assignments.map((a) => a.package_id))));
   return { assignments, versionsByPackage, overrides };
 }

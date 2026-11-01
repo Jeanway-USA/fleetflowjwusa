@@ -122,6 +122,8 @@ export interface TaxAuditSnapshot {
   employmentClass: EmploymentClass;
   profile: PayeeTaxProfile;
   ytdAtCalculation: PayeeYtd;
+  /** The pay each tax was figured on. They differ from the gross when before-tax deductions (insurance, 401(k)) came out. */
+  wages?: { gross: number; fit: number; fica: number; futa: number; state: number };
   federalRates: {
     socialSecurityRate: number;
     socialSecurityWageBase: number;
@@ -133,7 +135,7 @@ export interface TaxAuditSnapshot {
   };
   stateRates: StateTaxConfig | null;
   fit: {
-    method: 'pub15t_percentage_annual';
+    method: 'pub15t_percentage_annual' | 'supplemental_flat_22';
     tableSet: 'standard' | 'multiple_jobs';
     annualWages: number;
     adjustedAnnualWage: number;

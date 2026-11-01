@@ -26,11 +26,11 @@ import {
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { toast } from 'sonner';
 import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
-import { applyW2WithholdingToSettlements } from '@/lib/payroll/applySettlementWithholding';
+import { generateDriverPay } from '@/lib/payroll/generateDriverPay';
 import { formatCurrency } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
 import { settlementWeek } from '@/lib/settlement-week';
-import { driversOnPackages, findOverlaps, generatePackageSettlements, loadPackageContext, type PackageContext } from '@/lib/pay-packages/generate';
+import { findOverlaps } from '@/lib/pay-packages/generate';
 import { cn } from '@/lib/utils';
 import { addDays, format } from 'date-fns';
 import { CalendarIcon, Check, ChevronsUpDown, X, Users } from 'lucide-react';
@@ -136,64 +136,18 @@ export function GenerateSettlementsDialog({
       const end = format(periodEnd, 'yyyy-MM-dd');
       const pay = format(paymentDate, 'yyyy-MM-dd');
 
-      // Drivers with a pay package are paid from it; everyone else goes through the original generator.
-      // If the pay package tables are not set up yet, every driver is simply paid the original way.
-      let context: PackageContext | null = null;
-      try {
-        context = await loadPackageContext();
-      } catch {
-        context = null;
-      }
-      const chosen = Array.from(selected);
-      const onPackage = context ? driversOnPackages(chosen, context, end) : new Set<string>();
-      const legacyIds = chosen.filter((id) => !onPackage.has(id));
-
-      const rows: any[] = [];
-      let packageSkipped: Array<{ driverId: string; reason: string }> = [];
-      if (legacyIds.length > 0) {
-        const targetIds = onPackage.size === 0 && allSelected ? null : legacyIds;
-        const { data, error } = await supabase.rpc('generate_driver_settlements', {
-          _driver_ids: targetIds,
-          _period_start: start,
-          _period_end: end,
-          _payment_date: pay,
-        });
-        if (error) throw error;
-        rows.push(...((data ?? []) as any[]));
-      }
-      if (onPackage.size > 0 && context) {
-        if (!taxConfig?.orgId) throw new Error('Your organization has not finished loading. Try again in a moment.');
-        const made = await generatePackageSettlements({
-          orgId: taxConfig.orgId,
-          userId: user?.id ?? null,
-          driverIds: Array.from(onPackage),
-          periodStart: start,
-          periodEnd: end,
-          paymentDate: pay,
-          context,
-          replaceDrafts: true,
-        });
-        rows.push(...made.rows);
-        packageSkipped = made.skipped;
-      }
-
-      // Auto-apply W-2 withholding (contractors are left untouched).
-      let withheld = { w2Count: 0, totalWithheld: 0 };
-      if (taxConfig?.orgId && rows.length) {
-        withheld = await applyW2WithholdingToSettlements(rows, {
-          orgId: taxConfig.orgId,
-          config: taxConfig.config,
-          statesByCode: taxConfig.statesByCode,
-          payFrequency: taxConfig.payFrequency,
-          defaultTaxState: taxConfig.defaultTaxState,
-        });
-      }
-      // The rows above were read before withholding was applied, so read the pay back for the message.
-      let finalNet = rows.reduce((s, r: any) => s + Number(r.net_pay ?? 0), 0);
-      if (rows.length > 0) {
-        const { data: fresh } = await supabase.from('driver_settlements').select('net_pay').in('id', rows.map((r: any) => r.id));
-        if (fresh) finalNet = fresh.reduce((s, r) => s + Number(r.net_pay ?? 0), 0);
-      }
+      if (!taxConfig?.orgId) throw new Error('Your organization has not finished loading. Try again in a moment.');
+      // The same function the Pay Run uses, so a driver is never paid two different ways.
+      const { rows, withheld, packageSkipped, finalNet } = await generateDriverPay({
+        orgId: taxConfig.orgId,
+        userId: user?.id ?? null,
+        driverIds: Array.from(selected),
+        periodStart: start,
+        periodEnd: end,
+        paymentDate: pay,
+        taxContext: { statesByCode: taxConfig.statesByCode, payFrequency: taxConfig.payFrequency, defaultTaxState: taxConfig.defaultTaxState },
+        allSelected,
+      });
       return { rows, withheld, packageSkipped, finalNet };
     },
     onSuccess: ({ rows, withheld, packageSkipped, finalNet }) => {

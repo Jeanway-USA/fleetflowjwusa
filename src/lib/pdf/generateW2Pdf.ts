@@ -197,6 +197,11 @@ function drawFront(doc: jsPDF, copy: Copy, input: W2PdfInput) {
     doc.text(t, cx - 2, Y + row * 6 + 29, { maxWidth: 44 });
   });
   box(L + half, row * 6, half, h13, '12b');
+  if (w2.retirementPlan) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('X', X + L + 8 + 46 + 1.2, Y + row * 6 + 19.5);
+  }
   const info = (input.box14a ?? []).map((e) => `${e.label} ${money(e.amount)}`);
   const y14 = row * 6 + h13;
   box(L, y14, half, row, '14a  Other');
@@ -206,6 +211,15 @@ function drawFront(doc: jsPDF, copy: Copy, input: W2PdfInput) {
   box(L + half, y14, half, row, '12c');
   box(L, y14 + row, half, row, '14b  Treasury Tipped Occupation Code(s)');
   box(L + half, y14 + row, half, row, '12d');
+
+  // Box 12: up to four codes with their amounts (D 401(k), W HSA, AA Roth 401(k)).
+  const box12At = [row * 5, row * 6, y14, y14 + row];
+  w2.box12.slice(0, 4).forEach((e, idx) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(valueSize - 0.5);
+    doc.text(`${e.code}`, X + L + half + 6, Y + box12At[idx] + (idx === 1 ? 24 : 22));
+    doc.text(money(e.amount), X + L + half + half - 5, Y + box12At[idx] + (idx === 1 ? 24 : 22), { align: 'right' });
+  });
 
   // State and local row.
   const sy = y14 + row * 2 + 4;
@@ -329,6 +343,7 @@ export function generateFilingSheetPdf(input: FilingSheetInput): Blob {
     line(`1  Wages ${money(w2.box1)}     2  Federal tax withheld ${money(w2.box2)}`);
     line(`3  Social security wages ${money(w2.box3)}     4  Social security tax ${money(w2.box4)}`);
     line(`5  Medicare wages ${money(w2.box5)}     6  Medicare tax ${money(w2.box6)}`);
+    if (w2.box12.length > 0) line(`12  ${w2.box12.map((e) => `${e.code} ${money(e.amount)}`).join('     ')}${w2.retirementPlan ? '     13  Retirement plan: check the box' : ''}`);
     if (w2.states.length === 0) line('15 to 17  State: none (no state income tax withheld for this employee)');
     w2.states.forEach((s) => line(`15  State ${s.code}  ID ${stateIds?.[s.code] ?? input.stateIds?.[s.code] ?? 'MISSING'}     16  State wages ${money(s.wages)}     17  State income tax ${money(s.tax)}`));
     y += 6;

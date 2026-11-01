@@ -101,6 +101,12 @@ export function computeFederalIncomeTax(params: {
   };
 }
 
+/** Flat 22% on supplemental wages. A single employee above $1 million of supplemental wages in a year is out of scope here. */
+export function supplementalFit(gross: number): FitComputation {
+  const total = round2(Math.max(0, gross) * 0.22);
+  return { tableSet: 'standard', annualWages: 0, adjustedAnnualWage: 0, bracket: null, tentativeAnnualTax: total, dependentCredit: 0, annualTaxAfterCredits: total, perPeriod: total, extraWithholding: 0, total, method: 'supplemental_flat_22' } as FitComputation & { method: string };
+}
+
 /** Approximate per-allowance annual exemption used until per-state tables land. */
 export const STATE_ALLOWANCE_VALUE = 2000;
 
@@ -122,6 +128,16 @@ export interface CalculatePayrollTaxParams {
   sitStateConfig?: StateTaxConfig | null;
   /** How many people the employer has. Washington's employer share of paid leave starts at 50. */
   employerHeadcount?: number;
+  /**
+   * Pay made apart from regular wages (a bonus, back pay, a correction). Federal income tax is withheld at the flat 22%
+   * supplemental rate (Pub 15, section 7), not annualized like a regular paycheck.
+   */
+  supplemental?: boolean;
+  /**
+   * Deductions taken before tax, by the tax they lower: income tax, Social Security and Medicare, unemployment tax, and state
+   * income tax. Each tax is figured on the pay less its own amount, never below zero.
+   */
+  preTax?: { fit?: number; fica?: number; futa?: number; state?: number };
 }
 
 /**
@@ -131,6 +147,11 @@ export interface CalculatePayrollTaxParams {
  */
 export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCalculationResult {
   const gross = Math.max(0, round2(params.grossTaxablePay));
+  const lower = (v?: number) => round2(Math.max(0, gross - Math.max(0, Number(v) || 0)));
+  const fitGross = lower(params.preTax?.fit);
+  const ficaGross = lower(params.preTax?.fica);
+  const futaGross = lower(params.preTax?.futa);
+  const stateGross = lower(params.preTax?.state);
   const otherDeductions = Math.max(0, round2(params.otherDeductions ?? 0));
   const ytd = params.ytd ?? EMPTY_YTD;
   const cfg = params.config;
@@ -194,25 +215,27 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
   let sit = 0;
 
   // --- Federal income tax (Pub 15-T) ---
-  const fit = computeFederalIncomeTax({
-    grossTaxablePay: gross,
-    profile: { ...profile, usedDefaults: profile.usedDefaults },
-    config: cfg,
-    payFrequency: params.payFrequency,
-  });
+  const fit = params.supplemental
+    ? supplementalFit(fitGross)
+    : computeFederalIncomeTax({
+        grossTaxablePay: fitGross,
+        profile: { ...profile, usedDefaults: profile.usedDefaults },
+        config: cfg,
+        payFrequency: params.payFrequency,
+      });
   employeeLines.push({
     key: 'federal_income_tax',
     label: 'Federal income tax',
     amount: fit.total,
     side: 'employee',
-    note: profile.usedDefaults ? 'No Form W-4 on file: withheld as single with no adjustments (Pub 15-T, 2026)' : fit.bracket
+    note: params.supplemental ? 'Supplemental pay: flat 22% (Pub 15, section 7)' : profile.usedDefaults ? 'No Form W-4 on file: withheld as single with no adjustments (Pub 15-T, 2026)' : fit.bracket
       ? `Pub 15-T ${fit.tableSet === 'multiple_jobs' ? 'multiple-jobs' : 'standard'} table, ${(fit.bracket.rate * 100).toFixed(0)}% bracket over $${fit.bracket.over.toLocaleString()}`
       : 'Pub 15-T percentage method',
   });
 
   // --- Social Security (wage-base capped, YTD aware) ---
   const ssRemaining = Math.max(0, cfg.social_security_wage_base - Math.max(0, ytd.socialSecurityWages));
-  const ssTaxable = round2(Math.min(gross, ssRemaining));
+  const ssTaxable = round2(Math.min(ficaGross, ssRemaining));
   const eeSS = round2(ssTaxable * cfg.social_security_rate);
   employeeLines.push({
     key: 'social_security',
@@ -221,7 +244,7 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
     rate: cfg.social_security_rate,
     taxableWages: ssTaxable,
     side: 'employee',
-    note: ssTaxable < gross ? `Wage base $${cfg.social_security_wage_base.toLocaleString()} reached` : undefined,
+    note: ssTaxable < ficaGross ? `Wage base $${cfg.social_security_wage_base.toLocaleString()} reached` : undefined,
   });
   employerLines.push({
     key: 'employer_social_security',
@@ -233,13 +256,13 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
   });
 
   // --- Medicare (uncapped) + Additional Medicare (employee only) ---
-  const eeMed = round2(gross * cfg.medicare_rate);
+  const eeMed = round2(ficaGross * cfg.medicare_rate);
   employeeLines.push({
     key: 'medicare',
     label: 'Medicare',
     amount: eeMed,
     rate: cfg.medicare_rate,
-    taxableWages: gross,
+    taxableWages: ficaGross,
     side: 'employee',
   });
   employerLines.push({
@@ -247,12 +270,12 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
     label: 'Employer Medicare',
     amount: eeMed,
     rate: cfg.medicare_rate,
-    taxableWages: gross,
+    taxableWages: ficaGross,
     side: 'employer',
   });
 
   const priorMed = Math.max(0, ytd.medicareWages);
-  const overNow = Math.max(0, priorMed + gross - cfg.additional_medicare_threshold);
+  const overNow = Math.max(0, priorMed + ficaGross - cfg.additional_medicare_threshold);
   const overPrior = Math.max(0, priorMed - cfg.additional_medicare_threshold);
   const addlBase = round2(Math.max(0, overNow - overPrior));
   const addlMed = round2(addlBase * cfg.additional_medicare_rate);
@@ -279,7 +302,7 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
     const sitCfg = params.sitStateConfig ?? (state && state.state_code.toUpperCase() === sitCode ? state : null);
     const est = sitCfg && sitCfg.has_state_income_tax && sitCfg.sit_rate > 0 ? sitCfg : null;
     if (est) {
-      const annualWages = gross * periods;
+      const annualWages = stateGross * periods;
       const allowanceReduction = Math.max(0, profile.stateAllowances) * STATE_ALLOWANCE_VALUE;
       const annualTaxable = Math.max(0, annualWages - allowanceReduction);
       sit = round2((annualTaxable * est.sit_rate) / periods + Math.max(0, profile.stateAdditionalWithholding));
@@ -303,7 +326,7 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
   const stateCode = (state?.state_code ?? '').toUpperCase();
   if (stateCode === 'WA') {
     const pfmlRoom = Math.max(0, cfg.social_security_wage_base - Math.max(0, ytd.socialSecurityWages));
-    const pfmlWages = round2(Math.min(gross, pfmlRoom));
+    const pfmlWages = round2(Math.min(ficaGross, pfmlRoom));
     const pfmlTotal = round2(pfmlWages * WA_2026.pfmlTotalRate);
     const pfmlEmployee = round2(pfmlTotal * WA_2026.pfmlEmployeeShare);
     const pfmlEmployer = (params.employerHeadcount ?? 0) >= WA_2026.employerShareMinHeadcount ? round2(pfmlTotal - pfmlEmployee) : 0;
@@ -313,15 +336,15 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
     if (pfmlEmployer > 0) {
       employerLines.push({ key: 'wa_pfml_employer', label: 'WA Paid Leave (employer share)', amount: pfmlEmployer, rate: WA_2026.pfmlTotalRate * (1 - WA_2026.pfmlEmployeeShare), taxableWages: pfmlWages, side: 'employer' });
     }
-    const cares = round2(gross * WA_2026.caresRate);
+    const cares = round2(ficaGross * WA_2026.caresRate);
     if (cares > 0) {
-      employeeLines.push({ key: 'wa_cares', label: 'WA Cares Fund', amount: cares, rate: WA_2026.caresRate, taxableWages: gross, side: 'employee', note: 'Withheld after tax; stays in W-2 wages. Skip only for an employee with a state exemption.' });
+      employeeLines.push({ key: 'wa_cares', label: 'WA Cares Fund', amount: cares, rate: WA_2026.caresRate, taxableWages: ficaGross, side: 'employee', note: 'Withheld after tax; stays in W-2 wages. Skip only for an employee with a state exemption.' });
     }
   }
 
   // --- Employer unemployment: FUTA + state SUTA ---
   const futaRemaining = Math.max(0, cfg.futa_wage_base - Math.max(0, ytd.gross));
-  const futaTaxable = round2(Math.min(gross, futaRemaining));
+  const futaTaxable = round2(Math.min(futaGross, futaRemaining));
   const futa = round2(futaTaxable * cfg.futa_rate);
   if (futa > 0) {
     employerLines.push({
@@ -342,7 +365,7 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
   }
   if (state && state.suta_rate > 0 && state.suta_wage_base > 0) {
     const remaining = Math.max(0, state.suta_wage_base - Math.max(0, ytd.gross));
-    const taxable = round2(Math.min(gross, remaining));
+    const taxable = round2(Math.min(futaGross, remaining));
     suta = round2(taxable * state.suta_rate);
     if (suta > 0) {
       employerLines.push({
@@ -373,8 +396,9 @@ export function calculatePayrollTaxes(params: CalculatePayrollTaxParams): TaxCal
     warnings,
     audit: {
       ...baseAudit,
+      wages: { gross, fit: fitGross, fica: ficaGross, futa: futaGross, state: stateGross },
       fit: {
-        method: 'pub15t_percentage_annual',
+        method: params.supplemental ? 'supplemental_flat_22' : 'pub15t_percentage_annual',
         tableSet: fit.tableSet,
         annualWages: fit.annualWages,
         adjustedAnnualWage: fit.adjustedAnnualWage,

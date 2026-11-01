@@ -5,6 +5,12 @@ import { assignmentOn, packageCovers, resolvePay, snapshotFor } from '@/lib/pay-
 import { buildWeekInput, type PackageContext } from '@/lib/pay-packages/generate';
 import type { PayLine, PayResult } from '@/lib/pay-packages/types';
 import { isWholePayWeeks, periodPaidHours, type ShiftEntry } from '@/lib/shop/hours';
+import { defaultTaxYearConfig } from '@/lib/payroll/taxTables';
+import { employeeForUser, loadStaffTaxContext, staffTaxesFor, staffYtd } from '@/lib/payroll/staffTax';
+import { loadPlansFor, recordApplied } from '@/lib/payroll/deductionPlans';
+import { wageIssues } from '@/lib/payroll/compliance';
+import { balanceOn, leavePay, sickAccrual } from '@/lib/payroll/timeOff';
+import { fetchEntries, KIND_LABEL, recordAccrual } from '@/lib/payroll/timeOffStore';
 
 const db = supabase as any;
 
@@ -19,8 +25,11 @@ export interface StaffStatement {
   gross_pay: number;
   non_taxable: number;
   deductions: number;
+  /** Federal, state and payroll taxes withheld. Zero on statements made before staff taxes were added. */
+  tax_withholding: number;
   net_pay: number;
   lines: PayLine[];
+  tax_calculation?: { lines?: Array<{ key: string; label: string; amount: number; side: 'employee' | 'employer'; note?: string }>; profile?: { usedDefaults?: boolean } } | null;
   note: string | null;
   archived_at: string | null;
   created_at: string;
@@ -48,6 +57,8 @@ export function staffOnPackages(ctx: PackageContext, periodEnd: string): string[
 export interface StaffGenerationResult {
   created: number;
   skipped: Array<{ userId: string; reason: string }>;
+  /** Things to look at, such as a person with no W-4 on file. */
+  warnings: Array<{ userId: string; message: string }>;
 }
 
 /**
@@ -62,10 +73,16 @@ export async function generateStaffStatements(args: {
   periodStart: string;
   periodEnd: string;
   context: PackageContext;
+  /** The payday, which standing deductions are dated against. Defaults to the end of the period. */
+  payDate?: string;
 }): Promise<StaffGenerationResult> {
   const { orgId, userId, staffIds, periodStart, periodEnd, context } = args;
+  const payDate = args.payDate ?? periodEnd;
   const skipped: StaffGenerationResult['skipped'] = [];
+  const warnings: StaffGenerationResult['warnings'] = [];
   let created = 0;
+  const taxCtx = await loadStaffTaxContext(orgId);
+  const taxConfig = defaultTaxYearConfig(Number(periodEnd.slice(0, 4)));
 
   const { data: loads, error: loadsError } = await db
     .from('fleet_loads')
@@ -129,13 +146,65 @@ export async function generateStaffStatements(args: {
       continue;
     }
 
+    // Wage law: hours worked must be paid, overtime must be paid, and the pay must reach the minimum wage.
+    const hoursWorked = (staffWeek.regularHours ?? 0) + (staffWeek.overtimeHours ?? 0);
+    if (hourly && hoursWorked > 0) {
+      const live = resolved.components.filter((c) => c.is_active);
+      const rateLine = live.find((c) => c.calculation_method === 'per_hour');
+      const wage = wageIssues({
+        state: employeeForUser(taxCtx, staffId)?.profile.workState,
+        date: periodEnd,
+        regularHours: staffWeek.regularHours ?? 0,
+        overtimeHours: staffWeek.overtimeHours ?? 0,
+        // Hourly pay worked out by a formula has no single rate: the average for the hours is checked instead.
+        hourlyRate: rateLine ? rateLine.value : live.some((c) => c.calculation_method === 'overtime_hour') ? null : result.taxableGross / hoursWorked,
+        hasOvertimePay: live.some((c) => c.calculation_method === 'overtime_hour') || live.some((c) => c.calculation_method === 'formula' && /overtime_hours/.test(c.formula ?? '')),
+        taxableGross: result.taxableGross,
+      });
+      const blocking = wage.filter((w) => w.level === 'block');
+      if (blocking.length > 0) { skipped.push({ userId: staffId, reason: blocking.map((w) => w.message).join(' ') }); continue; }
+    }
+
     for (const d of (existing ?? []) as Array<{ id: string }>) {
       const { error } = await db.rpc('set_staff_pay_statement_status', { _id: d.id, _action: 'archive' });
       if (error) throw error;
     }
 
+    // Paid leave taken in this period is paid at the hourly rate. Sick leave is earned from hours worked (Washington).
+    const payee = employeeForUser(taxCtx, staffId);
+    const leaveEntries = await fetchEntries(orgId, staffId);
+    const taken = leaveEntries.filter((e) => e.entry_type === 'use' && e.effective_date >= periodStart && e.effective_date <= periodEnd);
+    const liveComponents = resolved.components.filter((c) => c.is_active);
+    const hourlyRate = liveComponents.find((c) => c.calculation_method === 'per_hour')?.value ?? null;
+    const leaveLines: PayLine[] = [];
+    (['sick', 'pto', 'holiday'] as const).forEach((kind, idx) => {
+      const hrs = Math.round(-taken.filter((e) => e.kind === kind).reduce((s, e) => s + e.hours, 0) * 100) / 100;
+      if (hrs <= 0) return;
+      if (hourlyRate == null) { warnings.push({ userId: staffId, message: `${KIND_LABEL[kind]} of ${hrs} hours was NOT paid: the pay package has no hourly rate to pay it at.` }); return; }
+      leaveLines.push({ componentId: `leave:${kind}`, componentType: 'custom', label: KIND_LABEL[kind], method: 'extra', amount: leavePay(hrs, hourlyRate), isDeduction: false, isTaxable: true, detail: `${hrs} hours at ${hourlyRate.toFixed(2)} an hour`, sortOrder: 900 + idx });
+    });
+    const leaveTotal = Math.round(leaveLines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
+    const taxableTotal = Math.round((result.taxableGross + leaveTotal) * 100) / 100;
+    const earnsSick = (payee?.profile.workState ?? '').toUpperCase() === 'WA' && hoursWorked > 0;
+    const sickEarned = earnsSick ? sickAccrual(hoursWorked) : 0;
+    const sickUsed = Math.round(-taken.filter((e) => e.kind === 'sick').reduce((s, e) => s + e.hours, 0) * 100) / 100;
+    const sickBalance = earnsSick || leaveEntries.some((e) => e.kind === 'sick')
+      ? balanceOn([...leaveEntries, { id: 'new', kind: 'sick', entry_type: 'accrual', hours: sickEarned, effective_date: periodEnd }], 'sick', periodEnd).available
+      : null;
+
+    // Taxes come off the pay, from the person's own W-4 and state form.
+    const ytd = await staffYtd(orgId, staffId, Number(periodEnd.slice(0, 4)), periodEnd);
+    const taxes = staffTaxesFor({ payee, taxableGross: taxableTotal, nonTaxable: result.nonTaxable, deductions: result.deductions, config: taxConfig, ctx: taxCtx, ytd, plans: payee ? (await loadPlansFor(orgId, 'employee', [payee.id], Number(periodEnd.slice(0, 4)))).get(payee.id) ?? [] : [], payDate });
+    for (const message of taxes.warnings) warnings.push({ userId: staffId, message });
+    // Standing deductions (insurance, 401(k), garnishments, loans) join the package's own lines.
+    const planLines: PayLine[] = taxes.applied.map((a, idx) => ({
+      componentId: `plan:${a.planId}`, componentType: 'deduction' as PayLine['componentType'], label: a.label, method: 'extra', amount: a.amount, isDeduction: true, isTaxable: false,
+      detail: `${a.preTax ? 'Taken before tax' : 'Taken after tax'}${a.note ? `. ${a.note}` : ''}`, sortOrder: 1000 + idx,
+    }));
+
+    const calculation = sickBalance == null ? taxes.calculation : { ...(taxes.calculation as object), timeOff: { sick: { available: sickBalance, earned: sickEarned, used: sickUsed } } };
     const snap = snapshotFor(resolved);
-    const { error: insertError } = await db.from('staff_pay_statements').insert({
+    const { data: inserted, error: insertError } = await db.from('staff_pay_statements').insert({
       org_id: orgId,
       user_id: staffId,
       package_id: snap.packageId,
@@ -145,19 +214,23 @@ export async function generateStaffStatements(args: {
       assignment_id: snap.assignmentId,
       period_start: periodStart,
       period_end: periodEnd,
-      gross_pay: result.taxableGross,
+      gross_pay: taxableTotal,
       non_taxable: result.nonTaxable,
-      deductions: result.deductions,
-      net_pay: result.net,
-      lines: result.lines,
+      deductions: Math.round((result.deductions + taxes.planTotal) * 100) / 100,
+      tax_withholding: taxes.taxWithholding,
+      tax_calculation: calculation,
+      net_pay: taxes.netPay,
+      lines: [...result.lines, ...leaveLines, ...planLines],
       snapshot: snap.snapshot,
       week: staffWeek,
       created_by: userId,
-    });
+    }).select('id').single();
     if (insertError) throw insertError;
+    if (inserted?.id && sickEarned > 0) await recordAccrual({ orgId, userId: staffId, statementId: inserted.id, kind: 'sick', hours: sickEarned, periodEnd, note: `Earned from ${hoursWorked} hours worked` });
+    if (inserted?.id) await recordApplied({ orgId, source: 'staff_statement', sourceId: inserted.id, payDate, applied: taxes.applied });
     created++;
   }
-  return { created, skipped };
+  return { created, skipped, warnings };
 }
 
 /** Finished shifts in a period, for hourly pay. An entry still running is left out: it is not finished yet. */
@@ -177,7 +250,7 @@ async function fetchShifts(periodStart: string, periodEnd: string): Promise<Shif
 export async function fetchStaffStatements(): Promise<StaffStatement[]> {
   const { data, error } = await db.from('staff_pay_statements').select('*').is('archived_at', null).order('period_end', { ascending: false });
   if (error) throw new Error(error.message);
-  return ((data ?? []) as any[]).map((r) => ({ ...r, gross_pay: Number(r.gross_pay), non_taxable: Number(r.non_taxable), deductions: Number(r.deductions), net_pay: Number(r.net_pay) }));
+  return ((data ?? []) as any[]).map((r) => ({ ...r, gross_pay: Number(r.gross_pay), non_taxable: Number(r.non_taxable), deductions: Number(r.deductions), tax_withholding: Number(r.tax_withholding) || 0, net_pay: Number(r.net_pay) }));
 }
 
 export async function setStatementStatus(id: string, action: 'approve' | 'pay' | 'archive' | 'restore') {

@@ -49,6 +49,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/archive': 'Archive',
   '/audit-trail': 'Audit Trail',
   '/admin/tax-hub': 'Tax Hub',
+  '/payroll': 'Payroll',
 };
 
 const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
@@ -62,6 +63,7 @@ const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
   '/ifta': { label: 'Money', path: '/finance' },
   '/crm': { label: 'Operations', path: '/crm' },
   '/admin/tax-hub': { label: 'Money', path: '/finance' },
+  '/payroll': { label: 'Money', path: '/finance' },
   '/shop/parts': { label: 'Shop', path: '/shop' },
   '/shop/planner': { label: 'Shop', path: '/shop' },
   '/shop/history': { label: 'Shop', path: '/shop' },

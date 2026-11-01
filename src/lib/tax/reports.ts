@@ -42,6 +42,10 @@ export interface W2Data {
   reimbursementsExcluded: number;
   /** Other state payroll programs withheld, for information (Washington paid leave and WA Cares). */
   stateProgramsWithheld: number;
+  /** Box 12 amounts by code (D 401(k), W HSA, AA Roth 401(k)). */
+  box12: Array<{ code: string; amount: number }>;
+  /** Box 13, retirement plan: the person put money into one this year. */
+  retirementPlan: boolean;
   recordCount: number;
   anyCalculated: boolean;
   problems: string[];
@@ -50,11 +54,17 @@ export interface W2Data {
 export function buildW2(payee: Payee, records: PayRecord[], year: number, cfg: Pick<TaxYearConfig, 'social_security_wage_base'>): W2Data {
   const mine = records.filter((r) => r.payeeKey === payee.key && r.payDate.startsWith(String(year)));
   const total = sumAmounts(mine.map((r) => r.amounts));
-  const wages = round2(mine.reduce((s, r) => s + r.wages, 0));
+  const gross = round2(mine.reduce((s, r) => s + r.wages, 0));
+  // Box 1 is pay less before-tax deductions; boxes 3 and 5 are pay less Section 125 deductions only (a 401(k) is still subject to Social Security and Medicare).
+  const wages = round2(mine.reduce((s, r) => s + (r.fitWages ?? r.wages), 0));
+  const ficaWages = round2(mine.reduce((s, r) => s + (r.ficaWages ?? r.wages), 0));
+  const box12Totals = new Map<string, number>();
+  for (const r of mine) for (const [code, amt] of Object.entries(r.box12 ?? {})) box12Totals.set(code, round2((box12Totals.get(code) ?? 0) + amt));
+  void gross;
   const reimbursementsExcluded = round2(mine.reduce((s, r) => s + r.nonTaxable, 0));
 
   // Box 1 is every taxable dollar paid. Boxes 3 and 5 are wages subject to the two taxes: social security stops at the wage base.
-  const box3 = round2(Math.min(wages, cfg.social_security_wage_base));
+  const box3 = round2(Math.min(ficaWages, cfg.social_security_wage_base));
   const box4 = total.ss;
   const box6 = round2(total.medicare + total.addlMedicare);
 
@@ -64,29 +74,30 @@ export function buildW2(payee: Payee, records: PayRecord[], year: number, cfg: P
     const info = stateInfo(code);
     if (!info || info.sit === 'none') continue;
     const row = stateRows.get(code) ?? { wages: 0, tax: 0 };
-    row.wages = round2(row.wages + r.wages);
+    row.wages = round2(row.wages + (r.stateWages ?? r.wages));
     row.tax = round2(row.tax + r.amounts.sit);
     stateRows.set(code, row);
   }
 
   const problems: string[] = [];
-  if (wages > 0 && total.ss === 0 && box3 > 0) problems.push('Social security wages are shown but no social security tax was withheld.');
-  if (wages > 0 && box6 === 0) problems.push('Medicare wages are shown but no Medicare tax was withheld.');
+  if (ficaWages > 0 && total.ss === 0 && box3 > 0) problems.push('Social security wages are shown but no social security tax was withheld.');
+  if (ficaWages > 0 && box6 === 0) problems.push('Medicare wages are shown but no Medicare tax was withheld.');
   // The SSA rejects a report when social security wages (box 3) are less than what the tax implies, or tax with no wages.
   if (box4 > 0 && box3 === 0) problems.push('Social security tax is shown with no social security wages.');
   const expectedSs = round2(box3 * 0.062);
   if (box3 > 0 && Math.abs(expectedSs - box4) > Math.max(1, mine.length * 0.01)) {
     problems.push(`Social security tax withheld ($${box4.toFixed(2)}) is not 6.2% of box 3 ($${expectedSs.toFixed(2)}). Check the pay records before filing.`);
   }
-  const expectedMed = round2(wages * 0.0145);
-  if (wages > 0 && Math.abs(expectedMed - total.medicare) > Math.max(1, mine.length * 0.01)) {
+  const expectedMed = round2(ficaWages * 0.0145);
+  if (ficaWages > 0 && Math.abs(expectedMed - total.medicare) > Math.max(1, mine.length * 0.01)) {
     problems.push(`Medicare tax withheld ($${total.medicare.toFixed(2)}) is not 1.45% of box 5 ($${expectedMed.toFixed(2)}). Check the pay records before filing.`);
   }
 
   return {
-    payee, year, box1: wages, box2: total.fit, box3, box4, box5: wages, box6,
+    payee, year, box1: wages, box2: total.fit, box3, box4, box5: ficaWages, box6,
     states: [...stateRows.entries()].map(([code, v]) => ({ code, ...v })),
     reimbursementsExcluded, stateProgramsWithheld: total.stateEmployeeOther,
+    box12: [...box12Totals.entries()].map(([code, amount]) => ({ code, amount })).sort((a, b) => a.code.localeCompare(b.code)), retirementPlan: mine.some((r) => r.retirementPlan),
     recordCount: mine.length, anyCalculated: mine.some((r) => !r.recorded), problems,
   };
 }
@@ -144,22 +155,23 @@ export function buildForm941(records: PayRecord[], year: number, quarter: 1 | 2 
 
   // Social security wages stop at the wage base across the whole year, so look at the year before this quarter.
   const priorByPayee = new Map<string, number>();
-  for (const r of records) if (r.payDate >= `${year}-01-01` && r.payDate < start) priorByPayee.set(r.payeeKey, (priorByPayee.get(r.payeeKey) ?? 0) + r.wages);
+  for (const r of records) if (r.payDate >= `${year}-01-01` && r.payDate < start) priorByPayee.set(r.payeeKey, (priorByPayee.get(r.payeeKey) ?? 0) + (r.ficaWages ?? r.wages));
   const ssWagesByPayee = new Map<string, number>();
   for (const r of [...inQ].sort((a, b) => a.payDate.localeCompare(b.payDate))) {
     const before = (priorByPayee.get(r.payeeKey) ?? 0) + (ssWagesByPayee.get(r.payeeKey) ?? 0);
     const room = Math.max(0, cfg.social_security_wage_base - before);
-    ssWagesByPayee.set(r.payeeKey, (ssWagesByPayee.get(r.payeeKey) ?? 0) + Math.min(r.wages, room));
+    ssWagesByPayee.set(r.payeeKey, (ssWagesByPayee.get(r.payeeKey) ?? 0) + Math.min(r.ficaWages ?? r.wages, room));
   }
   const ssWages = round2([...ssWagesByPayee.values()].reduce((s, v) => s + v, 0));
 
   const total = sumAmounts(inQ.map((r) => r.amounts));
-  const wages = round2(inQ.reduce((s, r) => s + r.wages, 0));
+  const wages = round2(inQ.reduce((s, r) => s + (r.fitWages ?? r.wages), 0));
+  const medicareWages = round2(inQ.reduce((s, r) => s + (r.ficaWages ?? r.wages), 0));
   const date12 = twelfthOfLastMonth(year, quarter);
   const paidThen = new Set(inQ.filter((r) => (r.periodStart <= date12 && date12 <= r.periodEnd) || r.payDate === date12).map((r) => r.payeeKey));
 
   const line5aTax = round2(ssWages * 0.124);
-  const line5cTax = round2(wages * 0.029);
+  const line5cTax = round2(medicareWages * 0.029);
   const addlWages = round2(total.addlMedicare / 0.009);
   const line5dTax = total.addlMedicare;
   const line5e = round2(line5aTax + line5cTax + line5dTax);
@@ -175,7 +187,7 @@ export function buildForm941(records: PayRecord[], year: number, quarter: 1 | 2 
 
   return {
     year, quarter, due: quarterDue(year, quarter), line1Employees: paidThen.size, line2Wages: wages, line3Fit: total.fit,
-    line5aWages: ssWages, line5aTax, line5cWages: wages, line5cTax, line5dWages: addlWages, line5dTax, line5e, line6,
+    line5aWages: ssWages, line5aTax, line5cWages: medicareWages, line5cTax, line5dWages: addlWages, line5dTax, line5e, line6,
     withheldPlusEmployer: owed, line7Fractions: round2(owed - line6),
     liabilityByDate: [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, amount]) => ({ date, amount })),
   };
@@ -258,10 +270,11 @@ export interface Form940 {
  */
 export function buildForm940(records: PayRecord[], year: number, futaWageBase: number, creditReductionByState: Record<string, number> = {}): Form940 {
   const of = records.filter((r) => r.payDate.startsWith(String(year)));
-  const byPayee = new Map<string, { wages: number; state: string }>();
+  const byPayee = new Map<string, { wages: number; futa: number; state: string }>();
   for (const r of of) {
-    const row = byPayee.get(r.payeeKey) ?? { wages: 0, state: (r.stateCode ?? '').toUpperCase() };
+    const row = byPayee.get(r.payeeKey) ?? { wages: 0, futa: 0, state: (r.stateCode ?? '').toUpperCase() };
     row.wages += r.wages;
+    row.futa += r.futaWages ?? r.wages;
     byPayee.set(r.payeeKey, row);
   }
   let total = 0;
@@ -269,7 +282,7 @@ export function buildForm940(records: PayRecord[], year: number, futaWageBase: n
   const stateWages = new Map<string, number>();
   for (const v of byPayee.values()) {
     total += v.wages;
-    const t = Math.min(v.wages, futaWageBase);
+    const t = Math.min(v.futa, futaWageBase);
     taxable += t;
     stateWages.set(v.state, (stateWages.get(v.state) ?? 0) + t);
   }
@@ -321,10 +334,10 @@ export function buildStateQuarter(records: PayRecord[], year: number, quarter: 1
   for (const r of mine) {
     const before = running.get(r.payeeKey) ?? 0;
     const room = Math.max(0, wageBase - before);
-    running.set(r.payeeKey, before + r.wages);
+    running.set(r.payeeKey, before + (r.futaWages ?? r.wages));
     if (r.payDate >= start && r.payDate <= end) {
-      gross += r.wages;
-      taxable += Math.min(r.wages, room);
+      gross += r.futaWages ?? r.wages;
+      taxable += Math.min(r.futaWages ?? r.wages, room);
       people.add(r.payeeKey);
       qAmounts.push(r.amounts);
     }
