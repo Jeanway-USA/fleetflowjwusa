@@ -1972,6 +1972,7 @@ export type Database = {
           item_type: string
           load_id: string | null
           org_id: string
+          plan_id: string | null
           quantity: number | null
           rate: number | null
           settlement_id: string
@@ -1986,6 +1987,7 @@ export type Database = {
           item_type: string
           load_id?: string | null
           org_id: string
+          plan_id?: string | null
           quantity?: number | null
           rate?: number | null
           settlement_id: string
@@ -2000,6 +2002,7 @@ export type Database = {
           item_type?: string
           load_id?: string | null
           org_id?: string
+          plan_id?: string | null
           quantity?: number | null
           rate?: number | null
           settlement_id?: string
@@ -5841,6 +5844,183 @@ export type Database = {
           },
           {
             foreignKeyName: "pay_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_deduction_applied: {
+        Row: {
+          amount: number
+          created_at: string
+          employer_amount: number
+          id: string
+          kind: string
+          org_id: string
+          pay_date: string
+          plan_id: string
+          source: string
+          source_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          employer_amount?: number
+          id?: string
+          kind: string
+          org_id: string
+          pay_date: string
+          plan_id: string
+          source: string
+          source_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          employer_amount?: number
+          id?: string
+          kind?: string
+          org_id?: string
+          pay_date?: string
+          plan_id?: string
+          source?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_deduction_applied_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_deduction_applied_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "payroll_deduction_applied_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_deduction_applied_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_deduction_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_deduction_plans: {
+        Row: {
+          amount: number
+          annual_limit_override: number | null
+          archived_at: string | null
+          arrears_over_12_weeks: boolean
+          case_reference: string | null
+          catch_up: string | null
+          created_at: string
+          created_by: string | null
+          employer_amount: number
+          end_date: string | null
+          family_coverage: boolean
+          id: string
+          kind: string
+          label: string
+          levy_exempt_per_period: number | null
+          method: string
+          note: string | null
+          org_id: string
+          pay_to: string | null
+          payee_id: string
+          payee_type: string
+          priority: number | null
+          start_date: string
+          supporting_family: boolean
+          total_to_collect: number | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          annual_limit_override?: number | null
+          archived_at?: string | null
+          arrears_over_12_weeks?: boolean
+          case_reference?: string | null
+          catch_up?: string | null
+          created_at?: string
+          created_by?: string | null
+          employer_amount?: number
+          end_date?: string | null
+          family_coverage?: boolean
+          id?: string
+          kind: string
+          label: string
+          levy_exempt_per_period?: number | null
+          method?: string
+          note?: string | null
+          org_id: string
+          pay_to?: string | null
+          payee_id: string
+          payee_type: string
+          priority?: number | null
+          start_date: string
+          supporting_family?: boolean
+          total_to_collect?: number | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          annual_limit_override?: number | null
+          archived_at?: string | null
+          arrears_over_12_weeks?: boolean
+          case_reference?: string | null
+          catch_up?: string | null
+          created_at?: string
+          created_by?: string | null
+          employer_amount?: number
+          end_date?: string | null
+          family_coverage?: boolean
+          id?: string
+          kind?: string
+          label?: string
+          levy_exempt_per_period?: number | null
+          method?: string
+          note?: string | null
+          org_id?: string
+          pay_to?: string | null
+          payee_id?: string
+          payee_type?: string
+          priority?: number | null
+          start_date?: string
+          supporting_family?: boolean
+          total_to_collect?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_deduction_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_deduction_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "payroll_deduction_plans_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "super_admin_organizations"
