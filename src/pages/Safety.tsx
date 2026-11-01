@@ -1,244 +1,131 @@
-import { useState, lazy, Suspense } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Panel, StatementLine } from '@/components/finance/statement-ui';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { DriverComplianceHub } from '@/components/safety/DriverComplianceHub';
-import { NewWorkOrderSheet, WorkOrderInitialData } from '@/components/maintenance/NewWorkOrderSheet';
-import { format, addDays, isBefore, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays } from 'date-fns';
-import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
+import { StatStrip } from '@/components/shared/StatStrip';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Panel } from '@/components/finance/statement-ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DriverStandards, driverRows } from '@/components/safety/DriverStandards';
+import { EquipmentStandards, equipmentRows } from '@/components/safety/EquipmentStandards';
+import { IncidentRegister } from '@/components/safety/IncidentRegister';
+import { RequirementsReference } from '@/components/safety/RequirementsReference';
+import { STATUS_UI } from '@/components/safety/CheckList';
+import { useSafetyData } from '@/hooks/useSafetyData';
+import { todayLocal } from '@/lib/datetime';
+import { accidentsToReview, needsAction } from '@/lib/safety/compliance';
+import { cn } from '@/lib/utils';
 
-const IncidentTrendsChart = lazy(() =>
-  import('@/components/safety/IncidentTrendsChart').then(m => ({ default: m.IncidentTrendsChart })),
-);
+const TABS = ['overview', 'drivers', 'equipment', 'incidents', 'requirements'] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABEL: Record<Tab, string> = { overview: 'Overview', drivers: 'Drivers', equipment: 'Equipment', incidents: 'Incidents', requirements: 'Requirements' };
+const SEVERITY = { overdue: 5, missing: 4, review: 3, soon: 2, ok: 1, info: 0 } as const;
 
-
-interface AlertItem {
-  id: string;
-  name: string;
-  subtitle: string;
-  date: string;
-  isExpired: boolean;
-}
-
+/**
+ * Safety and compliance: drivers and equipment against Landstar's minimums and the DOT rules, the accident register, and a plain
+ * list of what each requires. Landstar keeps the official driver files; this page tracks what JeanWay has to keep current.
+ */
 export default function Safety() {
-  const [workOrderOpen, setWorkOrderOpen] = useState(false);
-  const [workOrderInitialData] = useState<WorkOrderInitialData | undefined>();
+  const { orgId, user, isOwner, hasRole } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'overview';
+  const setTab = (t: string) => setParams(t === 'overview' ? {} : { tab: t }, { replace: true });
+  const canEdit = isOwner || hasRole('safety');
+  const today = todayLocal();
+  const data = useSafetyData();
 
-  const { data: trucks = [] } = useQuery({
-    queryKey: ['trucks'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('trucks').select('*').is('deleted_at', null);
-      if (error) throw error;
-      return data;
-    },
-  });
+  const drivers = useMemo(() => driverRows(data.drivers.filter((d) => d.status === 'active'), data.files, data.incidents, today), [data.drivers, data.files, data.incidents, today]);
+  const equipment = useMemo(() => equipmentRows(data.trucks, data.trailers, data.files, today), [data.trucks, data.trailers, data.files, today]);
 
-  const { data: drivers = [] } = useQuery({
-    queryKey: ['drivers'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*').is('deleted_at', null);
-      if (error) throw error;
-      return data;
-    },
-  });
+  // One list of everything that needs a hand, worst first.
+  const todo = useMemo(() => [
+    ...drivers.flatMap((r) => r.checks.filter((c) => needsAction(c.status)).map((c) => ({ who: r.name, tab: 'drivers' as const, check: c }))),
+    ...equipment.flatMap((r) => r.checks.filter((c) => needsAction(c.status)).map((c) => ({ who: r.title, tab: 'equipment' as const, check: c }))),
+  ].sort((a, b) => SEVERITY[b.check.status] - SEVERITY[a.check.status] || (a.check.date ?? '9999').localeCompare(b.check.date ?? '9999')), [drivers, equipment]);
 
-  // Fetch incidents for trend data (last 6 months)
-  const { data: incidents = [] } = useQuery({
-    queryKey: ['incidents-safety-trends'],
-    queryFn: async () => {
-      const sixMonthsAgo = format(subMonths(new Date(), 6), 'yyyy-MM-dd');
-      const { data, error } = await supabase
-        .from('incidents')
-        .select('id, incident_date, incident_type, severity, status')
-        .gte('incident_date', sixMonthsAgo)
-        .order('incident_date', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const driversToFix = drivers.filter((r) => r.checks.some((c) => needsAction(c.status))).length;
+  const equipmentToFix = equipment.filter((r) => r.checks.some((c) => needsAction(c.status))).length;
+  const overdue = todo.filter((t) => t.check.status === 'overdue' || t.check.status === 'missing').length;
+  const toReview = data.drivers.filter((d) => d.status === 'active').reduce((n, d) => n + accidentsToReview(data.incidents, d.id, today).length, 0);
 
-  // Compute incident trend by month
-  const incidentTrends = (() => {
-    const months = [];
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const monthStart = startOfMonth(subMonths(now, i));
-      const monthEnd = endOfMonth(subMonths(now, i));
-      const label = format(monthStart, 'MMM');
-      const monthIncidents = incidents.filter(inc => {
-        const d = new Date(inc.incident_date);
-        return d >= monthStart && d <= monthEnd;
-      });
-      months.push({
-        month: label,
-        total: monthIncidents.length,
-        critical: monthIncidents.filter(i => i.severity === 'critical' || i.severity === 'major').length,
-      });
-    }
-    return months;
-  })();
-
-  const trendChartConfig = {
-    total: { label: 'Total Incidents', color: 'hsl(var(--warning))' },
-    critical: { label: 'Critical/Major', color: 'hsl(var(--destructive))' },
-  };
-
-  const today = new Date();
-  const in30Days = addDays(today, 30);
-
-  // Trucks with upcoming or overdue inspections
-  const inspectionAlerts: AlertItem[] = trucks.filter(t => {
-    if (!t.next_inspection_date) return false;
-    const inspDate = parseISO(t.next_inspection_date);
-    return isBefore(inspDate, in30Days);
-  }).map(t => ({
-    id: t.id,
-    name: t.unit_number,
-    subtitle: `${t.make || ''} ${t.model || ''}`.trim() || 'Truck',
-    date: t.next_inspection_date!,
-    isExpired: isBefore(parseISO(t.next_inspection_date!), today)
-  }));
-
-  // Drivers with license issues
-  const licenseAlerts: AlertItem[] = drivers.filter(d => {
-    if (!d.license_expiry) return false;
-    const expDate = parseISO(d.license_expiry);
-    return isBefore(expDate, in30Days);
-  }).map(d => ({
-    id: d.id,
-    name: `${d.first_name} ${d.last_name}`,
-    subtitle: `License: ${d.license_number || 'N/A'}`,
-    date: d.license_expiry!,
-    isExpired: isBefore(parseISO(d.license_expiry!), today)
-  }));
-
-  // Drivers with medical card issues
-  const medicalAlerts: AlertItem[] = drivers.filter(d => {
-    if (!d.medical_card_expiry) return false;
-    const expDate = parseISO(d.medical_card_expiry);
-    return isBefore(expDate, in30Days);
-  }).map(d => ({
-    id: d.id,
-    name: `${d.first_name} ${d.last_name}`,
-    subtitle: 'DOT Medical Card',
-    date: d.medical_card_expiry!,
-    isExpired: isBefore(parseISO(d.medical_card_expiry!), today)
-  }));
-
-  // Drivers with HAZMAT issues
-  const hazmatAlerts: AlertItem[] = drivers.filter(d => {
-    if (!d.hazmat_expiry) return false;
-    const expDate = parseISO(d.hazmat_expiry);
-    return isBefore(expDate, in30Days);
-  }).map(d => ({
-    id: d.id,
-    name: `${d.first_name} ${d.last_name}`,
-    subtitle: 'HAZMAT Certification',
-    date: d.hazmat_expiry!,
-    isExpired: isBefore(parseISO(d.hazmat_expiry!), today)
-  }));
-
-  // Trucks that are down
-  const downTrucks = trucks.filter(t => t.status === 'down' || t.status === 'out_of_service');
-
-  const totalDriverAlerts = licenseAlerts.length + medicalAlerts.length + hazmatAlerts.length;
-  const openIncidents = incidents.filter(i => i.status === 'reported' || i.status === 'under_review').length;
-
-  const trucksNeedingAttention = inspectionAlerts.length + downTrucks.length;
-  const anyExpired = [...licenseAlerts, ...medicalAlerts, ...hazmatAlerts].some((a) => a.isExpired);
-
-  // One list of everything due within 30 days, soonest first, in place of five tabs.
-  const attention = [
-    ...inspectionAlerts.map((a) => ({ ...a, what: 'Truck inspection', who: `Unit ${a.name}` })),
-    ...licenseAlerts.map((a) => ({ ...a, what: 'CDL', who: a.name })),
-    ...medicalAlerts.map((a) => ({ ...a, what: 'DOT medical card', who: a.name })),
-    ...hazmatAlerts.map((a) => ({ ...a, what: 'Hazmat certification', who: a.name })),
-  ].sort((a, b) => a.date.localeCompare(b.date));
+  if (data.error) {
+    return (
+      <>
+        <PageHeader title="Safety" description="Compliance with Landstar, DOT and FMCSA" />
+        <EmptyState icon={Loader2} title="Safety could not load" description={data.error.message} />
+      </>
+    );
+  }
 
   return (
     <>
-      <PageHeader title="Safety" description="Inspections, driver credentials, incidents and alerts" />
+      <PageHeader title="Safety" description="Compliance with Landstar, DOT and FMCSA: drivers, equipment and accidents" />
 
-      <Panel title="Needs attention" className="mb-5">
-        <StatementLine
-          label="Trucks"
-          note={`${inspectionAlerts.length} ${inspectionAlerts.length === 1 ? 'inspection' : 'inspections'} due within 30 days, ${downTrucks.length} down`}
-          value={trucksNeedingAttention}
-          tone={downTrucks.length > 0 ? 'bad' : undefined}
-        />
-        <StatementLine
-          label="Driver credentials to renew"
-          note="CDL, medical card and hazmat, due within 30 days"
-          value={totalDriverAlerts}
-          rule="single"
-          tone={anyExpired ? 'bad' : undefined}
-        />
-        <StatementLine
-          label="Open incidents"
-          note="Reported or under review"
-          value={openIncidents}
-          rule="single"
-          tone={openIncidents > 0 ? 'bad' : undefined}
-        />
-        <StatementLine
-          label="Trucks running"
-          note={downTrucks.length === 0 ? 'Every truck is operational.' : `${downTrucks.length} down or out of service`}
-          value={`${trucks.length - downTrucks.length} of ${trucks.length}`}
-          strong
-          rule="double"
-          tone={downTrucks.length === 0 ? 'good' : 'bad'}
-        />
-      </Panel>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="mb-4 h-auto w-full flex-wrap justify-start">
+          {TABS.map((t) => <TabsTrigger key={t} value={t} className="h-10">{TAB_LABEL[t]}</TabsTrigger>)}
+        </TabsList>
 
-      <Panel title="Due within 30 days" description="Everything that is expired or about to be, soonest first." className="mb-5">
-        {attention.length === 0 && downTrucks.length === 0 ? (
-          <p className="border-t py-4 text-sm text-muted-foreground">Nothing needs attention. Inspections and credentials are current.</p>
-        ) : (
-          <div className="border-t">
-            {downTrucks.map((truck, i) => (
-              <StatementLine
-                key={`down-${truck.id}`}
-                label={`Unit ${truck.unit_number}`}
-                note={[truck.make, truck.model].filter(Boolean).join(' ') || 'Truck'}
-                value={<span className="text-base"><StatusBadge status={truck.status} /></span>}
-                rule={i > 0 ? 'single' : undefined}
-              />
-            ))}
-            {attention.map((item, i) => {
-              const days = differenceInCalendarDays(parseISO(item.date), today);
-              return (
-                <StatementLine
-                  key={item.id + item.what}
-                  label={item.who}
-                  note={`${item.what}, ${format(parseISO(item.date), 'MMM d, yyyy')}`}
-                  value={<span className="text-base">{item.isExpired ? `Expired ${Math.abs(days)} ${Math.abs(days) === 1 ? 'day' : 'days'} ago` : `In ${days} ${days === 1 ? 'day' : 'days'}`}</span>}
-                  tone={item.isExpired ? 'bad' : undefined}
-                  rule={i > 0 || downTrucks.length > 0 ? 'single' : undefined}
-                />
-              );
-            })}
-          </div>
-        )}
-      </Panel>
+        <TabsContent value="overview" className="mt-0 space-y-5">
+          {data.loading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
+            <>
+              <StatStrip cells={[
+                { label: 'Drivers to fix', value: `${driversToFix} of ${drivers.length}`, note: 'active drivers' },
+                { label: 'Equipment to fix', value: `${equipmentToFix} of ${equipment.length}`, note: 'trucks and trailers' },
+                { label: 'Overdue or missing', value: String(overdue) },
+                { label: 'Accidents to review', value: String(toReview), note: 'last 12 months' },
+              ]} />
 
-      <DriverComplianceHub />
+              <Panel title="Needs attention" description="Everything overdue, missing, due within 30 days, or waiting for a decision. Worst first.">
+                {todo.length === 0 ? (
+                  <p className="border-t py-4 text-sm text-muted-foreground">Nothing needs attention. Every active driver and every truck and trailer is current.</p>
+                ) : (
+                  <ul className="divide-y border-t">
+                    {todo.map((t, i) => {
+                      const ui = STATUS_UI[t.check.status];
+                      return (
+                        <li key={`${t.who}-${t.check.key}-${i}`}>
+                          <button type="button" onClick={() => setTab(t.tab)} className="flex w-full flex-wrap items-baseline gap-x-3 gap-y-0.5 py-3 text-left hover:bg-accent/50">
+                            <span className="min-w-[8rem] font-medium">{t.who}</span>
+                            <span className="text-sm">{t.check.label}</span>
+                            <span className={cn('text-xs font-medium', ui.text)}>{ui.label}</span>
+                            <span className="basis-full text-sm text-muted-foreground">{t.check.detail}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Panel>
 
-      {incidents.length > 0 && (
-        <Panel title="Incidents, last 6 months" description="Monthly count, with critical and major incidents shown separately." className="mb-5">
-          <Suspense fallback={<ChartSkeleton height={200} />}>
-            <IncidentTrendsChart data={incidentTrends} config={trendChartConfig} />
-          </Suspense>
-        </Panel>
-      )}
+              <Panel title="Who handles what">
+                <ul className="space-y-2 border-t pt-3 text-sm">
+                  <li><span className="font-medium">Landstar keeps</span> the official driver qualification files, the drug and alcohol program, Clearinghouse queries, and approves every driver. Its operator minimums were last confirmed as valid on July 1, 2026.</li>
+                  <li><span className="font-medium">JeanWay keeps</span> licenses, medical cards and hazmat current, a copy of each MVR, equipment inspected every 120 days, and the accident record.</li>
+                  <li className="text-muted-foreground">The Requirements tab lists every rule, who handles it, and where it comes from.</li>
+                </ul>
+              </Panel>
+            </>
+          )}
+        </TabsContent>
 
-      <NewWorkOrderSheet
-        open={workOrderOpen}
-        onOpenChange={setWorkOrderOpen}
-        initialData={workOrderInitialData}
-      />
+        <TabsContent value="drivers" className="mt-0">
+          <DriverStandards drivers={data.drivers} files={data.files} filesReady={data.filesReady} incidents={data.incidents} today={today} canEdit={canEdit} orgId={orgId} userId={user?.id ?? null} />
+        </TabsContent>
+
+        <TabsContent value="equipment" className="mt-0">
+          <EquipmentStandards trucks={data.trucks} trailers={data.trailers} files={data.files} filesReady={data.filesReady} today={today} canEdit={canEdit} orgId={orgId} userId={user?.id ?? null} />
+        </TabsContent>
+
+        <TabsContent value="incidents" className="mt-0">
+          <IncidentRegister incidents={data.incidents} drivers={data.drivers} trucks={data.trucks} />
+        </TabsContent>
+
+        <TabsContent value="requirements" className="mt-0">
+          <RequirementsReference />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }
