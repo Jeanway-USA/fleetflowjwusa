@@ -74,6 +74,7 @@ interface Accessorial {
   is_driver_pay: boolean;
 }
 import { format, parseISO } from 'date-fns';
+import { applyStopOffRule, defaultAccessorialPercentage, isStopOff } from '@/lib/accessorials';
 
 export default function FleetLoads() {
   // Opening /fleet-loads?highlight=<id> (e.g. from the Today logbook) flashes that load.
@@ -543,6 +544,11 @@ export default function FleetLoads() {
     setPendingIntermediateStops([]);
   };
 
+  // Stop-off pay is paid at the truck share, 65%, like linehaul. Nobody knows yet whether it follows the 70% power-only share,
+  // so power-only loads use 65% too until that is confirmed with Landstar.
+  const truckSharePct = parseFloat(getSetting('truck_percentage', '65')) || 65;
+  const linehaulPctFor = (_powerOnly: boolean) => truckSharePct;
+
   // Accessorial management
   const addAccessorial = () => {
     const first = accessorialTypes[0];
@@ -551,7 +557,7 @@ export default function FleetLoads() {
       {
         accessorial_type: first?.name ?? 'Detention',
         amount: 0,
-        percentage: 100,
+        percentage: defaultAccessorialPercentage(first?.name, linehaulPctFor(!!formData.is_power_only)),
         is_driver_pay: first?.default_is_driver_pay ?? true,
       },
     ]);
@@ -563,7 +569,14 @@ export default function FleetLoads() {
 
   const updateAccessorial = (index: number, field: keyof Accessorial, value: any) => {
     const updated = [...accessorials];
-    updated[index] = { ...updated[index], [field]: value };
+    const before = updated[index];
+    updated[index] = { ...before, [field]: value };
+    if (field === 'accessorial_type') {
+      // Stop-off pay is paid at the linehaul share. Moving a charge off stop-off puts it back to 100% unless the percentage was changed by hand.
+      const share = linehaulPctFor(!!formData.is_power_only);
+      if (isStopOff(String(value))) updated[index].percentage = share;
+      else if (isStopOff(before.accessorial_type) && Number(before.percentage) === share) updated[index].percentage = 100;
+    }
     setAccessorials(updated);
   };
 
@@ -634,7 +647,9 @@ export default function FleetLoads() {
       return;
     }
 
-    const calculated = calculateRevenueLocal(formData);
+    // New stop-off rows are never left at 100%: they take this load's linehaul share before revenue is worked out.
+    const accessorialsToSave = applyStopOffRule(accessorials, linehaulPctFor(!!formData.is_power_only), [truckSharePct]);
+    const calculated = calculateRevenueLocal(formData, accessorialsToSave);
     // Strip non-column enrichment fields before sending to Supabase
     const { driver_name: _dn, truck_unit: _tu, ...cleanFormData } = formData;
     const payload = {
@@ -647,7 +662,7 @@ export default function FleetLoads() {
     };
 
     // Strip any prior auto-generated rows, then re-inject if applicable.
-    const manualAccessorials = accessorials.filter(
+    const manualAccessorials = accessorialsToSave.filter(
       (a) =>
         !(a.accessorial_type === OVER_DIM_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(OVER_DIM_AUTO_NOTE_PREFIX)) &&
         !(a.accessorial_type === IN_BOND_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(IN_BOND_AUTO_NOTE_PREFIX))
@@ -813,7 +828,8 @@ export default function FleetLoads() {
     const extractedAccessorials: Accessorial[] = (data.accessorials || []).map((acc: any) => ({
       accessorial_type: acc.type === 'Stop Of' ? 'Stop-off' : acc.type,
       amount: acc.amount || 0,
-      percentage: 100,
+      // Stop-off pay is paid at the linehaul share, so a $325 listing is 65% of $325.
+      percentage: defaultAccessorialPercentage(acc.type === 'Stop Of' ? 'Stop-off' : acc.type, linehaulPctFor(!!data.is_power_only)),
       notes: acc.notes,
       is_driver_pay: true,
     }));

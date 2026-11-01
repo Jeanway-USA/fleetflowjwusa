@@ -295,7 +295,7 @@ export function SettlementsTab() {
         const { data: fullLoads } = ids.length
           ? await supabase
               .from('fleet_loads')
-              .select('rate, fuel_surcharge, booked_miles, load_accessorials(amount)')
+              .select('rate, fuel_surcharge, booked_miles, load_accessorials(amount, percentage)')
               .in('id', ids)
           : { data: [] as any[] };
         const weekly = calculateWeeklyPay({

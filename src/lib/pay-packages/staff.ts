@@ -69,7 +69,7 @@ export async function generateStaffStatements(args: {
 
   const { data: loads, error: loadsError } = await db
     .from('fleet_loads')
-    .select('id, pickup_date, delivery_date, booked_miles, actual_miles, gross_revenue, net_revenue, detention_hours, detention_pay, load_accessorials(amount, is_driver_pay)')
+    .select('id, pickup_date, delivery_date, booked_miles, actual_miles, gross_revenue, net_revenue, detention_hours, detention_pay, load_accessorials(amount, percentage, is_driver_pay)')
     .eq('org_id', orgId)
     .eq('status', 'delivered')
     .is('deleted_at', null)
