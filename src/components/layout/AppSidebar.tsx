@@ -25,6 +25,7 @@ import {
   ChevronRight,
   LucideIcon,
   Tablet,
+  Banknote,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAreaAccess } from '@/hooks/useAreaAccess';
@@ -259,6 +260,7 @@ export function AppSidebar() {
 
   const financeItems: NavItem[] = [
     { title: 'Money', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss', tourId: 'nav-finance' },
+    { title: 'Payroll', icon: Banknote, path: '/payroll', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
     { title: 'Tax Hub', icon: Receipt, path: '/admin/tax-hub', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
     { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta', tmsMode: 'independent' as TmsMode },
   ];

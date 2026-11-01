@@ -60,7 +60,7 @@ export function StaffPayTab() {
     },
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: KEY });
-      const note = r.skipped.length > 0 ? ` ${r.skipped.length} skipped: ${r.skipped[0].reason}.` : '';
+      const note = (r.skipped.length > 0 ? ` ${r.skipped.length} skipped: ${r.skipped[0].reason}.` : '') + (r.warnings.length > 0 ? ` Check: ${r.warnings[0].message}` : '');
       toast[r.created > 0 ? 'success' : 'info'](r.created > 0 ? `Made ${r.created} pay statement${r.created === 1 ? '' : 's'}.${note}` : `No statements made.${note}`);
     },
     onError: (e: any) => toast.error(e.message ?? 'Could not make the statements'),
@@ -78,8 +78,8 @@ export function StaffPayTab() {
   const exportCsv = () =>
     downloadCsv(
       `staff-pay-${today()}`,
-      ['Person', 'Period start', 'Period end', 'Package', 'Taxable pay', 'Not taxable', 'Deductions', 'Pay before taxes', 'Status'],
-      statements.map((s) => [names.get(s.user_id) ?? s.user_id, s.period_start, s.period_end, s.package_name, s.gross_pay, s.non_taxable, s.deductions, s.net_pay, s.status]),
+      ['Person', 'Period start', 'Period end', 'Package', 'Taxable pay', 'Not taxable', 'Deductions', 'Taxes withheld', 'Take-home pay', 'Status'],
+      statements.map((s) => [names.get(s.user_id) ?? s.user_id, s.period_start, s.period_end, s.package_name, s.gross_pay, s.non_taxable, s.deductions, s.tax_withholding, s.net_pay, s.status]),
     );
 
   if (error) {
@@ -103,8 +103,8 @@ export function StaffPayTab() {
           <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" />{hasPayrollAccess ? 'Staff pay' : 'My pay statements'}</CardTitle>
           <CardDescription>
             {hasPayrollAccess
-              ? 'Pay statements for staff, worked out from their pay package. Shown before taxes. Drivers are paid through settlements.'
-              : 'Your pay statements. Shown before taxes.'}
+              ? 'Pay statements for staff, worked out from their pay package, with taxes taken from each person\'s W-4 and state form. Drivers are paid through settlements.'
+              : 'Your pay statements.'}
           </CardDescription>
         </div>
         {statements.length > 0 && (
@@ -158,7 +158,14 @@ export function StaffPayTab() {
                       <span className="tabular-nums">{l.isDeduction ? '−' : ''}{formatCurrency(l.amount)}</span>
                     </li>
                   ))}
-                  <li className="flex justify-between py-2 font-semibold"><span>Pay before taxes</span><span className="tabular-nums">{formatCurrency(s.net_pay)}</span></li>
+                  {(s.tax_calculation?.lines ?? []).filter((t) => t.side === 'employee').map((t) => (
+                    <li key={t.key} className="flex items-start justify-between gap-3 py-2">
+                      <span className="min-w-0"><span className="block">{t.label}</span>{t.note && <span className="block text-xs text-muted-foreground">{t.note}</span>}</span>
+                      <span className="tabular-nums">−{formatCurrency(t.amount)}</span>
+                    </li>
+                  ))}
+                  {!s.tax_calculation && <li className="py-2 text-xs text-muted-foreground">Made before staff taxes were added: no taxes were withheld on this statement.</li>}
+                  <li className="flex justify-between py-2 font-semibold"><span>Take-home pay</span><span className="tabular-nums">{formatCurrency(s.net_pay)}</span></li>
                 </ul>
               )}
             </li>

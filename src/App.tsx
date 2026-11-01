@@ -66,6 +66,7 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
 const TaxHub = lazy(() => import("./pages/admin/TaxHub"));
+const Payroll = lazy(() => import("./pages/Payroll"));
 const DocumentsSigning = lazy(() => import("./pages/DocumentsSigning"));
 const DocumentSigningWorkspace = lazy(() => import("./pages/DocumentSigningWorkspace"));
 const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
@@ -326,6 +327,11 @@ const App = () => {
                     <Route path="/admin/document-templates" element={
                       <ProtectedRoute allowedRoles={['owner']}>
                         <DocumentTemplates />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/payroll" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']}>
+                        <Payroll />
                       </ProtectedRoute>
                     } />
                     <Route path="/admin/tax-hub" element={

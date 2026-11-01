@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { calculatePayrollTaxes } from '@/lib/payroll/taxEngine';
 import { EMPTY_YTD, type PayeeTaxProfile, type PayeeYtd, type PayFrequency, type StateTaxConfig, type TaxYearConfig } from '@/lib/payroll/types';
-import { classifyEmploymentType } from '@/lib/payroll/profiles';
+import { classifyEmploymentType, normalizeFilingStatus } from '@/lib/payroll/profiles';
 
 /**
  * One list of everything the company has paid its people, whichever screen paid it.
@@ -41,8 +41,17 @@ export interface PayRecord {
   payDate: string;
   periodStart: string;
   periodEnd: string;
-  /** Taxable wages paid on this date. */
+  /** Taxable pay before any before-tax deduction. */
   wages: number;
+  /** The pay each tax is figured on, when before-tax deductions (insurance, 401(k)) came out. Missing means the same as wages. */
+  fitWages?: number;
+  ficaWages?: number;
+  futaWages?: number;
+  stateWages?: number;
+  /** Amounts reported in W-2 box 12, by code (D for 401(k), W for HSA, AA for Roth). */
+  box12?: Record<string, number>;
+  /** True when the person put money into a retirement plan this pay (W-2 box 13). */
+  retirementPlan?: boolean;
   /** Reimbursements paid under an accountable plan. Never wages. */
   nonTaxable: number;
   amounts: Amounts;
@@ -71,20 +80,49 @@ export interface Payee {
   hasI9: boolean;
   profile: PayeeTaxProfile;
   hireDate: string | null;
+  /** The login behind an employee, so staff pay (kept by login) finds their tax forms. */
+  userId?: string | null;
 }
 
 const n = (v: unknown) => Number(v) || 0;
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const dateOnly = (v: string | null | undefined) => (v ? String(v).slice(0, 10) : '');
 
+export interface SnapshotWages {
+  wages: number;
+  fitWages: number;
+  ficaWages: number;
+  futaWages: number;
+  stateWages: number;
+  box12: Record<string, number>;
+  retirementPlan: boolean;
+}
+
+const BOX12: Record<string, string> = { retirement_pretax: 'D', retirement_roth: 'AA', hsa: 'W' };
+
 /** Reads the tax figures out of a saved calculation (the lines the engine stored when the pay was made). */
-export function amountsFromSnapshot(snapshot: any): { wages: number; amounts: Amounts } | null {
+export function amountsFromSnapshot(snapshot: any): ({ amounts: Amounts } & SnapshotWages) | null {
   const lines: any[] = Array.isArray(snapshot?.lines) ? snapshot.lines : [];
   if (lines.length === 0) return null;
   const get = (key: string, side: 'employee' | 'employer') => round2(lines.filter((l) => l.key === key && l.side === side).reduce((s, l) => s + n(l.amount), 0));
   const medicare = lines.find((l) => l.key === 'medicare' && l.side === 'employee');
+  const w = snapshot?.wages;
+  const gross = n(w?.gross) || n(medicare?.taxableWages);
+  const box12: Record<string, number> = {};
+  let retirementPlan = false;
+  for (const d of Array.isArray(snapshot?.payrollDeductions) ? snapshot.payrollDeductions : []) {
+    const code = BOX12[d.kind];
+    if (code) box12[code] = round2((box12[code] ?? 0) + n(d.amount) + (code === 'W' ? n(d.employerAmount) : 0));
+    if (d.kind === 'retirement_pretax' || d.kind === 'retirement_roth') retirementPlan = true;
+  }
   return {
-    wages: n(medicare?.taxableWages),
+    wages: gross,
+    fitWages: w ? n(w.fit) : gross,
+    ficaWages: w ? n(w.fica) : gross,
+    futaWages: w ? n(w.futa) : gross,
+    stateWages: w ? n(w.state) : gross,
+    box12,
+    retirementPlan,
     amounts: {
       fit: get('federal_income_tax', 'employee'),
       ss: get('social_security', 'employee'),
@@ -154,10 +192,6 @@ export async function loadPayees(orgId: string): Promise<Payee[]> {
 
   const out: Payee[] = [];
   const normStatus = (s: unknown) => String(s ?? '').toLowerCase();
-  const filing = (v: unknown): PayeeTaxProfile['filingStatus'] => {
-    const s = String(v ?? '').toLowerCase().replace(/[\s-]/g, '_');
-    return s.includes('joint') || s === 'married' ? 'married_joint' : s.includes('head') ? 'head_of_household' : 'single';
-  };
 
   for (const d of (drivers.data ?? []) as any[]) {
     const w4 = w4ByD.get(d.id);
@@ -185,7 +219,7 @@ export async function loadPayees(orgId: string): Promise<Payee[]> {
         payeeType: 'driver',
         name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim(),
         employmentClass: cls,
-        filingStatus: filing(w4?.filing_status),
+        filingStatus: normalizeFilingStatus(w4?.filing_status),
         multipleJobs: !!(w4?.multiple_jobs || w4?.step_2c_checkbox),
         dependentsAmount: n(w4?.dependents_amount),
         otherIncome: n(w4?.other_income),
@@ -223,12 +257,13 @@ export async function loadPayees(orgId: string): Promise<Payee[]> {
       hasStateForm: !!st,
       hasI9: !!i9,
       hireDate: e.hire_date ?? null,
+      userId: e.user_id ?? null,
       profile: {
         payeeId: e.id,
         payeeType: 'employee',
         name: `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim(),
         employmentClass: 'w2',
-        filingStatus: filing(w4?.filing_status),
+        filingStatus: normalizeFilingStatus(w4?.filing_status),
         multipleJobs: !!(w4?.multiple_jobs || w4?.step_2c_checkbox),
         dependentsAmount: n(w4?.dependents_amount),
         otherIncome: n(w4?.other_income),
@@ -261,7 +296,7 @@ export async function loadPayRecords(orgId: string, year: number, payees: Payee[
     supabase.from('driver_settlements').select('id, driver_id, period_start, period_end, payment_date, paid_at, status, gross_pay, reimbursements, tax_calculation').eq('org_id', orgId).is('deleted_at', null).eq('status', 'paid').gte('period_end', widen),
     supabase.from('driver_payroll').select('id, driver_id, period_start, period_end, payment_date, status, gross_pay, federal_income_tax, social_security_tax, medicare_tax, additional_medicare_tax, state_income_tax, employer_ss_tax, employer_medicare_tax, fl_suta_tax, tax_state, tax_calculation').eq('org_id', orgId).is('deleted_at', null).gte('period_end', widen),
     supabase.from('internal_payroll_ledger').select('id, driver_id, period_start, period_end, finalized_at, status, gross_taxable_pay, one_time_bonus, tax_calculation, tax_withholding_ledger (ee_social_security, er_social_security, ee_medicare, employer_medicare, additional_medicare, federal_income_withholding, state_sit, state_suta, tx_twc_unemployment, fl_reemployment, state_code)').eq('org_id', orgId).eq('status', 'finalized').gte('period_end', widen),
-    supabase.from('staff_pay_statements' as never).select('id, user_id, period_start, period_end, paid_at, status, gross_pay, non_taxable').eq('org_id', orgId).eq('status', 'paid').is('archived_at', null).gte('period_end', widen),
+    supabase.from('staff_pay_statements' as never).select('id, user_id, period_start, period_end, paid_at, status, gross_pay, non_taxable, tax_calculation').eq('org_id', orgId).eq('status', 'paid').is('archived_at', null).gte('period_end', widen),
   ]);
 
   for (const e of (employees ?? []) as any[]) {
@@ -279,9 +314,10 @@ export async function loadPayRecords(orgId: string, year: number, payees: Payee[
     const payDate = dateOnly(s.payment_date) || dateOnly(s.paid_at) || dateOnly(s.period_end);
     const snap = amountsFromSnapshot(s.tax_calculation);
     const wages = snap?.wages || n(s.gross_pay);
+    const adj = snap ? { fitWages: snap.fitWages, ficaWages: snap.ficaWages, futaWages: snap.futaWages, stateWages: snap.stateWages, box12: snap.box12, retirementPlan: snap.retirementPlan } : {};
     push({
       id: s.id, source: 'settlement', payeeKey: payee.key, payeeType: 'driver', payeeId: payee.id, payDate,
-      periodStart: s.period_start, periodEnd: s.period_end, wages: round2(wages), nonTaxable: round2(n(s.reimbursements)),
+      periodStart: s.period_start, periodEnd: s.period_end, wages: round2(wages), ...adj, nonTaxable: round2(n(s.reimbursements)),
       amounts: snap?.amounts ?? { ...ZERO_AMOUNTS }, stateCode: s.tax_calculation?.profile?.workState ?? payee.profile.workState, sitStateCode: s.tax_calculation?.profile?.sitState ?? payee.profile.sitState ?? null,
       recorded: !!snap, notes: [],
     });
@@ -294,7 +330,7 @@ export async function loadPayRecords(orgId: string, year: number, payees: Payee[
     const payDate = dateOnly(p.payment_date) || dateOnly(p.period_end);
     push({
       id: p.id, source: 'payroll', payeeKey: payee.key, payeeType: 'driver', payeeId: payee.id, payDate,
-      periodStart: p.period_start, periodEnd: p.period_end, wages: round2(snap?.wages || n(p.gross_pay)), nonTaxable: 0,
+      periodStart: p.period_start, periodEnd: p.period_end, wages: round2(snap?.wages || n(p.gross_pay)), ...(snap ? { fitWages: snap.fitWages, ficaWages: snap.ficaWages, futaWages: snap.futaWages, stateWages: snap.stateWages, box12: snap.box12, retirementPlan: snap.retirementPlan } : {}), nonTaxable: 0,
       amounts: snap?.amounts ?? {
         ...ZERO_AMOUNTS, fit: n(p.federal_income_tax), ss: n(p.social_security_tax), medicare: n(p.medicare_tax), addlMedicare: n(p.additional_medicare_tax),
         sit: n(p.state_income_tax), employerSs: n(p.employer_ss_tax), employerMedicare: n(p.employer_medicare_tax), suta: n(p.fl_suta_tax),
@@ -312,7 +348,7 @@ export async function loadPayRecords(orgId: string, year: number, payees: Payee[
     const fallbackWages = n(l.gross_taxable_pay) + n(l.one_time_bonus);
     push({
       id: l.id, source: 'ledger', payeeKey: payee.key, payeeType: 'driver', payeeId: payee.id, payDate,
-      periodStart: l.period_start, periodEnd: l.period_end, wages: round2(snap?.wages || fallbackWages), nonTaxable: 0,
+      periodStart: l.period_start, periodEnd: l.period_end, wages: round2(snap?.wages || fallbackWages), ...(snap ? { fitWages: snap.fitWages, ficaWages: snap.ficaWages, futaWages: snap.futaWages, stateWages: snap.stateWages, box12: snap.box12, retirementPlan: snap.retirementPlan } : {}), nonTaxable: 0,
       amounts: snap?.amounts ?? {
         ...ZERO_AMOUNTS, fit: n(wh?.federal_income_withholding), ss: n(wh?.ee_social_security), medicare: n(wh?.ee_medicare), addlMedicare: n(wh?.additional_medicare),
         sit: n(wh?.state_sit), employerSs: n(wh?.er_social_security), employerMedicare: n(wh?.employer_medicare),
@@ -325,12 +361,14 @@ export async function loadPayRecords(orgId: string, year: number, payees: Payee[
   for (const s of (staff.data ?? []) as any[]) {
     const payee = empByUser.get(s.user_id);
     if (!payee) continue;
-    // Staff pay statements carry no tax figures: the hub works them out (see applyEngineToUnrecorded).
+    // Statements made since staff taxes were added carry their withholding. Older ones do not: the hub calculates those.
+    const snap = amountsFromSnapshot(s.tax_calculation);
     push({
       id: s.id, source: 'staff', payeeKey: payee.key, payeeType: 'employee', payeeId: payee.id,
       payDate: dateOnly(s.paid_at) || dateOnly(s.period_end), periodStart: s.period_start, periodEnd: s.period_end,
-      wages: round2(n(s.gross_pay)), nonTaxable: round2(n(s.non_taxable)), amounts: { ...ZERO_AMOUNTS },
-      stateCode: payee.profile.workState, sitStateCode: payee.profile.sitState ?? null, recorded: false, notes: [],
+      wages: round2(n(s.gross_pay)), ...(snap ? { fitWages: snap.fitWages, ficaWages: snap.ficaWages, futaWages: snap.futaWages, stateWages: snap.stateWages, box12: snap.box12, retirementPlan: snap.retirementPlan } : {}), nonTaxable: round2(n(s.non_taxable)), amounts: snap?.amounts ?? { ...ZERO_AMOUNTS },
+      stateCode: s.tax_calculation?.profile?.workState ?? payee.profile.workState, sitStateCode: s.tax_calculation?.profile?.sitState ?? payee.profile.sitState ?? null,
+      recorded: !!snap, notes: [],
     });
   }
 

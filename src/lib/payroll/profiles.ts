@@ -2,10 +2,15 @@ import { supabase } from '@/integrations/supabase/client';
 import type { FilingStatus } from './taxTables';
 import type { EmploymentClass, PayeeTaxProfile } from './types';
 
-function normalizeFilingStatus(v: unknown): FilingStatus {
+/**
+ * The W-4 filing status the onboarding form saved. It saves 'single', 'married' (jointly) or 'hoh'. Head of household was
+ * once read as single, which over-withheld every head-of-household employee. Married filing separately is withheld as single.
+ */
+export function normalizeFilingStatus(v: unknown): FilingStatus {
   const s = String(v ?? '').toLowerCase().replace(/[\s-]/g, '_');
-  if (s.includes('joint') || s === 'married') return 'married_joint';
-  if (s.includes('head')) return 'head_of_household';
+  if (/separate/.test(s) || s === 'mfs' || s === 'married_separate') return 'single';
+  if (s === 'hoh' || s.includes('head')) return 'head_of_household';
+  if (s.includes('joint') || s === 'mfj' || s === 'married') return 'married_joint';
   return 'single';
 }
 

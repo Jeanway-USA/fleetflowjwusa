@@ -48,7 +48,7 @@ export function MobileTabBar() {
     : [
         { label: 'Today', icon: CalendarDays, path: home, match: ['/executive-dashboard', '/dispatcher-dashboard'] },
         { label: 'Loads', icon: Package, path: '/fleet-loads', match: ['/agency-loads'] },
-        { label: 'Money', icon: Wallet, path: '/finance', match: ['/admin/tax-hub', '/ifta', '/insights'] },
+        { label: 'Money', icon: Wallet, path: '/finance', match: ['/payroll', '/admin/tax-hub', '/ifta', '/insights'] },
       ];
 
   const isActive = (tab: Tab) => {
