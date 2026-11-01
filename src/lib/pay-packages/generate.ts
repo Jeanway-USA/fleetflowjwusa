@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
+import { accessorialShare } from '@/lib/accessorials';
 import { supabase } from '@/integrations/supabase/client';
 import { applyOverrides, calculatePackagePay, settlementItemType } from '@/lib/pay-packages/engine';
 import { assignmentOn, packageCovers, resolvePay, snapshotFor } from '@/lib/pay-packages/resolve';
@@ -51,7 +52,7 @@ interface LoadRow {
   net_revenue: number | null;
   detention_hours: number | null;
   detention_pay: number | null;
-  load_accessorials: Array<{ amount: number | null; is_driver_pay: boolean | null }> | null;
+  load_accessorials: Array<{ amount: number | null; percentage?: number | null; is_driver_pay: boolean | null }> | null;
 }
 
 /** What happened to one driver in one period, worked out from their delivered loads. */
@@ -77,7 +78,7 @@ export function buildWeekInput(loads: LoadRow[], incidents: number, periodStart:
     netRevenue: loads.reduce((s, l) => s + n(l.net_revenue), 0),
     loadCount: loads.length,
     daysWorked: days.size,
-    accessorials: loads.reduce((s, l) => s + (l.load_accessorials ?? []).filter((a) => a.is_driver_pay !== false).reduce((t, a) => t + n(a.amount), 0), 0),
+    accessorials: loads.reduce((s, l) => s + (l.load_accessorials ?? []).filter((a) => a.is_driver_pay !== false).reduce((t, a) => t + accessorialShare(a), 0), 0),
     detentionHours: loads.reduce((s, l) => s + n(l.detention_hours), 0),
     detentionPay: loads.reduce((s, l) => s + n(l.detention_pay), 0),
     incidents,
@@ -179,7 +180,7 @@ export async function generatePackageSettlements(args: {
 
     const { data: loads, error: loadsError } = await db
       .from('fleet_loads')
-      .select('id, pickup_date, delivery_date, booked_miles, actual_miles, gross_revenue, net_revenue, detention_hours, detention_pay, load_accessorials(amount, is_driver_pay)')
+      .select('id, pickup_date, delivery_date, booked_miles, actual_miles, gross_revenue, net_revenue, detention_hours, detention_pay, load_accessorials(amount, percentage, is_driver_pay)')
       .eq('org_id', orgId)
       .eq('driver_id', driverId)
       .eq('status', 'delivered')

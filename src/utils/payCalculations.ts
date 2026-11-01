@@ -1,3 +1,4 @@
+import { accessorialShare } from '@/lib/accessorials';
 /**
  * SINGLE SOURCE OF TRUTH for driver pay calculations.
  *
@@ -64,7 +65,7 @@ export interface PayLoad {
   booked_miles?: number | null;
   /** Odometer miles; used only when booked_miles is missing. */
   actual_miles?: number | null;
-  load_accessorials?: Array<{ amount?: number | null; is_driver_pay?: boolean | null }> | null;
+  load_accessorials?: Array<{ amount?: number | null; percentage?: number | null; is_driver_pay?: boolean | null }> | null;
 }
 
 export interface PaySettings {
@@ -134,7 +135,8 @@ export function sumAccessorials(load: PayLoad | null | undefined): number {
   // `!== false` keeps legacy/undefined rows (default true) included.
   return load.load_accessorials
     .filter((a) => a?.is_driver_pay !== false)
-    .reduce((s, a) => s + n(a?.amount), 0);
+    // The paid share of each row: stop-off pay listed at $325 pays 65% of it.
+    .reduce((s, a) => s + accessorialShare(a), 0);
 }
 
 /** Paid miles: booked miles, falling back to actual miles when none were booked. */
