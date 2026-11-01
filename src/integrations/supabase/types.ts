@@ -5158,6 +5158,58 @@ export type Database = {
         }
         Relationships: []
       }
+      new_hire_reports: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          org_id: string
+          payee_key: string
+          reported_by: string | null
+          reported_on: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          org_id: string
+          payee_key: string
+          reported_by?: string | null
+          reported_on: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          org_id?: string
+          payee_key?: string
+          reported_by?: string | null
+          reported_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "new_hire_reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "new_hire_reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "new_hire_reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_storage_config: {
         Row: {
           connected_at: string | null
@@ -7587,6 +7639,73 @@ export type Database = {
           reason?: string | null
         }
         Relationships: []
+      }
+      time_off_entries: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          entry_type: string
+          hours: number
+          id: string
+          kind: string
+          note: string | null
+          org_id: string
+          source_id: string | null
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_date: string
+          entry_type: string
+          hours: number
+          id?: string
+          kind: string
+          note?: string | null
+          org_id: string
+          source_id?: string | null
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          entry_type?: string
+          hours?: number
+          id?: string
+          kind?: string
+          note?: string | null
+          org_id?: string
+          source_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_off_entries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_off_entries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "time_off_entries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trailer_assignments: {
         Row: {
