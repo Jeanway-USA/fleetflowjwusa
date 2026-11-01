@@ -5757,6 +5757,105 @@ export type Database = {
           },
         ]
       }
+      pay_run_payments: {
+        Row: {
+          account_last4: string | null
+          amount: number
+          batch_ref: string | null
+          check_number: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          method: string
+          note: string | null
+          org_id: string
+          payee_key: string
+          payee_name: string
+          run_id: string
+          sent_at: string | null
+          sent_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_last4?: string | null
+          amount: number
+          batch_ref?: string | null
+          check_number?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          method: string
+          note?: string | null
+          org_id: string
+          payee_key: string
+          payee_name: string
+          run_id: string
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_last4?: string | null
+          amount?: number
+          batch_ref?: string | null
+          check_number?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          method?: string
+          note?: string | null
+          org_id?: string
+          payee_key?: string
+          payee_name?: string
+          run_id?: string
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_run_payments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "pay_run_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_run_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_run_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "pay_run_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_run_payments_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "pay_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pay_runs: {
         Row: {
           approved_at: string | null
@@ -6030,6 +6129,11 @@ export type Database = {
       }
       payroll_settings: {
         Row: {
+          ach_bank_name: string | null
+          ach_bank_routing: string | null
+          ach_company_id: string | null
+          ach_company_name: string | null
+          ach_next_check_number: number
           additional_medicare_rate: number
           additional_medicare_threshold: number
           created_at: string
@@ -6047,6 +6151,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ach_bank_name?: string | null
+          ach_bank_routing?: string | null
+          ach_company_id?: string | null
+          ach_company_name?: string | null
+          ach_next_check_number?: number
           additional_medicare_rate?: number
           additional_medicare_threshold?: number
           created_at?: string
@@ -6064,6 +6173,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ach_bank_name?: string | null
+          ach_bank_routing?: string | null
+          ach_company_id?: string | null
+          ach_company_name?: string | null
+          ach_next_check_number?: number
           additional_medicare_rate?: number
           additional_medicare_threshold?: number
           created_at?: string
@@ -8921,6 +9035,25 @@ export type Database = {
       get_public_load_by_tracking: {
         Args: { _tracking_id: string }
         Returns: Json
+      }
+      get_run_bank_details: {
+        Args: { _run_id: string }
+        Returns: {
+          account_number: string
+          account_type: string
+          bank_name: string
+          item_id: string
+          routing_number: string
+        }[]
+      }
+      get_run_bank_status: {
+        Args: { _run_id: string }
+        Returns: {
+          account_last4: string
+          account_type: string
+          bank_name: string
+          item_id: string
+        }[]
       }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: { Args: { _user_id: string }; Returns: string }

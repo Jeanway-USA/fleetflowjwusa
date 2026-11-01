@@ -148,6 +148,13 @@
       "when": 1793491228007,
       "tag": "0020_apply_deductions",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793509254029,
+      "tag": "0021_apply_payments",
+      "breakpoints": true
     }
   ]
 }
