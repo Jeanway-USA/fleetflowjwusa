@@ -49,6 +49,7 @@ import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
 import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
 import { AgencyCRMStatusBadge } from '@/components/loads/AgencyCRMStatusBadge';
+import { findPickupNumber } from '@/lib/loads/pickupNumber';
 import { FeetInchesInput } from '@/components/shared/FeetInchesInput';
 import {
   calcOverDimensionCharge,
@@ -834,6 +835,9 @@ export default function FleetLoads() {
       is_driver_pay: true,
     }));
 
+    // The pickup number the driver gives at the gate: from References, else the pickup stop's notes.
+    const pickupNumber = findPickupNumber(data);
+
     // Format intermediate stops to append to notes
     const intermediateStopsText = formatIntermediateStops(data.intermediate_stops);
     const combinedNotes = (data.notes || '') + intermediateStopsText;
@@ -842,8 +846,11 @@ export default function FleetLoads() {
     if (existingLoadId) {
       const existingLoad = loads.find((l: any) => l.id === existingLoadId);
       if (existingLoad) {
-        // Merge: use extracted data where available, preserve existing data otherwise
+        // Merge: use extracted data where available, preserve existing data otherwise. Everything else on the load is kept.
+        const { driver_name: _dn, truck_unit: _tu, ...keptFromLoad } = existingLoad as any;
         setFormData({
+          ...keptFromLoad,
+          pickup_number: pickupNumber ?? existingLoad.pickup_number ?? '',
           landstar_load_id: data.landstar_load_id || existingLoad.landstar_load_id || '',
           agency_code: data.agency_code || existingLoad.agency_code || '',
           origin: data.origin || existingLoad.origin || '',
@@ -894,6 +901,7 @@ export default function FleetLoads() {
       driver_id: data.driver_id || null,
       truck_id: data.truck_id || null,
       notes: combinedNotes,
+      pickup_number: pickupNumber ?? '',
       status: 'assigned',
       is_power_only: false,
     });
@@ -1126,7 +1134,7 @@ export default function FleetLoads() {
 
       {/* Add/Edit Load Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[92vh] w-[calc(100%-1rem)] max-w-3xl overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="max-h-[92vh] w-[calc(100%-1rem)] max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editingLoad ? `Edit load ${editingLoad.landstar_load_id || ''}`.trim() : 'Add a load'}</DialogTitle>
           </DialogHeader>

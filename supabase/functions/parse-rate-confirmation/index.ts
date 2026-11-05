@@ -40,6 +40,9 @@ interface ExtractedLoadData {
   destination: string | null;
   pickup_date: string | null;
   pickup_time: string | null;
+  pickup_number: string | null;
+  customer_references: string[];
+  pickup_stop_notes: string | null;
   delivery_date: string | null;
   delivery_time: string | null;
   booked_miles: number | null;
@@ -87,6 +90,11 @@ CRITICAL INSTRUCTIONS:
 4. Dates should be in YYYY-MM-DD format.
 5. Look for "Agency Name" for the agency code (last 3 letters like LTL or BLR).
 6. For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).
+8. For the PICKUP NUMBER (what the driver gives the guard at pickup):
+   - Look at the "References" block near the top of the document. Each line "Customer Reference Number: XXXXX" is a candidate. List every one, in order, in "customer_references".
+   - Also copy the "Notes" and "References" text of Stop # 1 (the first Pickup) into "pickup_stop_notes".
+   - "pickup_number" is the Customer Reference Number that also appears in Stop # 1's notes. If none match, use the first Customer Reference Number. If there are no references at all, use a reference-like code from Stop # 1's notes (letters and digits, no spaces). If still nothing, null.
+   - Never use the Freight Bill # or the Load # (EL...) as the pickup number.
 7. For TIMES: Extract pickup and delivery appointment times in 12-hour format (e.g., "8:00 AM", "2:30 PM"). Look for times next to or below dates in the stop information section.`;
 
 const userPrompt = `Analyze this Landstar BCO Load Detail PDF document and extract the load information.
@@ -99,6 +107,9 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
   "destination": "FULL address of final delivery stop including street, city, state, ZIP (e.g., '5678 Commerce Dr, Evans, CO 80620')",
   "pickup_date": "First pickup date in YYYY-MM-DD format",
   "pickup_time": "Pickup appointment time in 12-hour format (e.g., '8:00 AM', '2:30 PM') or null if not specified",
+  "pickup_number": "The pickup number: the Customer Reference Number that also appears in Stop # 1 notes, else the first Customer Reference Number, else a reference code from Stop # 1 notes, else null",
+  "customer_references": ["every Customer Reference Number under References, in order"],
+  "pickup_stop_notes": "The Notes and References text shown under Stop # 1, or null",
   "delivery_date": "Final delivery date in YYYY-MM-DD format",
   "delivery_time": "Delivery appointment time in 12-hour format (e.g., '10:00 AM', '4:00 PM') or null if not specified",
   "booked_miles": Total Distance in miles as a number,

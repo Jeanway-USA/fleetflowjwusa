@@ -26,6 +26,12 @@ interface ExtractedLoadData {
   destination: string | null;
   pickup_date: string | null;
   pickup_time: string | null;
+  /** The number the driver gives at the pickup gate. */
+  pickup_number?: string | null;
+  /** The Customer Reference Numbers under References on the load detail. */
+  customer_references?: string[] | null;
+  /** The Notes text of the first (pickup) stop. */
+  pickup_stop_notes?: string | null;
   delivery_date: string | null;
   delivery_time: string | null;
   booked_miles: number | null;

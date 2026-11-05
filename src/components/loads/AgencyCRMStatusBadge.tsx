@@ -26,6 +26,15 @@ export function AgencyCRMStatusBadge({ agencyCode, onBlockedChange }: Props) {
     );
   }
 
+  if (state.status === 'error') {
+    return (
+      <div className="mt-1 flex items-start gap-2 text-xs text-muted-foreground">
+        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        <span>Could not check this agent code against the CRM. Saving the load still works.</span>
+      </div>
+    );
+  }
+
   if (state.status === 'not_found') {
     return (
       <div className="mt-1 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs text-primary">
