@@ -169,6 +169,13 @@
       "when": 1793513355000,
       "tag": "0023_apply_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793848795971,
+      "tag": "0024_apply_agent_harvest",
+      "breakpoints": true
     }
   ]
 }
