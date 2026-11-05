@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
     const resend = new Resend(resendApiKey);
 
     const payload = await req.json();
-    console.log('Webhook payload received:', JSON.stringify(payload));
+    console.log('Webhook payload received for load status change');
 
     const record = payload.record ?? payload;
     const loadId: string | null = record.load_id ?? null;
