@@ -35,6 +35,8 @@ vi.mock('@/integrations/supabase/client', () => {
   return { supabase: { from: builder } };
 });
 
+vi.mock('@/hooks/useStorageProvider', () => ({ uploadFile: async (_bucket: string, path: string) => ({ path, error: null }) }));
+
 import { advanceSchedules, logCompletedWork, schedulesFor, shouldAdvance, validateLog } from '@/lib/shop/log-work';
 
 beforeEach(() => {
@@ -109,5 +111,38 @@ describe('logging finished work', () => {
   it('refuses before saving anything when the entry is not valid', async () => {
     await expect(logCompletedWork({ orgId: 'o', userName: 'A', truckId: '', date: '2026-09-20', kinds: ['pm'], title: '', description: '', doneBy: '', cost: 0, odometer: null, receipts: [] })).rejects.toThrow(/truck/);
     expect(state.inserts).toEqual([]);
+  });
+});
+
+describe('logging work from an invoice', () => {
+  const base = { orgId: 'o', userName: 'Andrew', truckId: 't1', date: '2026-11-06', kinds: ['repair'], title: 'Repair', description: 'Replaced the air compressor', doneBy: 'Reliable Road Service', cost: 1684.71, odometer: null };
+  const invoice = new File(['%PDF'], 'INVOICE_5054.pdf', { type: 'application/pdf' });
+
+  it('keeps the invoice notes and the parts used, and points the job at the invoice file', async () => {
+    await logCompletedWork({
+      ...base, receipts: [invoice], invoiceIndex: 0, notes: 'Invoice #5054 from Reliable Road Service',
+      parts: [{ name: 'Hose (per ft)', number: null, quantity: 4, unitCost: 27 }, { name: 'Air compressor', number: 'AC-1', quantity: 1, unitCost: 1495.69 }],
+    });
+    expect(state.inserts.find((i) => i.table === 'work_orders')!.row).toMatchObject({ notes: 'Invoice #5054 from Reliable Road Service', final_cost: 1684.71 });
+    const parts = state.inserts.find((i) => i.table === 'work_order_parts')!.row;
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toMatchObject({ org_id: 'o', work_order_id: 'job-1', part_name: 'Hose (per ft)', part_number: null, quantity: 4, unit_cost: 27 });
+    expect(parts[1]).toMatchObject({ part_number: 'AC-1', quantity: 1, unit_cost: 1495.69 });
+    const link = state.updates.find((u) => u.table === 'work_orders');
+    expect(link?.patch.invoice_url).toMatch(/INVOICE_5054.pdf$/);
+    const events = state.inserts.find((i) => i.table === 'work_order_events')!.row;
+    expect(events.some((e: any) => e.kind === 'photo' && e.body === 'Invoice')).toBe(true);
+  });
+
+  it('does not save a parts list, or point at an invoice, when there is none', async () => {
+    await logCompletedWork({ ...base, receipts: [] });
+    expect(state.inserts.some((i) => i.table === 'work_order_parts')).toBe(false);
+    expect(state.updates.some((u) => u.table === 'work_orders')).toBe(false);
+    expect(state.inserts.find((i) => i.table === 'work_orders')!.row.notes).toBeNull();
+  });
+
+  it('leaves out parts with no quantity or no name', async () => {
+    await logCompletedWork({ ...base, receipts: [], parts: [{ name: ' ', number: null, quantity: 1, unitCost: 5 }, { name: 'Bolt', number: null, quantity: 0, unitCost: 1 }] });
+    expect(state.inserts.some((i) => i.table === 'work_order_parts')).toBe(false);
   });
 });

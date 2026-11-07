@@ -18,7 +18,7 @@ import { WORK_KINDS } from '@/lib/shop/templates';
 import { ShopNav } from '@/components/shop/ShopNav';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatStrip } from '@/components/shared/StatStrip';
-import { LogWorkSheet } from '@/components/shop/LogWorkSheet';
+import { LogWorkDialog } from '@/components/shop/LogWorkDialog';
 import { Button } from '@/components/ui/button';
 import { ShopEmpty } from '@/components/shop/shared';
 
@@ -158,7 +158,7 @@ export default function ShopHistoryPage() {
           ))}
         </div>
       )}
-      <LogWorkSheet open={logOpen} onOpenChange={setLogOpen} />
+      <LogWorkDialog open={logOpen} onOpenChange={setLogOpen} />
       <EditHistorySheet entry={editing} onOpenChange={(v) => !v && setEditing(null)} />
     </div>
   );
