@@ -1,6 +1,7 @@
 import { addDays, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toLocalIso, todayLocal } from '@/lib/datetime';
+import type { LoggedPart } from '@/lib/shop/invoice';
 
 const db = supabase as any;
 
@@ -42,6 +43,12 @@ export interface LogWorkInput {
   cost: number;
   odometer: number | null;
   receipts: File[];
+  /** Notes for the job, such as the invoice number and where the cost came from. */
+  notes?: string;
+  /** The parts on an invoice, saved as the job's parts used. */
+  parts?: LoggedPart[];
+  /** Which receipt is the vendor's invoice, so the job can point to it. */
+  invoiceIndex?: number;
 }
 
 export function validateLog(i: Pick<LogWorkInput, 'truckId' | 'date' | 'kinds' | 'description' | 'cost' | 'odometer'>, today: string = todayLocal()): string | null {
@@ -95,6 +102,7 @@ export async function logCompletedWork(input: LogWorkInput): Promise<string> {
       cost_estimate: input.cost,
       vendor: input.doneBy.trim() || null,
       odometer_reading: input.odometer,
+      notes: input.notes?.trim() || null,
     })
     .select('id')
     .single();
@@ -102,12 +110,24 @@ export async function logCompletedWork(input: LogWorkInput): Promise<string> {
 
   const events: Array<Record<string, unknown>> = [{ kind: 'status', body: `Logged as done on ${input.date}`, photo_path: null }];
 
-  for (const file of input.receipts) {
+  let invoicePath: string | null = null;
+  for (const [index, file] of input.receipts.entries()) {
     const { uploadFile } = await import('@/hooks/useStorageProvider');
     const path = `work-orders/${input.orgId}/${job.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const { path: saved, error: upError } = await uploadFile('documents', path, file);
     if (upError) throw new Error(`The job was saved, but a receipt could not be uploaded: ${upError.message}`);
-    events.push({ kind: 'photo', body: 'Receipt', photo_path: saved });
+    events.push({ kind: 'photo', body: index === input.invoiceIndex ? 'Invoice' : 'Receipt', photo_path: saved });
+    if (index === input.invoiceIndex) invoicePath = saved;
+  }
+  if (invoicePath) await db.from('work_orders').update({ invoice_url: invoicePath }).eq('id', job.id);
+
+  // The parts on the invoice. If the parts list cannot be saved the job still is, and the job says so.
+  const parts = (input.parts ?? []).filter((p) => p.quantity > 0 && p.name.trim());
+  if (parts.length > 0) {
+    const { error: partsError } = await db.from('work_order_parts').insert(parts.map((p) => ({
+      org_id: input.orgId, work_order_id: job.id, part_name: p.name.trim(), part_number: p.number || null, quantity: p.quantity, unit_cost: p.unitCost, logged_by_name: input.userName || null,
+    })));
+    if (partsError) events.push({ kind: 'note', body: 'The parts list from the invoice could not be saved. It is in the invoice file.', photo_path: null });
   }
   // The activity feed arrives with the shop upgrade; if it is missing the job is still saved.
   await db.from('work_order_events').insert(events.map((e) => ({ ...e, org_id: input.orgId, work_order_id: job.id, user_name: input.userName })));

@@ -9,7 +9,7 @@ import { useFleetAvailability } from '@/hooks/useMaintenanceData';
 import { summarize } from '@/lib/shop/board';
 import { cn } from '@/lib/utils';
 import { NewJobSheet } from '@/components/shop/NewJobSheet';
-import { LogWorkSheet } from '@/components/shop/LogWorkSheet';
+import { LogWorkDialog } from '@/components/shop/LogWorkDialog';
 import { LaneBoard } from '@/components/shop/board/LaneBoard';
 import { PulseStrip } from '@/components/shop/board/PulseStrip';
 import { HeadsUpRail } from '@/components/shop/board/HeadsUpRail';
@@ -98,7 +98,7 @@ export default function ShopBoardPage() {
       )}
 
       <NewJobSheet open={newOpen} onOpenChange={setNewOpen} />
-      <LogWorkSheet open={logOpen} onOpenChange={setLogOpen} />
+      <LogWorkDialog open={logOpen} onOpenChange={setLogOpen} />
     </div>
   );
 }
