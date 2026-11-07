@@ -154,6 +154,7 @@ export function LogWorkDialog({ open, onOpenChange, truckId }: Props) {
       description: what, doneBy: doneBy.trim(), cost: num(cost), odometer: odo ? num(odo) : null, receipts,
       notes: [invoiceNo.trim() && !notes.includes(`#${invoiceNo.trim()}`) ? `Invoice #${invoiceNo.trim()}` : '', notes].filter(Boolean).join('\n'),
       parts: keepParts ? parts : [],
+      onWarning: (message: string) => toast.warning(message, { duration: 10000 }),
       invoiceIndex: invoiceFile ? receipts.indexOf(invoiceFile) : undefined,
     };
     const problem = validateLog(input);

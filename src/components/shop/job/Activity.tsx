@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { Camera, CheckCircle2, ListChecks, MessageSquare, PackageMinus, Pause, Play, UserRound, AlertCircle } from 'lucide-react';
+import { Camera, CheckCircle2, FileText, ListChecks, MessageSquare, PackageMinus, Pause, Play, UserRound, AlertCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,14 @@ const ICON: Record<string, typeof MessageSquare> = {
 function Photo({ path }: { path: string }) {
   const { url } = useProviderSignedUrl('documents', path);
   if (!url) return <div className="h-28 w-40 animate-pulse rounded-lg bg-muted" />;
+  // An invoice is often a PDF, which cannot be shown as a picture.
+  if (/\.pdf$/i.test(path)) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-accent">
+        <FileText className="h-4 w-4 text-muted-foreground" />Open the PDF
+      </a>
+    );
+  }
   return (
     <a href={url} target="_blank" rel="noreferrer">
       <img src={url} alt="Job photo" className="max-h-44 rounded-lg border object-cover" loading="lazy" />

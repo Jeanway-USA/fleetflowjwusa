@@ -49,6 +49,8 @@ export interface LogWorkInput {
   parts?: LoggedPart[];
   /** Which receipt is the vendor's invoice, so the job can point to it. */
   invoiceIndex?: number;
+  /** Told about anything that could not be saved after the job itself was (for example a receipt that failed to upload). */
+  onWarning?: (message: string) => void;
 }
 
 export function validateLog(i: Pick<LogWorkInput, 'truckId' | 'date' | 'kinds' | 'description' | 'cost' | 'odometer'>, today: string = todayLocal()): string | null {
@@ -110,12 +112,18 @@ export async function logCompletedWork(input: LogWorkInput): Promise<string> {
 
   const events: Array<Record<string, unknown>> = [{ kind: 'status', body: `Logged as done on ${input.date}`, photo_path: null }];
 
+  // A receipt that cannot be saved must not stop the rest: the job is already saved, so its parts, its history and the
+  // service it covers are still recorded, and the person is told which file was left out.
+  const warnings: string[] = [];
   let invoicePath: string | null = null;
   for (const [index, file] of input.receipts.entries()) {
     const { uploadFile } = await import('@/hooks/useStorageProvider');
-    const path = `work-orders/${input.orgId}/${job.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const path = `${input.orgId}/work-orders/${job.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const { path: saved, error: upError } = await uploadFile('documents', path, file);
-    if (upError) throw new Error(`The job was saved, but a receipt could not be uploaded: ${upError.message}`);
+    if (upError) {
+      warnings.push(`${file.name} could not be saved (${upError.message})`);
+      continue;
+    }
     events.push({ kind: 'photo', body: index === input.invoiceIndex ? 'Invoice' : 'Receipt', photo_path: saved });
     if (index === input.invoiceIndex) invoicePath = saved;
   }
@@ -129,10 +137,12 @@ export async function logCompletedWork(input: LogWorkInput): Promise<string> {
     })));
     if (partsError) events.push({ kind: 'note', body: 'The parts list from the invoice could not be saved. It is in the invoice file.', photo_path: null });
   }
+  if (warnings.length > 0) events.push({ kind: 'note', body: `Not saved with this job: ${warnings.join('; ')}. Add it again from the job page.`, photo_path: null });
   // The activity feed arrives with the shop upgrade; if it is missing the job is still saved.
   await db.from('work_order_events').insert(events.map((e) => ({ ...e, org_id: input.orgId, work_order_id: job.id, user_name: input.userName })));
 
   await advanceSchedules(input.truckId, kinds, input.date, input.odometer);
+  if (warnings.length > 0) input.onWarning?.(`The job was saved, but ${warnings.join('; ')}.`);
   return job.id as string;
 }
 
