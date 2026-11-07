@@ -6,6 +6,8 @@ const state = vi.hoisted(() => ({
   updates: [] as Array<{ table: string; patch: any; id?: string }>,
   schedules: {} as Record<string, { id: string; last_performed_date: string | null }>,
   truckInspection: null as string | null,
+  uploadFails: false,
+  uploadedPaths: [] as string[],
 }));
 
 vi.mock('@/integrations/supabase/client', () => {
@@ -35,7 +37,12 @@ vi.mock('@/integrations/supabase/client', () => {
   return { supabase: { from: builder } };
 });
 
-vi.mock('@/hooks/useStorageProvider', () => ({ uploadFile: async (_bucket: string, path: string) => ({ path, error: null }) }));
+vi.mock('@/hooks/useStorageProvider', () => ({
+  uploadFile: async (_bucket: string, path: string) => {
+    state.uploadedPaths.push(path);
+    return state.uploadFails ? { path: '', error: new Error('new row violates row-level security policy') } : { path, error: null };
+  },
+}));
 
 import { advanceSchedules, logCompletedWork, schedulesFor, shouldAdvance, validateLog } from '@/lib/shop/log-work';
 
@@ -44,6 +51,8 @@ beforeEach(() => {
   state.updates = [];
   state.schedules = {};
   state.truckInspection = null;
+  state.uploadFails = false;
+  state.uploadedPaths = [];
 });
 
 describe('which services a job resets', () => {
@@ -144,5 +153,43 @@ describe('logging work from an invoice', () => {
   it('leaves out parts with no quantity or no name', async () => {
     await logCompletedWork({ ...base, receipts: [], parts: [{ name: ' ', number: null, quantity: 1, unitCost: 5 }, { name: 'Bolt', number: null, quantity: 0, unitCost: 1 }] });
     expect(state.inserts.some((i) => i.table === 'work_order_parts')).toBe(false);
+  });
+});
+
+describe('saving the invoice file', () => {
+  const base = { orgId: 'org-9', userName: 'Andrew', truckId: 't1', date: '2026-11-06', kinds: ['repair'], title: 'Repair', description: 'Replaced the air compressor', doneBy: 'Reliable Road Service', cost: 1684.71, odometer: null };
+  const invoice = new File(['%PDF'], 'INVOICE 5054.pdf', { type: 'application/pdf' });
+
+  it('puts the file under the organization folder first, which is the only place storage allows', async () => {
+    await logCompletedWork({ ...base, receipts: [invoice] });
+    expect(state.uploadedPaths).toHaveLength(1);
+    expect(state.uploadedPaths[0]).toMatch(/^org-9\/work-orders\/job-1\/\d+-INVOICE_5054\.pdf$/);
+  });
+
+  it('still records the parts, the history and the service when the file cannot be saved, and says what was left out', async () => {
+    state.uploadFails = true;
+    const warnings: string[] = [];
+    const id = await logCompletedWork({ ...base, receipts: [invoice], invoiceIndex: 0, parts: [{ name: 'Hose', number: null, quantity: 2, unitCost: 27 }], onWarning: (m) => warnings.push(m) });
+    expect(id).toBe('job-1');
+    expect(state.inserts.find((i) => i.table === 'work_order_parts')!.row).toHaveLength(1);
+    const events = state.inserts.find((i) => i.table === 'work_order_events')!.row;
+    expect(events.some((e: any) => e.kind === 'status')).toBe(true);
+    expect(events.some((e: any) => e.kind === 'note' && /Not saved with this job: INVOICE 5054.pdf/.test(e.body))).toBe(true);
+    expect(events.some((e: any) => e.kind === 'photo')).toBe(false);
+    expect(state.updates.some((u) => u.table === 'work_orders')).toBe(false); // no invoice link without a file
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/The job was saved, but INVOICE 5054.pdf could not be saved/);
+  });
+
+  it('keeps the files that did save when only one fails', async () => {
+    const good = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
+    let calls = 0;
+    const realPush = state.uploadedPaths.push.bind(state.uploadedPaths);
+    state.uploadedPaths.push = (...a: string[]) => { calls++; state.uploadFails = calls === 1; return realPush(...a); };
+    const warnings: string[] = [];
+    await logCompletedWork({ ...base, receipts: [invoice, good], invoiceIndex: 0, onWarning: (m) => warnings.push(m) });
+    const events = state.inserts.find((i) => i.table === 'work_order_events')!.row;
+    expect(events.filter((e: any) => e.kind === 'photo')).toHaveLength(1);
+    expect(warnings).toHaveLength(1);
   });
 });

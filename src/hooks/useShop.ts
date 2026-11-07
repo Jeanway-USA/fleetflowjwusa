@@ -255,7 +255,7 @@ export function useShopActions() {
     note: simple(async (a: { id: string; text: string }) => event(a.id, 'note', a.text)),
     photo: simple(async (a: { id: string; file: File }) => {
       if (!orgId) throw new Error('Your organization has not finished loading.');
-      const path = `work-orders/${orgId}/${a.id}/${Date.now()}-${a.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `${orgId}/work-orders/${a.id}/${Date.now()}-${a.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const { path: saved, error } = await uploadFile('documents', path, a.file);
       if (error) throw error;
       await event(a.id, 'photo', 'Photo added', saved);
