@@ -176,6 +176,13 @@
       "when": 1793848795971,
       "tag": "0024_apply_agent_harvest",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794013420350,
+      "tag": "0025_apply_shop_files",
+      "breakpoints": true
     }
   ]
 }
