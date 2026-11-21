@@ -1,14 +1,25 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, RefreshCw, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, AlertTriangle, X, RefreshCw, Plus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  classifyParseFailure,
+  findTripMatch,
+  flagText,
+  looksLikeRateCon,
+  previewMoney,
+  revenueSettingsFrom,
+  reviewFlags,
+  type ParseFailure,
+} from '@/lib/rate-con-review';
 
 interface IntermediateStop {
   stop_number: number;
@@ -56,14 +67,24 @@ interface ExistingLoad {
   destination: string;
   rate: number | null;
   pickup_date: string | null;
+  delivery_date?: string | null;
+  status?: string | null;
+}
+
+export interface RateConUseOptions {
+  /** The office chose "Create anyway" on a trip number that already exists. */
+  allowDuplicateTrip?: boolean;
 }
 
 interface RateConfirmationUploadProps {
-  onDataExtracted: (data: ExtractedLoadData, existingLoadId?: string) => void;
+  onDataExtracted: (data: ExtractedLoadData, existingLoadId?: string, options?: RateConUseOptions) => void;
   existingLoads: ExistingLoad[];
   drivers: Array<{ id: string; first_name: string; last_name: string }>;
   trucks: Array<{ id: string; unit_number: string }>;
 }
+
+const money = (value: number | null | undefined) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value ?? 0);
 
 export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers, trucks }: RateConfirmationUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -71,12 +92,23 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
   const [fileName, setFileName] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedLoadData | null>(null);
   const [matchingLoad, setMatchingLoad] = useState<ExistingLoad | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<ParseFailure | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFileRef = useRef<File | null>(null);
   const { orgId, user } = useAuth();
   const { upload: storageUpload } = useStorageProvider();
   const queryClient = useQueryClient();
+
+  // The same pay settings the load form uses (same query key, so one fetch serves both).
+  const { data: settingRows = [] } = useQuery({
+    queryKey: ['company_settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('company_settings').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+  const paySettings = useMemo(() => revenueSettingsFrom(settingRows as any[]), [settingRows]);
 
   const saveToDocuments = async (file: File, loadId?: string) => {
     try {
@@ -98,7 +130,6 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
         org_id: orgId,
       });
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
-      console.log('[RC] PDF saved to Documents tab');
     } catch (err) {
       console.error('[RC] Error saving PDF to documents:', err);
     }
@@ -115,29 +146,35 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
   }, []);
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const PARSE_TIMEOUT_MS = 120_000;
 
+  const fail = (raw: unknown) => {
+    const f = classifyParseFailure(raw);
+    setFailure(f);
+    toast.error(f.title);
+  };
 
   const processFile = async (file: File) => {
-    if (!file.type.includes('pdf')) {
-      toast.error('Please upload a PDF file');
+    setFailure(null);
+    if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
+      fail('Please upload a PDF file');
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error(`PDF file must be under 5MB. This file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`);
+      fail(`PDF file must be under 5MB. This file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`);
       return;
     }
 
     setIsProcessing(true);
     setFileName(file.name);
-    setError(null);
     setExtractedData(null);
+    setMatchingLoad(null);
     pendingFileRef.current = file;
 
     try {
       // Step 1: Upload PDF to storage (bypasses functions relay)
       const tempPath = `${orgId}/temp-rc/${Date.now()}-${file.name}`;
-      console.log('[RC Upload] Uploading PDF to storage:', tempPath);
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(tempPath, file, { contentType: 'application/pdf' });
@@ -147,51 +184,57 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
         throw new Error('Failed to upload file for processing');
       }
 
-      // Step 2: Call edge function with just the storage path (tiny JSON body)
-      console.log('[RC Upload] Invoking edge function with filePath:', tempPath);
-      const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
-        body: { filePath: tempPath },
+      // Step 2: Call edge function with just the storage path (tiny JSON body), with a time limit so a stuck read ends
+      const invoke = supabase.functions.invoke('parse-rate-confirmation', { body: { filePath: tempPath } });
+      const { data, error: fnError } = await new Promise<Awaited<typeof invoke>>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Reading this PDF took too long.')), PARSE_TIMEOUT_MS);
+        invoke.then(
+          (v) => { clearTimeout(timer); resolve(v); },
+          (e) => { clearTimeout(timer); reject(e); },
+        );
       });
 
       if (fnError) {
-        console.error('[RC Upload] Function invoke error:', fnError);
-        throw new Error(fnError.message || 'Failed to process rate confirmation');
+        // The function's own message (in the response body) is more specific than the generic invoke error.
+        let detail = fnError.message || 'Failed to process rate confirmation';
+        try {
+          const body = await (fnError as any).context?.json?.();
+          if (body?.error) detail = body.error;
+        } catch { /* keep the generic message */ }
+        throw new Error(detail);
       }
 
       if (data?.error) {
         throw new Error(data.error);
       }
 
-      console.log('Extracted load data:', data);
+      if (!looksLikeRateCon(data)) {
+        setFailure({
+          kind: 'not_rate_con',
+          title: 'This does not look like a rate confirmation',
+          detail: 'No Landstar load details were found in it. Use the Landstar rate confirmation or load detail PDF.',
+          retryable: false,
+        });
+        return;
+      }
+
       setExtractedData(data);
-      
-      // Check if this load already exists by Freight Bill #
+
+      // Is this trip already in the system? Ask the database (not just the loaded page of loads), ignoring cancelled and deleted loads.
       if (data.landstar_load_id) {
-        // Query database directly for reliable duplicate detection
         const { data: existingRows } = await supabase
           .from('fleet_loads')
-          .select('id, landstar_load_id, origin, destination, rate, pickup_date')
+          .select('id, landstar_load_id, origin, destination, rate, pickup_date, delivery_date, status, deleted_at')
           .eq('landstar_load_id', data.landstar_load_id)
-          .limit(1);
+          .is('deleted_at', null)
+          .limit(5);
 
-        const existingLoad = existingRows?.[0] || 
-          existingLoads.find(load => load.landstar_load_id === data.landstar_load_id);
-
-        if (existingLoad) {
-          setMatchingLoad(existingLoad);
-          toast.info(`Found existing load with Freight Bill #${data.landstar_load_id}`);
-        } else {
-          setMatchingLoad(null);
-          toast.success('Rate confirmation parsed successfully!');
-        }
-      } else {
-        setMatchingLoad(null);
-        toast.success('Rate confirmation parsed successfully!');
+        const existingLoad = findTripMatch((existingRows ?? []) as any[], data.landstar_load_id) ?? findTripMatch(existingLoads, data.landstar_load_id);
+        setMatchingLoad(existingLoad);
+        if (existingLoad) toast.info(`Trip ${data.landstar_load_id} is already in your loads`);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to process file';
-      setError(message);
-      toast.error(message);
+      fail(err);
     } finally {
       setIsProcessing(false);
     }
@@ -216,7 +259,7 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     // Try to match truck by unit number
     if (data.truck_unit) {
       const unitNumber = data.truck_unit.replace(/\D/g, ''); // Extract just numbers
-      const matchedTruck = trucks.find(t => 
+      const matchedTruck = trucks.find(t =>
         t.unit_number.includes(unitNumber) || unitNumber.includes(t.unit_number)
       );
       if (matchedTruck) {
@@ -230,15 +273,16 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find(f => f.type === 'application/pdf');
-    
+    const pdfFile = files.find(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+
     if (pdfFile) {
       processFile(pdfFile);
     } else {
-      toast.error('Please drop a PDF file');
+      fail('Please upload a PDF file');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,53 +290,41 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     if (file) {
       processFile(file);
     }
+    e.target.value = '';
   };
 
-  const handleUseData = async (updateExisting: boolean = false) => {
-    if (extractedData) {
-      const matchedData = matchDriversAndTrucks(extractedData);
-      if (updateExisting && matchingLoad) {
-        onDataExtracted(matchedData as any, matchingLoad.id);
-        // Save PDF to documents linked to the existing load
-        if (pendingFileRef.current) {
-          saveToDocuments(pendingFileRef.current, matchingLoad.id);
-        }
-      } else {
-        onDataExtracted(matchedData as any);
-        // Save PDF to documents (no load ID yet for new loads)
-        if (pendingFileRef.current) {
-          saveToDocuments(pendingFileRef.current);
-        }
-      }
-      setExtractedData(null);
-      setFileName(null);
-      setMatchingLoad(null);
-      pendingFileRef.current = null;
+  const handleUseData = async (mode: 'new' | 'update' | 'anyway') => {
+    if (!extractedData) return;
+    const matchedData = matchDriversAndTrucks(extractedData);
+    if (mode === 'update' && matchingLoad) {
+      onDataExtracted(matchedData as any, matchingLoad.id);
+      // Save PDF to documents linked to the existing load
+      if (pendingFileRef.current) saveToDocuments(pendingFileRef.current, matchingLoad.id);
+    } else {
+      onDataExtracted(matchedData as any, undefined, { allowDuplicateTrip: mode === 'anyway' });
+      // Save PDF to documents (no load ID yet for new loads)
+      if (pendingFileRef.current) saveToDocuments(pendingFileRef.current);
     }
+    setExtractedData(null);
+    setFileName(null);
+    setMatchingLoad(null);
+    pendingFileRef.current = null;
   };
 
   const handleCancel = () => {
     setExtractedData(null);
     setFileName(null);
     setMatchingLoad(null);
-    setError(null);
+    setFailure(null);
   };
 
-  const formatCurrencyValue = (value: number | null) => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  const retry = () => {
+    const file = pendingFileRef.current;
+    if (file) void processFile(file);
   };
 
-  const formatCurrency = (value: number | null) => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return 'text-success';
-    if (confidence >= 50) return 'text-warning';
-    return 'text-destructive';
-  };
+  const flags = extractedData ? reviewFlags(extractedData) : [];
+  const preview = extractedData ? previewMoney(extractedData, paySettings) : null;
 
   return (
     <div className="space-y-4">
@@ -313,14 +345,14 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
           {isProcessing ? (
             <>
               <Loader2 className="h-8 w-8 text-primary animate-spin mb-2" />
-              <p className="text-sm font-medium">Processing {fileName}...</p>
-              <p className="text-xs text-muted-foreground">Extracting load details with AI</p>
+              <p className="text-sm font-medium">Reading {fileName}...</p>
+              <p className="text-xs text-muted-foreground">This can take up to a minute</p>
             </>
           ) : (
             <>
               <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm font-medium">Drop Rate Confirmation PDF here</p>
-              <p className="text-xs text-muted-foreground">or click to browse</p>
+              <p className="text-sm font-medium">Drop the Landstar rate confirmation PDF here</p>
+              <p className="text-xs text-muted-foreground">or tap to choose the file</p>
             </>
           )}
         </CardContent>
@@ -329,22 +361,27 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf"
+        accept=".pdf,application/pdf"
         className="hidden"
         onChange={handleFileSelect}
       />
 
-      {/* Error Display */}
-      {error && (
-        <Card className="border-destructive bg-destructive/5">
+      {/* Why it failed, and what to do */}
+      {failure && (
+        <Card className="border-destructive bg-destructive/5" role="alert">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-destructive">Failed to parse document</p>
-                <p className="text-xs text-muted-foreground mt-1">{error}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-destructive">{failure.title}</p>
+                <p className="text-sm text-muted-foreground mt-1">{failure.detail}</p>
+                {failure.retryable && pendingFileRef.current && (
+                  <Button variant="outline" size="sm" className="mt-3 h-11 sm:h-9" onClick={retry} disabled={isProcessing}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Try again
+                  </Button>
+                )}
               </div>
-              <Button variant="ghost" size="icon" className="ml-auto shrink-0" onClick={handleCancel}>
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancel} aria-label="Dismiss">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -352,132 +389,80 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
         </Card>
       )}
 
-      {/* Extracted Data Preview */}
-      {extractedData && (
-        <Card className={cn(
-          "border-2",
-          matchingLoad ? "border-warning bg-warning/5" : "border-success bg-success/5"
-        )}>
-          <CardContent className="py-4">
-            {/* Matching Load Alert */}
+      {/* Review: what was read, what to check, what it is worth */}
+      {extractedData && preview && (
+        <Card className={cn("border-2", matchingLoad ? "border-warning bg-warning/5" : "border-success bg-success/5")}>
+          <CardContent className="py-4 space-y-4">
+            {/* This trip is already a load */}
             {matchingLoad && (
-              <Alert className="mb-4 border-warning bg-warning/10">
+              <Alert className="border-warning bg-warning/10">
                 <RefreshCw className="h-4 w-4" />
                 <AlertDescription className="ml-2">
-                  <span className="font-semibold">Existing load found!</span> Freight Bill #{matchingLoad.landstar_load_id} already exists.
-                  You can update it with this data or create a new load.
+                  <span className="font-semibold">Trip {matchingLoad.landstar_load_id} is already in your loads.</span>{' '}
+                  Update that load with this rate confirmation, or create a second load only if you are sure.
+                  <span className="mt-2 block rounded-md border bg-card p-2 text-xs">
+                    <span className="font-medium">{matchingLoad.origin}</span> to <span className="font-medium">{matchingLoad.destination}</span>
+                    {' · '}pickup {matchingLoad.pickup_date || '-'}
+                    {matchingLoad.delivery_date ? `, delivery ${matchingLoad.delivery_date}` : ''}
+                    {' · '}linehaul {money(matchingLoad.rate)}
+                    {matchingLoad.status ? ` · ${matchingLoad.status.replace(/_/g, ' ')}` : ''}
+                  </span>
                 </AlertDescription>
               </Alert>
             )}
 
-            <div className="flex items-start gap-3 mb-4">
+            <div className="flex items-start gap-3">
               <CheckCircle className={cn("h-5 w-5 shrink-0 mt-0.5", matchingLoad ? "text-warning" : "text-success")} />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
                   <p className={cn("text-sm font-medium", matchingLoad ? "text-warning" : "text-success")}>
-                    Data extracted from {fileName}
+                    Read from {fileName}
                   </p>
-                  <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancel}>
+                  <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancel} aria-label="Discard">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Review the extracted data below</p>
+                <p className="text-xs text-muted-foreground mt-1">Check the details below. You can change anything on the next screen before it is saved.</p>
               </div>
             </div>
 
-            {/* Show comparison if matching load found */}
-            {matchingLoad && (
-              <div className="mb-4 p-3 rounded-md bg-muted/50 border">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Current Load Data:</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Origin:</span>
-                    <p className="font-medium truncate">{matchingLoad.origin}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Destination:</span>
-                    <p className="font-medium truncate">{matchingLoad.destination}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Rate:</span>
-                    <p className="font-medium">{formatCurrencyValue(matchingLoad.rate)}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Pickup:</span>
-                    <p className="font-medium">{matchingLoad.pickup_date || '-'}</p>
-                  </div>
-                </div>
+            {/* Fields to check */}
+            {flags.length > 0 && (
+              <div className="rounded-md border border-warning/50 bg-warning/10 p-3">
+                <p className="mb-1 flex items-center gap-2 text-sm font-medium">
+                  <AlertTriangle className="h-4 w-4 text-warning" /> Check these before saving
+                </p>
+                <ul className="space-y-0.5 text-sm">
+                  {flags.map((f) => <li key={f.key}>{flagText(f)}</li>)}
+                </ul>
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Landstar Load ID</p>
-                <p className="font-mono font-medium">{extractedData.landstar_load_id || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Agency Code</p>
-                <p className="font-mono font-medium">{extractedData.agency_code || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Origin</p>
-                <p className="font-medium">{extractedData.origin || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Destination</p>
-                <p className="font-medium">{extractedData.destination || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pickup Date</p>
-                <p className="font-medium">{extractedData.pickup_date || '-'}</p>
-                {extractedData.pickup_time && (
-                  <p className="text-xs text-muted-foreground">{extractedData.pickup_time}</p>
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Delivery Date</p>
-                <p className="font-medium">{extractedData.delivery_date || '-'}</p>
-                {extractedData.delivery_time && (
-                  <p className="text-xs text-muted-foreground">{extractedData.delivery_time}</p>
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Miles</p>
-                <p className="font-medium">{extractedData.booked_miles?.toLocaleString() || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Rate + FSC</p>
-                <p className="font-medium text-success">
-                  {formatCurrencyValue((extractedData.rate || 0) + (extractedData.fuel_surcharge || 0))}
-                </p>
-              </div>
-              {extractedData.driver_name && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Driver</p>
-                  <p className="font-medium">{extractedData.driver_name}</p>
-                </div>
-              )}
-              {extractedData.truck_unit && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Truck</p>
-                  <p className="font-mono font-medium">{extractedData.truck_unit}</p>
-                </div>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <Field label="Landstar load ID" flag={flags.find((f) => f.key === 'landstar_load_id')} mono>{extractedData.landstar_load_id}</Field>
+              <Field label="Agent code" flag={flags.find((f) => f.key === 'agency_code')} mono>{extractedData.agency_code}</Field>
+              <Field label="Pickup" flag={flags.find((f) => f.key === 'origin')}>{extractedData.origin}</Field>
+              <Field label="Delivery" flag={flags.find((f) => f.key === 'destination')}>{extractedData.destination}</Field>
+              <Field label="Pickup date" flag={flags.find((f) => f.key === 'pickup_date')} sub={extractedData.pickup_time}>{extractedData.pickup_date}</Field>
+              <Field label="Delivery date" flag={flags.find((f) => f.key === 'delivery_date')} sub={extractedData.delivery_time}>{extractedData.delivery_date}</Field>
+              <Field label="Pickup number" flag={flags.find((f) => f.key === 'pickup_number')} mono>{extractedData.pickup_number}</Field>
+              <Field label="Miles" flag={flags.find((f) => f.key === 'booked_miles')}>{extractedData.booked_miles?.toLocaleString()}</Field>
+              {extractedData.driver_name && <Field label="Driver on the PDF">{extractedData.driver_name}</Field>}
+              {extractedData.truck_unit && <Field label="Truck on the PDF" mono>{extractedData.truck_unit}</Field>}
+              {extractedData.trailer_number && <Field label="Trailer on the PDF" mono>{extractedData.trailer_number}</Field>}
               {extractedData.accessorials && extractedData.accessorials.length > 0 && (
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <p className="text-xs text-muted-foreground">Accessorials</p>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {extractedData.accessorials.map((acc, i) => (
-                      <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-primary/10 text-primary">
-                        {acc.type}: {formatCurrencyValue(acc.amount)}
-                      </span>
+                      <Badge key={i} variant="outline" className="text-xs">{acc.type}: {money(acc.amount)}</Badge>
                     ))}
                   </div>
                 </div>
               )}
               {extractedData.intermediate_stops && extractedData.intermediate_stops.length > 0 && (
-                <div className="col-span-full">
-                  <p className="text-xs text-muted-foreground">Intermediate Stops ({extractedData.intermediate_stops.length})</p>
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-muted-foreground">Stops between ({extractedData.intermediate_stops.length})</p>
                   <div className="flex flex-col gap-1 mt-1 text-xs">
                     {extractedData.intermediate_stops.map((stop, i) => (
                       <span key={i} className="text-muted-foreground">
@@ -489,29 +474,71 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
               )}
             </div>
 
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-              <Button variant="outline" onClick={handleCancel}>Cancel</Button>
+            {/* What the load is worth to the truck */}
+            <section aria-label="Settlement preview" className={cn("rounded-md border bg-card p-3", flags.some((f) => f.key === 'rate') && "border-warning")}>
+              <p className="text-sm font-medium">What this load pays the truck</p>
+              <dl className="mt-2 space-y-1 text-sm tabular-nums">
+                <Row label="Linehaul" value={money(preview.linehaul)} />
+                <Row label={`Your share of linehaul (${preview.truckPctDisplay}%)`} value={money(preview.linehaulShare)} />
+                <Row label="Fuel surcharge (100% to you)" value={money(preview.fuelSurcharge)} />
+                {preview.accessorials > 0 && <Row label="Accessorials" value={money(preview.accessorials)} />}
+                {preview.trailerShare > 0 && <Row label="Trailer share" value={money(preview.trailerShare)} />}
+              </dl>
+              <div className="mt-2 flex items-baseline justify-between border-t pt-2">
+                <span className="text-sm font-medium">Estimated net to the truck</span>
+                <span className="figure text-3xl font-bold tabular-nums">{money(preview.net)}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Billed in all {money(preview.gross)}; Landstar keeps {money(preview.landstarCut)} of linehaul. Advances and deductions come off at settlement.
+              </p>
+            </section>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-3 border-t">
+              <Button variant="outline" className="h-12 sm:h-10" onClick={handleCancel}>Cancel</Button>
               {matchingLoad ? (
                 <>
-                  <Button variant="outline" onClick={() => handleUseData(false)}>
+                  <Button variant="outline" className="h-12 sm:h-10" onClick={() => handleUseData('anyway')}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Create New Load
+                    Create anyway
                   </Button>
-                  <Button onClick={() => handleUseData(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button onClick={() => handleUseData('update')} className="h-12 sm:h-10 bg-primary text-primary-foreground hover:bg-primary/90">
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Update Existing Load
+                    Update existing load
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => handleUseData(false)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <Button onClick={() => handleUseData('new')} className="h-12 sm:h-10 bg-primary text-primary-foreground hover:bg-primary/90">
                   <FileText className="h-4 w-4 mr-2" />
-                  Use This Data
+                  Review and save
                 </Button>
               )}
             </div>
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function Field({ label, flag, mono, sub, children }: { label: string; flag?: { level: 'ok' | 'low' | 'missing' }; mono?: boolean; sub?: string | null; children?: React.ReactNode }) {
+  const empty = children === null || children === undefined || children === '';
+  return (
+    <div className={cn('min-w-0', flag && 'rounded-md border border-warning/60 bg-warning/10 px-2 py-1')}>
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {label}
+        {flag && <Badge variant="outline" className="border-warning px-1.5 py-0 text-[11px] text-warning">{flag.level === 'missing' ? 'Not found' : 'Check'}</Badge>}
+      </p>
+      <p className={cn('font-medium break-words', mono && 'font-mono', empty && 'text-muted-foreground')}>{empty ? 'Not found' : children}</p>
+      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }

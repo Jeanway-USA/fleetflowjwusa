@@ -46,6 +46,8 @@ import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
 import { AgencyCRMStatusBadge } from '@/components/loads/AgencyCRMStatusBadge';
 import { findPickupNumber } from '@/lib/loads/pickupNumber';
+import { findTripMatch, flagText, flaggedInputIds, reviewFlags, type ReviewFlag } from '@/lib/rate-con-review';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { FeetInchesInput } from '@/components/shared/FeetInchesInput';
 import {
   calcOverDimensionCharge,
@@ -73,6 +75,19 @@ interface Accessorial {
 import { format, parseISO } from 'date-fns';
 import { applyStopOffRule, defaultAccessorialPercentage, isStopOff } from '@/lib/accessorials';
 
+const CHECK_FIELD_CLASS: Record<string, string> = {
+  landstar_load_id: '[&_#landstar_load_id]:border-warning [&_#landstar_load_id]:ring-1 [&_#landstar_load_id]:ring-warning',
+  agency_code: '[&_#agency_code]:border-warning [&_#agency_code]:ring-1 [&_#agency_code]:ring-warning',
+  origin: '[&_#origin]:border-warning [&_#origin]:ring-1 [&_#origin]:ring-warning',
+  destination: '[&_#destination]:border-warning [&_#destination]:ring-1 [&_#destination]:ring-warning',
+  pickup_date: '[&_#pickup_date]:border-warning [&_#pickup_date]:ring-1 [&_#pickup_date]:ring-warning',
+  delivery_date: '[&_#delivery_date]:border-warning [&_#delivery_date]:ring-1 [&_#delivery_date]:ring-warning',
+  rate: '[&_#rate]:border-warning [&_#rate]:ring-1 [&_#rate]:ring-warning',
+  fuel_surcharge: '[&_#fuel_surcharge]:border-warning [&_#fuel_surcharge]:ring-1 [&_#fuel_surcharge]:ring-warning',
+  booked_miles: '[&_#booked_miles]:border-warning [&_#booked_miles]:ring-1 [&_#booked_miles]:ring-warning',
+  pickup_number: '[&_#pickup_number]:border-warning [&_#pickup_number]:ring-1 [&_#pickup_number]:ring-warning',
+};
+
 export default function FleetLoads() {
   // Opening /fleet-loads?highlight=<id> (e.g. from the Today logbook) flashes that load.
   useHighlightRow();
@@ -91,6 +106,11 @@ export default function FleetLoads() {
   const debouncedSetSearch = useDebouncedCallback((v: string) => setSearchTerm(v.trim().toLowerCase()), 300);
   const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
   const [pendingIntermediateStops, setPendingIntermediateStops] = useState<any[]>([]);
+  // From a rate confirmation: fields the reader was unsure of (shown and highlighted in the form), and whether the office
+  // chose to create a second load on a trip number that already exists.
+  const [rateConFlags, setRateConFlags] = useState<ReviewFlag[]>([]);
+  const [allowDuplicateTrip, setAllowDuplicateTrip] = useState(false);
+  const [duplicateTrip, setDuplicateTrip] = useState<any | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
@@ -309,11 +329,15 @@ export default function FleetLoads() {
         await replaceIntermediateStops(data.id, data.org_id, intermediateStops);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
       queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
       queryClient.invalidateQueries({ queryKey: ['load_intermediate_stops'] });
-      toast.success('Load created successfully');
+      const trip = vars.load?.landstar_load_id as string | undefined;
+      toast.success(trip ? `Load ${trip} created` : 'Load created', {
+        description: `${vars.load?.origin ?? ''} to ${vars.load?.destination ?? ''}${vars.load?.net_revenue != null ? ` · net ${formatCurrency(vars.load.net_revenue)}` : ''}`,
+        action: trip ? { label: 'Show in list', onClick: () => { setSearchInput(trip); debouncedSetSearch(trip); } } : undefined,
+      });
       closeDialog();
     },
     onError: (error: any) => toast.error(error.message),
@@ -351,11 +375,15 @@ export default function FleetLoads() {
         await replaceIntermediateStops(id, loadData.org_id, intermediateStops);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
       queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
       queryClient.invalidateQueries({ queryKey: ['load_intermediate_stops'] });
-      toast.success('Load updated successfully');
+      const trip = vars.updates?.landstar_load_id as string | undefined;
+      toast.success(trip ? `Load ${trip} updated` : 'Load updated', {
+        description: `${vars.updates?.origin ?? ''} to ${vars.updates?.destination ?? ''}${vars.updates?.net_revenue != null ? ` · net ${formatCurrency(vars.updates.net_revenue)}` : ''}`,
+        action: trip ? { label: 'Show in list', onClick: () => { setSearchInput(trip); debouncedSetSearch(trip); } } : undefined,
+      });
       closeDialog();
     },
     onError: (error: any) => toast.error(error.message),
@@ -538,6 +566,9 @@ export default function FleetLoads() {
     setFormData({});
     setAccessorials([]);
     setPendingIntermediateStops([]);
+    setRateConFlags([]);
+    setAllowDuplicateTrip(false);
+    setDuplicateTrip(null);
   };
 
   // Stop-off pay is paid at the truck share, 65%, like linehaul. Nobody knows yet whether it follows the 70% power-only share,
@@ -641,6 +672,15 @@ export default function FleetLoads() {
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message || 'Invalid In-Bond fields');
       return;
+    }
+
+    // One live load per Landstar trip number. A second one needs an explicit choice, never an accident.
+    if (!editingLoad && !allowDuplicateTrip) {
+      const match = findTripMatch(loads as any[], formData.landstar_load_id);
+      if (match) {
+        setDuplicateTrip(match);
+        return;
+      }
     }
 
     // New stop-off rows are never left at 100%: they take this load's linehaul share before revenue is worked out.
@@ -819,7 +859,9 @@ export default function FleetLoads() {
   };
 
   // Handle extracted data from rate confirmation
-  const handleRateConfirmationData = (data: any, existingLoadId?: string) => {
+  const handleRateConfirmationData = (data: any, existingLoadId?: string, options?: { allowDuplicateTrip?: boolean }) => {
+    setRateConFlags(reviewFlags(data));
+    setAllowDuplicateTrip(!!options?.allowDuplicateTrip);
     // Map accessorials from the extracted data
     const extractedAccessorials: Accessorial[] = (data.accessorials || []).map((acc: any) => ({
       accessorial_type: acc.type === 'Stop Of' ? 'Stop-off' : acc.type,
@@ -993,9 +1035,12 @@ export default function FleetLoads() {
 
   return (
     <>
-      <PageHeader title="Loads" description={timeframeLabel} action={{ label: 'Add load', onClick: () => openDialog() }}>
-        <Button variant="outline" className="h-11 sm:h-10" onClick={() => setShowRateConUpload((v) => !v)} aria-expanded={showRateConUpload}>
-          <FileText className="mr-2 h-4 w-4" /> Rate confirmation
+      <PageHeader title="Loads" description={timeframeLabel}>
+        <Button className="h-11 sm:h-10 w-full sm:w-auto" onClick={() => setShowRateConUpload((v) => !v)} aria-expanded={showRateConUpload}>
+          <FileText className="mr-2 h-4 w-4" /> Add from rate confirmation
+        </Button>
+        <Button variant="outline" className="h-11 sm:h-10" onClick={() => openDialog()}>
+          <Plus className="mr-2 h-4 w-4" /> Add by hand
         </Button>
         <Button variant="outline" className="hidden sm:inline-flex" onClick={() => bulkInputRef.current?.click()} disabled={bulkImporting}>
           <Upload className="mr-2 h-4 w-4" /> {bulkImporting ? 'Uploading…' : 'Bulk upload'}
@@ -1015,7 +1060,7 @@ export default function FleetLoads() {
       )}
 
       {noLoadsAtAll ? (
-        <EmptyState icon={Truck} title="No loads yet" description="Create your first load to start tracking revenue and miles." action={{ label: 'Add First Load', onClick: () => openDialog() }} />
+        <EmptyState icon={Truck} title="No loads yet" description="Create your first load to start tracking revenue and miles." action={{ label: 'Add from rate confirmation', onClick: () => setShowRateConUpload(true) }} />
       ) : (
         <>
           <Panel title="Delivered loads" description={selectedMonth === 'all' ? 'Every delivered load shown below, counted the way Landstar counts it.' : 'Delivered loads in this month.'} className="mb-5">
@@ -1118,13 +1163,46 @@ export default function FleetLoads() {
         ]}
       />
 
+      {/* A load with this Landstar trip number already exists */}
+      <AlertDialog open={!!duplicateTrip} onOpenChange={(open) => { if (!open) setDuplicateTrip(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Trip {duplicateTrip?.landstar_load_id} is already a load</AlertDialogTitle>
+            <AlertDialogDescription>
+              {duplicateTrip?.origin} to {duplicateTrip?.destination}, pickup {duplicateTrip?.pickup_date || '-'}{duplicateTrip?.delivery_date ? `, delivery ${duplicateTrip.delivery_date}` : ''}.
+              Saving would create a second load with the same trip number, and the weekly Landstar proof counts each trip once. Cancel and edit the existing load instead, unless this really is a separate load.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setAllowDuplicateTrip(true);
+                setDuplicateTrip(null);
+                setTimeout(() => (document.getElementById('load-form') as HTMLFormElement | null)?.requestSubmit(), 0);
+              }}
+            >
+              Create anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Add/Edit Load Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[92vh] w-[calc(100%-1rem)] max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editingLoad ? `Edit load ${editingLoad.landstar_load_id || ''}`.trim() : 'Add a load'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
+          <form id="load-form" onSubmit={handleSubmit} className={cn(flaggedInputIds(rateConFlags).map((id) => CHECK_FIELD_CLASS[id]).filter(Boolean))}>
+            {rateConFlags.length > 0 && (
+              <div className="mb-3 rounded-md border border-warning/50 bg-warning/10 p-3 text-sm" role="status">
+                <p className="font-medium">Check these from the rate confirmation</p>
+                <ul className="mt-1 space-y-0.5">
+                  {rateConFlags.map((fl) => <li key={fl.key}>{flagText(fl)}</li>)}
+                </ul>
+              </div>
+            )}
             {(() => {
               const editing = !!editingLoad?.id;
               const revenuePreview = calculateRevenueLocal(formData);
