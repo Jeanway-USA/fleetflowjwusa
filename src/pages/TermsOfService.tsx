@@ -12,7 +12,7 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-background text-foreground">
       <Helmet>
         <title>Terms of Service — FleetFlow TMS</title>
-        <meta name="description" content="Read the terms of service that govern your use of the FleetFlow TMS platform and services for owner-operators and fleets." />
+        <meta name="description" content="Read the terms of service that govern your use of the FleetFlow TMS platform and services for JeanWay USA's Landstar BCO operation." />
         <link rel="canonical" href="https://tms.jeanwayusa.com/terms" />
         <meta property="og:title" content="Terms of Service — FleetFlow TMS" />
         <meta property="og:description" content="The terms that govern your use of FleetFlow TMS." />
@@ -39,7 +39,7 @@ export default function TermsOfService() {
         <p>To use FleetFlow, you must create an account with accurate and complete information. You are responsible for maintaining the confidentiality of your credentials and for all activities under your account. You must be at least 18 years old to create an account.</p>
 
         <h2>2. Description of Service</h2>
-        <p>FleetFlow is a transportation management system (TMS) designed for owner-operators, BCOs, and small fleet operators. The Platform provides tools for load management, financial tracking, IFTA compliance, maintenance scheduling, driver management, CRM, and related fleet operations features.</p>
+        <p>FleetFlow is a transportation management system (TMS) built for JeanWay USA's operation as a Landstar BCO. The Platform provides tools for load management, financial tracking, IFTA compliance, maintenance scheduling, driver management, CRM, and related fleet operations features.</p>
 
         <h2>3. Acceptable Use</h2>
         <p>You agree to use the Platform only for lawful purposes related to your trucking and fleet operations. You shall not:</p>

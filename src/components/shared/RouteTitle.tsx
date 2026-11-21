@@ -61,7 +61,7 @@ export function RouteTitle() {
   if (!label && driverViewMatch) label = 'Driver View';
   if (!label && settlementPrintMatch) label = 'Settlement';
 
-  const title = label ? `${label} — ${BRAND}` : `${BRAND} — Fleet Management for Owner-Operators`;
+  const title = label ? `${label} — ${BRAND}` : `${BRAND} — Fleet Management for Landstar BCOs`;
 
   return (
     <Helmet>

@@ -13,7 +13,6 @@ import { ReconciliationPreview } from './ReconciliationPreview';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { usePaySettings } from '@/hooks/usePaySettings';
 
 interface FleetLoad {
@@ -65,7 +64,6 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId }: StatementUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { isLandstar } = useOrganizationMode();
   const { landstarSplit } = usePaySettings();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
@@ -274,7 +272,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <FileText className="h-5 w-5" />
-          {isLandstar ? 'Import from Landstar Statements' : 'Import from Statements'}
+          Import from Landstar Statements
         </CardTitle>
         <CardDescription>
           Upload multiple documents at once — we'll cross-reference and deduplicate before importing

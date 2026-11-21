@@ -36,10 +36,7 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false);
 
   // Step 1
-  const [tmsMode, setTmsMode] = useState<'landstar' | 'independent'>('landstar');
   const [companyName, setCompanyName] = useState('');
-  const [dotNumber, setDotNumber] = useState('');
-  const [mcNumber, setMcNumber] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -86,32 +83,20 @@ export default function Onboarding() {
       toast.error('Company name must be under 100 characters');
       return;
     }
-    if (tmsMode === 'independent') {
-      if (!dotNumber.trim()) {
-        toast.error('DOT Number is required for independent operators');
-        return;
-      }
-      if (!mcNumber.trim()) {
-        toast.error('MC Number is required for independent operators');
-        return;
-      }
-    }
-
     setLoading(true);
     try {
       // Create org via RPC (bypasses RLS)
       const { data: newOrgId, error } = await supabase.rpc('create_onboarding_org', {
         _name: companyName.trim(),
-        _tms_mode: tmsMode,
+        // JeanWay is a Landstar BCO: every organization is created that way.
+        _tms_mode: 'landstar',
       });
       if (error) throw error;
 
       setOrgId(newOrgId);
 
-      // Update org with DOT/MC numbers
+      // Landstar holds the operating authority, so there are no DOT or MC numbers to ask for.
       const updates: Record<string, string | null> = {};
-      if (dotNumber.trim()) updates.dot_number = dotNumber.trim();
-      if (mcNumber.trim()) updates.mc_number = mcNumber.trim();
 
       // Upload logo if provided
       if (logoFile) {
@@ -300,81 +285,21 @@ export default function Onboarding() {
                 <div className="text-center mb-2">
                   <Building2 className="h-10 w-10 text-primary mx-auto mb-3" />
                   <h2 className="text-2xl font-bold">Organization Profile</h2>
-                  <p className="text-muted-foreground mt-1">Tell us about your trucking business</p>
+                  <p className="text-muted-foreground mt-1">Tell us about your Landstar BCO business</p>
                 </div>
 
                 <div className="space-y-4">
-                  {/* TMS Mode Selection */}
-                  <div className="space-y-2">
-                    <Label>Business Type *</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setTmsMode('landstar')}
-                        className={`p-4 rounded-lg border-2 text-left transition-all ${
- tmsMode === 'landstar'
-                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                            : 'border-border hover:border-primary/40'
-                        }`}
-                      >
-                        <div className="font-semibold text-sm">Landstar BCO</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          I operate under Landstar's authority
-                        </p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTmsMode('independent')}
-                        className={`p-4 rounded-lg border-2 text-left transition-all ${
- tmsMode === 'independent'
-                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                            : 'border-border hover:border-primary/40'
-                        }`}
-                      >
-                        <div className="font-semibold text-sm">Independent Owner-Operator</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          I have my own DOT/MC Authority
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="company-name">Company Name *</Label>
                     <Input
                       id="company-name"
-                      placeholder="Your Trucking Co."
+                      placeholder="JeanWay USA"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
                       className="bg-background"
                       autoFocus
                     />
                   </div>
-
-                  {tmsMode === 'independent' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="dot-number">DOT Number *</Label>
-                        <Input
-                          id="dot-number"
-                          placeholder="1234567"
-                          value={dotNumber}
-                          onChange={(e) => setDotNumber(e.target.value)}
-                          className="bg-background"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="mc-number">MC Number *</Label>
-                        <Input
-                          id="mc-number"
-                          placeholder="MC-123456"
-                          value={mcNumber}
-                          onChange={(e) => setMcNumber(e.target.value)}
-                          className="bg-background"
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {/* Logo Upload */}
                   <div className="space-y-2">

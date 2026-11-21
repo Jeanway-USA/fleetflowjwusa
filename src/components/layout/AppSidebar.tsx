@@ -31,7 +31,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAreaAccess } from '@/hooks/useAreaAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
-import { useOrganizationMode, type TmsMode } from '@/hooks/useOrganizationMode';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -63,7 +62,6 @@ interface NavItem {
   roles: AppRole[];
   feature?: string;
   tourId?: string;
-  tmsMode?: TmsMode;
 }
 
 const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
@@ -196,7 +194,6 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl, orgName } = useAuth();
-  const { tmsMode: currentTmsMode } = useOrganizationMode();
   const { theme } = useTheme();
   const { isMobile, setOpenMobile } = useSidebar();
   const actuallyIsOwner = roles.includes('owner');
@@ -223,9 +220,8 @@ export function AppSidebar() {
     // in which case hasRole('owner') is false and normal filtering applies).
     const roleMatch = hasRole('owner') || item.roles.some(role => hasRole(role));
     const tierMatch = !item.feature || tierFeatures.has(item.feature);
-    const modeMatch = !item.tmsMode || item.tmsMode === currentTmsMode;
-    return roleMatch && tierMatch && modeMatch && allowsFeature(item.feature);
-  }), [hasRole, tierFeatures, currentTmsMode, allowsFeature]);
+    return roleMatch && tierMatch && allowsFeature(item.feature);
+  }), [hasRole, tierFeatures, allowsFeature]);
 
   // --- Dashboard items (non-collapsible) ---
   const dashboardNavItems: NavItem[] = actuallyIsOwner ? [
@@ -262,7 +258,7 @@ export function AppSidebar() {
     { title: 'Money', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss', tourId: 'nav-finance' },
     { title: 'Payroll', icon: Banknote, path: '/payroll', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
     { title: 'Tax Hub', icon: Receipt, path: '/admin/tax-hub', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
-    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta', tmsMode: 'independent' as TmsMode },
+    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta' },
   ];
 
   const complianceItems: NavItem[] = [
@@ -274,7 +270,7 @@ export function AppSidebar() {
   ];
 
   const crmItems: NavItem[] = [
-    { title: currentTmsMode === 'independent' ? 'Broker CRM' : 'Agent CRM', icon: currentTmsMode === 'independent' ? Building2 : Contact, path: '/crm', roles: ['owner', 'dispatcher'], feature: 'crm' },
+    { title: 'Agent CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher'], feature: 'crm' },
   ];
 
   const reportsItems: NavItem[] = [

@@ -21,7 +21,6 @@ interface LoadProfitabilityTabProps {
   totalPayroll: number;
   revenueTotals: any;
   allLoads: any[];
-  isIndependent?: boolean;
 }
 
 const chartConfig = {
@@ -35,7 +34,6 @@ export function LoadProfitabilityTab({
   loadExpenses,
   drivers,
   expenses,
-  isIndependent = false,
 }: LoadProfitabilityTabProps) {
   const paySettings = usePaySettings();
 
@@ -83,7 +81,7 @@ export function LoadProfitabilityTab({
 
       // Driver pay via single source of truth (skip for independent — owner IS the driver)
       let driverPay = 0;
-      if (!isIndependent && load.driver_id) {
+      if (load.driver_id) {
         const driver = driverMap.get(load.driver_id);
         if (driver) {
           driverPay = calculateLoadPay(load, { pay_type: driver.pay_type, pay_rate: driver.pay_rate }, paySettings).total;
@@ -112,7 +110,7 @@ export function LoadProfitabilityTab({
         rpm: miles > 0 ? gross / miles : 0,
       };
     }).sort((a, b) => (b.pickupDate || '').localeCompare(a.pickupDate || ''));
-  }, [deliveredLoads, loadExpenseMap, driverMap, isIndependent, paySettings]);
+  }, [deliveredLoads, loadExpenseMap, driverMap, paySettings]);
 
   // Monthly trends
   const trendData = useMemo(() => {
@@ -171,7 +169,7 @@ export function LoadProfitabilityTab({
         <CardHeader>
           <CardTitle>Per-Load Profitability</CardTitle>
           <CardDescription>
-            Left after load costs = Your revenue − ({!isIndependent ? 'Driver Pay + ' : ''}expenses tied to the load)
+            Left after load costs = Your revenue − (Driver Pay + expenses tied to the load)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -179,11 +177,11 @@ export function LoadProfitabilityTab({
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead>{isIndependent ? 'Load ID' : 'Landstar Load ID'}</TableHead>
+                  <TableHead>Landstar Load ID</TableHead>
                    <TableHead>Date</TableHead>
                    <TableHead className="text-right">Miles</TableHead>
                   <TableHead className="text-right">Your revenue</TableHead>
-                  {!isIndependent && <TableHead className="text-right">Driver Pay</TableHead>}
+                  <TableHead className="text-right">Driver Pay</TableHead>
                   <TableHead className="text-right">Fuel</TableHead>
                   <TableHead className="text-right">Tolls</TableHead>
                   <TableHead className="text-right">Other</TableHead>
@@ -193,7 +191,7 @@ export function LoadProfitabilityTab({
               <TableBody>
                 {loadProfitability.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isIndependent ? 8 : 9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No delivered loads in this period
                     </TableCell>
                   </TableRow>
@@ -208,9 +206,7 @@ export function LoadProfitabilityTab({
                        </TableCell>
                        <TableCell className="text-right font-mono text-sm">{lp.miles.toLocaleString()}</TableCell>
                       <TableCell className="text-right text-sm">{formatCurrency(lp.revenue)}</TableCell>
-                      {!isIndependent && (
-                        <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.driverPay)}</TableCell>
-                      )}
+                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.driverPay)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.fuelCost)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.tolls)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.otherExpenses)}</TableCell>
