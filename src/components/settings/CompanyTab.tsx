@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { Building2, Banknote } from 'lucide-react';
+import { ORG_DISPLAY_KEY, useOrgDisplaySettings } from '@/hooks/useOrgDisplaySettings';
+import { DATE_FORMATS, formatOrgDate, timezoneOptions, toDateFormat, toTimezone } from '@/lib/display-settings';
+import { todayLocal } from '@/lib/datetime';
 
 export function CompanyTab() {
   const { orgId, orgName, refreshOrgData } = useAuth();
@@ -107,6 +110,36 @@ export function CompanyTab() {
     }
   };
 
+  // Time zone and date format
+  const display = useOrgDisplaySettings();
+  const [timezone, setTimezone] = useState<string>(display.timezone);
+  const [dateFormat, setDateFormat] = useState<string>(display.dateFormat);
+  const [isSavingRegional, setIsSavingRegional] = useState(false);
+  useEffect(() => { setTimezone(display.timezone); }, [display.timezone]);
+  useEffect(() => { setDateFormat(display.dateFormat); }, [display.dateFormat]);
+  const regionalChanged = timezone !== display.timezone || (display.dateFormatAvailable && dateFormat !== display.dateFormat);
+
+  const handleSaveRegional = async () => {
+    if (!orgId) return;
+    setIsSavingRegional(true);
+    try {
+      // The date format is only written when the database has the column, so the time zone can still be saved before the update.
+      const update: { company_timezone: string; date_format?: string } = { company_timezone: toTimezone(timezone) };
+      if (display.dateFormatAvailable) update.date_format = toDateFormat(dateFormat);
+      const { error } = await supabase.from('organizations').update(update).eq('id', orgId);
+      if (error) throw error;
+      await refreshOrgData();
+      // Dates and times all over the app read these, so refresh everything that is on screen.
+      await queryClient.invalidateQueries({ queryKey: [ORG_DISPLAY_KEY] });
+      await queryClient.invalidateQueries();
+      toast.success('Time zone and date format saved');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save time zone and date format');
+    } finally {
+      setIsSavingRegional(false);
+    }
+  };
+
   const handleSaveAuthority = async () => {
     if (!orgId) return;
     setIsSavingAuthority(true);
@@ -188,33 +221,48 @@ export function CompanyTab() {
             </>
           )}
 
-          <div className="space-y-2">
-            <Label>Timezone</Label>
-            <Select defaultValue="america-chicago">
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="america-new_york">Eastern Time (ET)</SelectItem>
-                <SelectItem value="america-chicago">Central Time (CT)</SelectItem>
-                <SelectItem value="america-denver">Mountain Time (MT)</SelectItem>
-                <SelectItem value="america-los_angeles">Pacific Time (PT)</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="company-timezone">Timezone</Label>
+              <Select value={timezone} onValueChange={setTimezone} disabled={isSavingRegional}>
+                <SelectTrigger id="company-timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {timezoneOptions(display.timezone).map((z) => (
+                    <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Default zone for company-level dates and when a stop has no timezone.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company-date-format">Date Format</Label>
+              <Select value={dateFormat} onValueChange={setDateFormat} disabled={isSavingRegional || !display.dateFormatAvailable}>
+                <SelectTrigger id="company-date-format">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DATE_FORMATS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                How dates appear in lists, settlements, and reports. Today would read {formatOrgDate(todayLocal(), toDateFormat(dateFormat))}.
+              </p>
+              {!display.dateFormatAvailable && (
+                <p className="text-xs text-warning">The date format is not switched on yet. The database update for it has not been applied.</p>
+              )}
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Date Format</Label>
-            <Select defaultValue="mm-dd-yyyy">
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem>
-                <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem>
-                <SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Button
+            onClick={handleSaveRegional}
+            disabled={isSavingRegional || !regionalChanged}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {isSavingRegional ? 'Saving...' : 'Save Time Zone & Date Format'}
+          </Button>
         </CardContent>
       </Card>
 

@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ShieldCheck } from 'lucide-react';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
+import { getOrgDateFormat } from '@/lib/display-settings';
 
 interface CredentialsComplianceProps {
   driver: {
@@ -40,7 +41,7 @@ function ExpiryBadge({ date }: { date: string | null | undefined }) {
 
 function formatDate(date: string | null | undefined) {
   const parsed = parseDateSafe(date);
-  return parsed ? format(parsed, 'MM/dd/yyyy') : '—';
+  return parsed ? format(parsed, getOrgDateFormat()) : '—';
 }
 
 function Row({
