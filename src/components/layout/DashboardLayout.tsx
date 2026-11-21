@@ -99,7 +99,7 @@ function DashboardLayoutInner({ children, signOut }: {
   // The guided tour starts on its own only right after a new driver finishes
   // onboarding. Everyone else can replay it from the user menu.
   useEffect(() => {
-    if (autoStartedRef.current || !tourDef || tour.isActive) return;
+    if (autoStartedRef.current || !tourDef?.replayable || tour.isActive) return;
 
     const stateSaysStart = (location.state as any)?.startTour === true;
     let pendingFlag = false;
@@ -131,7 +131,7 @@ function DashboardLayoutInner({ children, signOut }: {
     <div className="min-h-screen flex w-full bg-background">
       <AppSidebar />
       <main className="flex-1 flex flex-col min-h-screen min-w-0">
-        <TopBar onReplayTour={() => tour.startTour()} hasTour={!!tourDef} />
+        <TopBar onReplayTour={() => tour.startTour()} hasTour={!!tourDef?.replayable} />
 
         <div className="flex-1 px-3 pt-4 pb-tabbar sm:px-4 md:pb-6 lg:px-6 lg:pt-6">
           <ErrorBoundary>

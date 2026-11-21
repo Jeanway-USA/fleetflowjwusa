@@ -26,6 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { isInternalProduct } from '@/lib/internal-product';
 import { supabase } from '@/integrations/supabase/client';
 
 const feedbackSchema = z.object({
@@ -136,7 +137,7 @@ export function BetaFeedbackWidget() {
   };
 
   if (!user) return null;
-  if (hidePromotions) return null;
+  if (isInternalProduct(hidePromotions)) return null;
   if (pathname.startsWith('/driver/onboarding') || pathname.startsWith('/staff/onboarding') || pathname === '/onboarding') return null;
 
   const includeScreenshot = form.watch('include_screenshot');
