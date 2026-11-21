@@ -538,7 +538,7 @@ Deno.serve(async (req) => {
 
       const { data: signedData, error: signedError } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(fileRef, 3600);
+        .createSignedUrl(fileRef, 300);
 
       if (signedError || !signedData?.signedUrl) {
         return new Response(JSON.stringify({ error: 'File not found' }), {
@@ -591,7 +591,7 @@ Deno.serve(async (req) => {
 
       const { data: signedData, error: signedError } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(storagePath, 3600);
+        .createSignedUrl(storagePath, 300);
 
       if (signedError || !signedData?.signedUrl) {
         return new Response(JSON.stringify({ error: 'File not found', url: null }), {
@@ -689,6 +689,11 @@ Deno.serve(async (req) => {
           const idx = cleanPath.indexOf(publicPattern);
           if (idx !== -1) {
             cleanPath = cleanPath.slice(idx + publicPattern.length);
+          }
+
+          // Only files inside this organization's own folder may be migrated
+          if (!cleanPath.startsWith(`${orgId}/`) || cleanPath.includes('..')) {
+            throw new Error('File is outside this organization');
           }
 
           // Download from built-in storage

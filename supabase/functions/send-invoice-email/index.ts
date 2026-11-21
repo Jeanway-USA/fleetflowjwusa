@@ -229,8 +229,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // A typed-in address must be one of the company's saved contacts (or already on this load) unless an owner is sending.
-    if (override_email && roleRow.role !== 'owner') {
+    // A typed-in address must be one of the company's saved contacts (or already on this load), for every role.
+    if (override_email) {
       const typed = String(override_email).trim().toLowerCase();
       const onLoad = typeof load.invoice_email === 'string' && load.invoice_email.trim().toLowerCase() === typed;
       if (!onLoad && !(await isKnownRecipient(supabaseAdmin, profile.org_id, typed))) {

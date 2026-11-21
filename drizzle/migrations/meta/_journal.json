@@ -183,6 +183,13 @@
       "when": 1794013420350,
       "tag": "0025_apply_shop_files",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795299683759,
+      "tag": "0026_security_fix_definer_functions_and_requests",
+      "breakpoints": true
     }
   ]
 }
