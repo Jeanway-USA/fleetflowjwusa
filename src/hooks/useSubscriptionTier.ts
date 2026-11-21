@@ -1,4 +1,5 @@
 import { useAuth, type SubscriptionTier } from '@/contexts/AuthContext';
+import { isInternalProduct } from '@/lib/internal-product';
 
 export type { SubscriptionTier };
 
@@ -39,11 +40,13 @@ const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
 };
 
 export function useSubscriptionTier() {
-  const { subscriptionTier, orgId, loading } = useAuth();
+  const { subscriptionTier, orgId, loading, hidePromotions } = useAuth();
+  const internal = isInternalProduct(hidePromotions);
 
   const tier = subscriptionTier;
-  const features = TIER_FEATURES[tier] ?? TIER_FEATURES.solo_bco;
-  const hasFeature = (feature: string) => features.includes(feature);
+  // The internal product is full access: no plan ever locks a feature.
+  const features = internal ? TIER_FEATURES.all_in_one : (TIER_FEATURES[tier] ?? TIER_FEATURES.solo_bco);
+  const hasFeature = (feature: string) => internal || features.includes(feature);
 
   return {
     org: orgId ? { id: orgId, subscription_tier: tier } : null,

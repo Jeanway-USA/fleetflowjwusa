@@ -190,6 +190,13 @@
       "when": 1795299683759,
       "tag": "0026_security_fix_definer_functions_and_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1795302040735,
+      "tag": "0027_org_date_format_and_settlement_week_end",
+      "breakpoints": true
     }
   ]
 }

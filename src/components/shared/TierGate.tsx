@@ -1,8 +1,6 @@
 import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Lock } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 interface TierGateProps {
   requiredFeature: string;
@@ -11,8 +9,7 @@ interface TierGateProps {
 }
 
 export function TierGate({ requiredFeature, children, fallback }: TierGateProps) {
-  const { hasFeature, tier, loading } = useSubscriptionTier();
-  const navigate = useNavigate();
+  const { hasFeature, loading } = useSubscriptionTier();
 
   if (loading) return null;
 
@@ -29,16 +26,12 @@ export function TierGate({ requiredFeature, children, fallback }: TierGateProps)
           <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-muted flex items-center justify-center">
             <Lock className="h-6 w-6 text-muted-foreground" />
           </div>
-          <CardTitle>Feature Not Available</CardTitle>
+          <CardTitle>Not available</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <p className="text-muted-foreground">
-            This feature is not included in your <span className="font-medium capitalize">{tier.replace('_', ' ')}</span> plan.
-            Upgrade to access it.
+            This area isn't available for your account. Ask the owner if you need access.
           </p>
-          <Button onClick={() => navigate('/pricing')} className="bg-primary text-primary-foreground hover:bg-primary/90">
-            View Plans
-          </Button>
         </CardContent>
       </Card>
     </div>
