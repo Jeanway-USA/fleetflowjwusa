@@ -4,14 +4,14 @@ import { generateDriverPay } from '@/lib/payroll/generateDriverPay';
 import { loadStaffTaxContext } from '@/lib/payroll/staffTax';
 import { loadPackageContext } from '@/lib/pay-packages/generate';
 import { generateStaffStatements, setStatementStatus, staffOnPackages } from '@/lib/pay-packages/staff';
-import { settlementWeek } from '@/lib/settlement-week';
+import { LANDSTAR_WEEK_STARTS_ON, settlementWeek, type WeekDay } from '@/lib/settlement-week';
 
 const db = supabase as any;
 const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 const iso = (d: Date) => format(d, 'yyyy-MM-dd');
 
 /**
- * A pay run is one payday for everyone: drivers (paid for their Landstar week, Thursday to Wednesday) and staff (paid for
+ * A pay run is one payday for everyone: drivers (paid for their settlement week, Thursday to Wednesday for Landstar) and staff (paid for
  * a Monday to Sunday week). It groups their draft pay so it is checked, approved and paid together, and then it is locked.
  * The pay itself still lives on the settlement or statement; the run keeps what was approved so it can be compared later.
  */
@@ -79,9 +79,12 @@ export interface RunPeriods {
   staff: { start: string; end: string };
 }
 
-/** The last driver week (Thursday to Wednesday) and the last staff week (Monday to Sunday) that finished before payday. */
-export function suggestedPeriods(payDate: Date): RunPeriods {
-  const driverWeek = settlementWeek(payDate, -1);
+/**
+ * The last driver settlement week and the last staff week (Monday to Sunday) that finished before payday. The driver week follows the
+ * company's settlement week (Thursday to Wednesday unless Settings says otherwise); the staff week is always Monday to Sunday.
+ */
+export function suggestedPeriods(payDate: Date, driverWeekStartsOn: WeekDay = LANDSTAR_WEEK_STARTS_ON): RunPeriods {
+  const driverWeek = settlementWeek(payDate, -1, driverWeekStartsOn);
   // Last Sunday strictly before payday.
   let sunday = subDays(payDate, 1);
   while (sunday.getDay() !== 0) sunday = subDays(sunday, 1);

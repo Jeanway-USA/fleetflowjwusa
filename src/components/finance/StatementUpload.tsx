@@ -62,7 +62,10 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   contractor_pdf: <FileText className="h-4 w-4" />,
 };
 
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
+
 export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId }: StatementUploadProps) {
+  const { endDay: weekEndDay } = useSettlementWeekSetting();
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { isLandstar } = useOrganizationMode();
@@ -235,7 +238,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     }
 
     // Reconcile (includes per-trip + period revenue cross-check against fleet_loads)
-    const result = reconcileDocuments(updatedFiles, existingLoads, landstarSplit);
+    const result = reconcileDocuments(updatedFiles, existingLoads, landstarSplit, new Date(), weekEndDay);
     setReconciliationResult(result);
 
     // Save files to documents

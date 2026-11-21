@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { FileText } from 'lucide-react';
 
 import { PeriodSelector, TimePeriod } from '@/components/executive/PeriodSelector';
-import { SETTLEMENT_WEEK_START } from '@/lib/settlement-week';
+import { type WeekDay } from '@/lib/settlement-week';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { LogbookWeek } from '@/components/executive/LogbookWeek';
 import { MoneyLines } from '@/components/executive/MoneyLines';
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
@@ -49,23 +50,23 @@ const PERIOD_LABEL: Record<TimePeriod, string> = {
  * Current period plus the same elapsed slice of the prior period, so
  * "Oct 1-3" is compared with "Sep 1-3" rather than all of September.
  */
-function getDateRange(period: TimePeriod) {
-  const range = getFullPeriodRange(period);
+function getDateRange(period: TimePeriod, weekStartsOn: WeekDay) {
+  const range = getFullPeriodRange(period, weekStartsOn);
   const elapsed = Date.now() - range.start.getTime();
   const toDatePrevEnd = new Date(Math.min(range.prevStart.getTime() + elapsed, range.prevEnd.getTime()));
   return { ...range, prevEnd: toDatePrevEnd };
 }
 
-function getFullPeriodRange(period: TimePeriod) {
+function getFullPeriodRange(period: TimePeriod, weekStartsOn: WeekDay) {
   const now = new Date();
   switch (period) {
     case 'week':
-      // Landstar settlement week: Thursday through the period-ending Wednesday.
+      // The settlement week (Landstar: Thursday through the period-ending Wednesday).
       return {
-        start: startOfWeek(now, { weekStartsOn: SETTLEMENT_WEEK_START }),
-        end: endOfWeek(now, { weekStartsOn: SETTLEMENT_WEEK_START }),
-        prevStart: startOfWeek(subWeeks(now, 1), { weekStartsOn: SETTLEMENT_WEEK_START }),
-        prevEnd: endOfWeek(subWeeks(now, 1), { weekStartsOn: SETTLEMENT_WEEK_START }),
+        start: startOfWeek(now, { weekStartsOn }),
+        end: endOfWeek(now, { weekStartsOn }),
+        prevStart: startOfWeek(subWeeks(now, 1), { weekStartsOn }),
+        prevEnd: endOfWeek(subWeeks(now, 1), { weekStartsOn }),
       };
     case 'month':
       return {
@@ -95,7 +96,8 @@ export default function ExecutiveDashboard() {
   // Defaults to the settlement week so the money matches the logbook above it.
   const [period, setPeriod] = useState<TimePeriod>('week');
   const [showReport, setShowReport] = useState(false);
-  const dateRange = useMemo(() => getDateRange(period), [period]);
+  const { startsOn } = useSettlementWeekSetting();
+  const dateRange = useMemo(() => getDateRange(period, startsOn), [period, startsOn]);
 
   // Fetch KPI data
   // NOTE: In this business model:

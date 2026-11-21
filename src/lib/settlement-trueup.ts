@@ -15,7 +15,7 @@ export interface SettlementLine {
   amount: number;
   delivery: string | null;
   lane: string | null;
-  /** The Wednesday Landstar settled the line. */
+  /** The period-ending day (a Wednesday) Landstar settled the line. */
   settled?: string | null;
   pickup?: string | null;
   agency?: string | null;

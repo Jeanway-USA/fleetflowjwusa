@@ -27,6 +27,11 @@ describe('periods', () => {
     expect(periodKey('2026-10-01', 'week')).toBe('2026-10-07'); // Thursday
     expect(periodKey('2026-10-07', 'week')).toBe('2026-10-07'); // Wednesday
     expect(periodKey('2026-10-08', 'week')).toBe('2026-10-14'); // next Thursday
+    // A company whose week ends on another day: Sunday-ending and Friday-ending weeks.
+    expect(periodKey('2026-10-01', 'week', 0)).toBe('2026-10-04'); // Thursday -> that Sunday
+    expect(periodKey('2026-10-04', 'week', 0)).toBe('2026-10-04'); // the Sunday itself
+    expect(periodKey('2026-10-05', 'week', 0)).toBe('2026-10-11'); // Monday starts the next week
+    expect(periodKey('2026-10-07', 'week', 5)).toBe('2026-10-09'); // Wednesday -> that Friday
     expect(periodKey('2026-10-07', 'month')).toBe('2026-10');
     expect(periodKey('2026-10-07', 'quarter')).toBe('2026-Q4');
     expect(periodKey('2026-03-31', 'quarter')).toBe('2026-Q1');

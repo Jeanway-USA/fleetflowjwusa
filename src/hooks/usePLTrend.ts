@@ -11,7 +11,7 @@ import {
   startOfMonth,
   endOfMonth,
 } from 'date-fns';
-import { SETTLEMENT_WEEK_START } from '@/lib/settlement-week';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { driverPayEvents, expenseCost, truckRevenueOf, MIRRORED_LOAN_EXPENSE_TYPE } from '@/lib/pl-metrics';
 
 export interface PeriodRollup {
@@ -70,13 +70,15 @@ const safeDate = (d: string | null | undefined): Date | null => {
 const isOnOrAfter = (date: Date, cutoff: Date) => date.getTime() >= cutoff.getTime();
 
 export function usePLTrend() {
+  const { startsOn, loading: weekLoading } = useSettlementWeekSetting();
   return useQuery<PLTrendData>({
-    queryKey: ['pl-trend', WEEKS],
+    queryKey: ['pl-trend', WEEKS, startsOn],
+    enabled: !weekLoading,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const today = new Date();
-      const horizonStart = startOfWeek(subDays(today, 7 * (WEEKS - 1)), { weekStartsOn: SETTLEMENT_WEEK_START });
+      const horizonStart = startOfWeek(subDays(today, 7 * (WEEKS - 1)), { weekStartsOn: startsOn });
       const horizonIso = format(horizonStart, 'yyyy-MM-dd');
       const trailing90Cutoff = subDays(today, 90);
       const trailing90Iso = format(trailing90Cutoff, 'yyyy-MM-dd');
@@ -138,7 +140,7 @@ export function usePLTrend() {
       });
 
       const bucketIndex = (d: Date): number => {
-        const weekStart = startOfWeek(d, { weekStartsOn: SETTLEMENT_WEEK_START });
+        const weekStart = startOfWeek(d, { weekStartsOn: startsOn });
         const diffDays = Math.floor((weekStart.getTime() - horizonStart.getTime()) / 86_400_000);
         const idx = Math.floor(diffDays / 7);
         return idx >= 0 && idx < WEEKS ? idx : -1;

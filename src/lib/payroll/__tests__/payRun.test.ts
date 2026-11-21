@@ -16,6 +16,16 @@ describe('pay run periods', () => {
     expect(p.driver).toEqual({ start: '2026-10-22', end: '2026-10-28' }); // Thursday to Wednesday, ended yesterday
     expect(p.staff).toEqual({ start: '2026-10-19', end: '2026-10-25' }); // Monday to Sunday
   });
+  it('the driver week follows the company settlement week; the staff week stays Monday to Sunday', () => {
+    // A week that ends Sunday starts Monday (1). Payday Thursday, October 29, 2026.
+    const sun = suggestedPeriods(new Date(2026, 9, 29), 1);
+    expect(sun.driver).toEqual({ start: '2026-10-19', end: '2026-10-25' });
+    expect(sun.staff).toEqual({ start: '2026-10-19', end: '2026-10-25' });
+    // A week that ends Friday starts Saturday (6).
+    const fri = suggestedPeriods(new Date(2026, 9, 29), 6);
+    expect(fri.driver).toEqual({ start: '2026-10-17', end: '2026-10-23' });
+    expect(fri.staff).toEqual({ start: '2026-10-19', end: '2026-10-25' });
+  });
   it('a Friday payday gives the same weeks', () => {
     const p = suggestedPeriods(new Date(2026, 9, 30));
     expect(p.driver.end).toBe('2026-10-28');

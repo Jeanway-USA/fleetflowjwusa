@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { parseLandstarXlsx } from '@/lib/parse-landstar-xlsx';
 import {
   reconcileDocuments,
-  latestSettlementWednesday,
+  latestSettlementEnd,
   mergeStagedFiles,
   typeFromParsedPdf,
   type StagedFile,
@@ -278,11 +278,16 @@ describe('staging statement files', () => {
   });
 });
 
-describe('latestSettlementWednesday', () => {
-  it('finds the period-ending Wednesday', () => {
-    expect(latestSettlementWednesday(new Date(2026, 9, 3))).toBe('2026-09-30'); // Sat
-    expect(latestSettlementWednesday(new Date(2026, 8, 30))).toBe('2026-09-30'); // Wed itself
-    expect(latestSettlementWednesday(new Date(2026, 6, 14))).toBe('2026-07-08'); // Tue
+describe('latestSettlementEnd', () => {
+  it('finds the period-ending Wednesday by default', () => {
+    expect(latestSettlementEnd(new Date(2026, 9, 3))).toBe('2026-09-30'); // Sat
+    expect(latestSettlementEnd(new Date(2026, 8, 30))).toBe('2026-09-30'); // Wed itself
+    expect(latestSettlementEnd(new Date(2026, 6, 14))).toBe('2026-07-08'); // Tue
+  });
+  it('follows another end day', () => {
+    expect(latestSettlementEnd(new Date(2026, 9, 3), 0)).toBe('2026-09-27'); // Sat -> Sunday
+    expect(latestSettlementEnd(new Date(2026, 9, 3), 5)).toBe('2026-10-02'); // Sat -> Friday
+    expect(latestSettlementEnd(new Date(2026, 9, 2), 5)).toBe('2026-10-02'); // the Friday itself
   });
 });
 

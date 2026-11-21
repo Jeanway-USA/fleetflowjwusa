@@ -1,3 +1,4 @@
+import { LANDSTAR_WEEK_END_DAY, latestPeriodEnd, type WeekDay } from '@/lib/settlement-week';
 import { classifyStatementLine } from '@/lib/expense-classifier';
 import { isSameCharge, daysBetween } from '@/lib/expense-matching';
 
@@ -87,7 +88,7 @@ export interface ReconciliationResult {
   /**
    * Set when some lines had no date of their own: 'statement' = dated with the
    * uploaded statement's period end; 'latest_week' = no document carried a date,
-   * so the most recent Wednesday (Landstar period end) was assumed.
+   * so the most recent settlement period end (Landstar: a Wednesday) was assumed.
    */
   datesInferred: 'statement' | 'latest_week' | null;
   /** Contractor PDF vs XLSX line check; null when both weren't uploaded. */
@@ -199,6 +200,8 @@ export function reconcileDocuments(
   loadsForRevenue: RevenueReconcileLoad[] = [],
   landstarSplit: number = 0.65,
   today: Date = new Date(),
+  /** The day the settlement week ends on. Landstar's is Wednesday. */
+  weekEndDay: WeekDay = LANDSTAR_WEEK_END_DAY,
 ): ReconciliationResult {
   type SourcedExpense = ExtractedExpense & { source: string; sourceType: StagedFile['type'] };
   const allExpenses: SourcedExpense[] = [];
@@ -251,7 +254,7 @@ export function reconcileDocuments(
     }
   }
 
-  // Landstar settles weekly (periods end on Wednesday). The PDF parser sometimes
+  // Settlements are weekly (Landstar's periods end on a Wednesday). The PDF parser sometimes
   // reports the whole month as the period, which would drag a month of loads into
   // the revenue check, so clamp to one week.
   if (periodEnd && (!periodStart || daysBetween(periodStart, periodEnd) > 7)) {
@@ -259,10 +262,10 @@ export function reconcileDocuments(
   }
 
   // Undated lines (Settlement Details "Latest Week" exports) take the statement's
-  // period end, or the most recent Wednesday when nothing else in the upload has a
+  // period end, or the most recent period end when nothing else in the upload has a
   // date. Never the upload day — that scattered old charges onto import dates.
   let datesInferred: ReconciliationResult['datesInferred'] = null;
-  const fallbackDate = periodEnd ?? latestSettlementWednesday(today);
+  const fallbackDate = periodEnd ?? latestSettlementEnd(today, weekEndDay);
   for (const item of [...allExpenses, ...xlsxLines]) {
     if (!item.date) {
       item.date = fallbackDate;
@@ -390,11 +393,9 @@ function addDays(isoDate: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Most recent Wednesday on or before `today` (local calendar), as YYYY-MM-DD. */
-export function latestSettlementWednesday(today: Date): string {
-  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const back = (d.getDay() - 3 + 7) % 7; // 3 = Wednesday
-  d.setDate(d.getDate() - back);
+/** The most recent settlement period end on or before `today` (local calendar), as YYYY-MM-DD. Landstar's is a Wednesday. */
+export function latestSettlementEnd(today: Date, weekEndDay: WeekDay = LANDSTAR_WEEK_END_DAY): string {
+  const d = latestPeriodEnd(today, weekEndDay);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 

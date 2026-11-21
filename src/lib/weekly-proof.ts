@@ -43,7 +43,7 @@ export type ProofIssue = 'missing_load' | 'revenue' | 'charges' | 'advances';
 
 export interface TripProof {
   trip: string;
-  /** The Wednesday of the trip's first settlement line. */
+  /** The period-ending day (Landstar: a Wednesday) of the trip's first settlement line. */
   week: string | null;
   loadFound: boolean;
   /** Settled with charges and advances only, no revenue: recorded as expenses, not as a load. */

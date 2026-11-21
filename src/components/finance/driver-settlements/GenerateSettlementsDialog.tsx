@@ -29,7 +29,8 @@ import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
 import { generateDriverPay } from '@/lib/payroll/generateDriverPay';
 import { formatCurrency } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
-import { settlementWeek } from '@/lib/settlement-week';
+import { settlementWeek, type WeekDay } from '@/lib/settlement-week';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { findOverlaps } from '@/lib/pay-packages/generate';
 import { cn } from '@/lib/utils';
 import { addDays, format } from 'date-fns';
@@ -53,19 +54,18 @@ function driverName(d: Driver) {
   return `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || 'Driver';
 }
 
-// Today if today is Thursday (4), otherwise next Thursday
-function nextThursday(from = new Date()): Date {
-  const day = from.getDay();
-  const diff = (4 - day + 7) % 7;
+// Payday is the first day of the next settlement week: today if the week starts today, otherwise the next one (Landstar: Thursday).
+function nextWeekStart(startsOn: WeekDay, from = new Date()): Date {
+  const diff = (startsOn - from.getDay() + 7) % 7;
   return addDays(from, diff);
 }
 
-/** The most recent Landstar settlement week (Thursday to Wednesday) that has ended, or is ending today. */
-function lastSettlementWeek() {
+/** The most recent settlement week (Landstar: Thursday to Wednesday) that has ended, or is ending today. */
+function lastSettlementWeek(startsOn: WeekDay) {
   const now = new Date();
-  const current = settlementWeek(now);
+  const current = settlementWeek(now, 0, startsOn);
   const endsToday = format(current.end, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
-  return endsToday ? current : settlementWeek(now, -1);
+  return endsToday ? current : settlementWeek(now, -1, startsOn);
 }
 
 export function GenerateSettlementsDialog({
@@ -74,22 +74,23 @@ export function GenerateSettlementsDialog({
   drivers,
   onGenerated,
 }: Props) {
-  const [periodEnd, setPeriodEnd] = useState<Date>(lastSettlementWeek().end);
-  const [periodStart, setPeriodStart] = useState<Date>(lastSettlementWeek().start);
-  const [paymentDate, setPaymentDate] = useState<Date>(nextThursday());
+  const { startsOn, startName } = useSettlementWeekSetting();
+  const [periodEnd, setPeriodEnd] = useState<Date>(lastSettlementWeek(startsOn).end);
+  const [periodStart, setPeriodStart] = useState<Date>(lastSettlementWeek(startsOn).start);
+  const [paymentDate, setPaymentDate] = useState<Date>(nextWeekStart(startsOn));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
-      const week = lastSettlementWeek();
+      const week = lastSettlementWeek(startsOn);
       setPeriodEnd(week.end);
       setPeriodStart(week.start);
-      setPaymentDate(nextThursday());
+      setPaymentDate(nextWeekStart(startsOn));
       setSelected(new Set());
       setPickerOpen(false);
     }
-  }, [open]);
+  }, [open, startsOn]);
 
   const allSelected = drivers.length > 0 && selected.size === drivers.length;
   const selectedDrivers = useMemo(
@@ -391,7 +392,7 @@ export function GenerateSettlementsDialog({
                 </PopoverContent>
               </Popover>
               <p className="text-xs text-muted-foreground">
-                Defaults to the upcoming Thursday.
+                Defaults to the upcoming {startName}.
               </p>
             </div>
           </div>

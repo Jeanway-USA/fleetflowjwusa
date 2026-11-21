@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
 import { settlementWeek } from '@/lib/settlement-week';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import {
   buildSettlementStatement,
   type StatementCharge,
@@ -159,7 +160,8 @@ function ChargeList({ charges }: { charges: StatementCharge[] }) {
 export function SettlementStatementTab({ loads, expenses, truckId, isLoading, onUpload }: SettlementStatementTabProps) {
   // Opens on the last finished settlement week: that is the statement Landstar has issued.
   const [offset, setOffset] = useState(-1);
-  const week = useMemo(() => settlementWeek(new Date(), offset), [offset]);
+  const { startsOn } = useSettlementWeekSetting();
+  const week = useMemo(() => settlementWeek(new Date(), offset, startsOn), [offset, startsOn]);
   const weekStart = week.isoDays[0];
   const weekEnd = week.isoDays[6];
 
