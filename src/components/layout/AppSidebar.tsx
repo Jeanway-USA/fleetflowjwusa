@@ -31,6 +31,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAreaAccess } from '@/hooks/useAreaAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
+import { isInternalProduct, tierAllows } from '@/lib/internal-product';
 import { useOrganizationMode, type TmsMode } from '@/hooks/useOrganizationMode';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
@@ -195,7 +196,8 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl, orgName } = useAuth();
+  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl, orgName, hidePromotions } = useAuth();
+  const internalProduct = isInternalProduct(hidePromotions);
   const { tmsMode: currentTmsMode } = useOrganizationMode();
   const { theme } = useTheme();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -222,10 +224,10 @@ export function AppSidebar() {
     // Owners see every nav item (unless they're simulating a lower role,
     // in which case hasRole('owner') is false and normal filtering applies).
     const roleMatch = hasRole('owner') || item.roles.some(role => hasRole(role));
-    const tierMatch = !item.feature || tierFeatures.has(item.feature);
+    const tierMatch = tierAllows(internalProduct, tierFeatures, item.feature);
     const modeMatch = !item.tmsMode || item.tmsMode === currentTmsMode;
     return roleMatch && tierMatch && modeMatch && allowsFeature(item.feature);
-  }), [hasRole, tierFeatures, currentTmsMode, allowsFeature]);
+  }), [hasRole, tierFeatures, internalProduct, currentTmsMode, allowsFeature]);
 
   // --- Dashboard items (non-collapsible) ---
   const dashboardNavItems: NavItem[] = actuallyIsOwner ? [

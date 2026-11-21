@@ -68,7 +68,7 @@ export function UserMenu({ onReplayTour, hasTour }: UserMenuProps) {
 
           <DropdownMenuItem onClick={onReplayTour}>
             <Compass className="mr-2 h-4 w-4" />
-            Replay welcome tour
+            Replay dashboard tour
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />

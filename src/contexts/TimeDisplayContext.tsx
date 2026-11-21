@@ -17,6 +17,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getBrowserTimezone } from '@/lib/datetime';
+import { setOrgDateFormat } from '@/lib/display-settings';
+import { useOrgDisplaySettings } from '@/hooks/useOrgDisplaySettings';
 
 export type TimeDisplayMode = 'company' | 'local';
 
@@ -46,21 +48,21 @@ function readInitialMode(): TimeDisplayMode {
 export function TimeDisplayProvider({ children }: { children: ReactNode }) {
   const { user, orgId } = useAuth();
   const [mode, setModeState] = useState<TimeDisplayMode>(readInitialMode);
-  const [companyTz, setCompanyTz] = useState<string>(DEFAULT_TZ);
+  // The company's zone is read through the shared settings hook, so saving a new one in Settings shows up without a refresh.
+  const display = useOrgDisplaySettings();
+  const companyTz = display.timezone;
   const localTz = useMemo(() => getBrowserTimezone(), []);
 
-  // Load org's company_timezone + user's persisted preference
+  // The company's date format is applied app-wide through the shared formatDate.
+  useEffect(() => {
+    setOrgDateFormat(display.dateFormat);
+  }, [display.dateFormat]);
+
+  // Load the user's persisted preference
   useEffect(() => {
     if (!orgId) return;
     let cancelled = false;
     (async () => {
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('company_timezone')
-        .eq('id', orgId)
-        .maybeSingle();
-      if (!cancelled && org?.company_timezone) setCompanyTz(org.company_timezone);
-
       if (user?.id) {
         const { data: profile } = await supabase
           .from('profiles')
