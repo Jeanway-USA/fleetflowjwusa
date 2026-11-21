@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { cityState } from '@/lib/formatters';
 import { layoutLogbook, logbookState, settlementWeek, type LogbookState } from '@/lib/settlement-week';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 
 interface WeekLoad {
   id: string;
@@ -41,7 +42,6 @@ const money = (v: number | null | undefined) =>
 
 const place = (s: string | null) => cityState(s) || 'Unknown';
 
-const DAY_LETTERS = ['Th', 'Fr', 'Sa', 'Su', 'Mo', 'Tu', 'We'];
 
 /** One hairline per day column, the ruling of a log page. */
 const gridRuling: React.CSSProperties = {
@@ -84,14 +84,16 @@ function SegmentLine({ state, continuesBefore, continuesAfter }: { state: Logboo
 }
 
 /**
- * The settlement week as a log page: seven day columns, Thursday to the
- * period-ending Wednesday, each load a line from pickup day to delivery day.
+ * The settlement week as a log page: seven day columns, from the first day of
+ * the week to the period-ending day (Landstar: Thursday to Wednesday), each load
+ * a line from pickup day to delivery day.
  */
 export function LogbookWeek() {
   const [offset, setOffset] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const today = useMemo(() => new Date(), []);
-  const week = useMemo(() => settlementWeek(today, offset), [today, offset]);
+  const { startsOn } = useSettlementWeekSetting();
+  const week = useMemo(() => settlementWeek(today, offset, startsOn), [today, offset, startsOn]);
   const first = week.isoDays[0];
   const last = week.isoDays[6];
 
@@ -189,7 +191,7 @@ export function LogbookWeek() {
             const isToday = i === todayCol;
             return (
               <div key={i} className="flex flex-col items-center leading-none">
-                <span className="text-xs font-semibold text-muted-foreground">{DAY_LETTERS[i]}</span>
+                <span className="text-xs font-semibold text-muted-foreground">{format(week.days[i], 'EEEEEE')}</span>
                 <span
                   className={cn(
                     'figure mt-1 text-base font-semibold',

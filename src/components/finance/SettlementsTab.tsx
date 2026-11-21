@@ -15,7 +15,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Plus, FileText, Pencil, Trash2, Loader2, Eye, Upload, MoreHorizontal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { settlementWeek } from '@/lib/settlement-week';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
@@ -112,6 +114,7 @@ function calcNetPay(data: Partial<Settlement>): number {
 export function SettlementsTab() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
+  const { startsOn: weekStartsOn } = useSettlementWeekSetting();
   const paySettings = usePaySettings();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
@@ -243,8 +246,10 @@ export function SettlementsTab() {
       setFormData(settlement);
     } else {
       setEditingSettlement(null);
-      const lastWeekStart = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
-      const lastWeekEnd = endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
+      // A new settlement starts on the last finished settlement week.
+      const lastWeek = settlementWeek(new Date(), -1, weekStartsOn);
+      const lastWeekStart = lastWeek.start;
+      const lastWeekEnd = lastWeek.end;
       setFormData({
         ...emptyFormData,
         period_start: format(lastWeekStart, 'yyyy-MM-dd'),

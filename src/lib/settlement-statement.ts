@@ -143,7 +143,7 @@ function isCardPurchase(e: StatementExpense): boolean {
 export interface BuildStatementOptions {
   loads: StatementLoad[];
   expenses: StatementExpense[];
-  /** First and last day of the week, YYYY-MM-DD (Thursday to Wednesday). */
+  /** First and last day of the week, YYYY-MM-DD (a settlement week: Thursday to Wednesday for Landstar). */
   weekStart: string;
   weekEnd: string;
   truckId?: string | null;

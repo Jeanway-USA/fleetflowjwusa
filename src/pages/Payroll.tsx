@@ -24,6 +24,7 @@ import { TimeOffSheet } from '@/components/payroll/TimeOffSheet';
 import { RunHistory } from '@/components/payroll/RunHistory';
 import { LiabilitySheet } from '@/components/payroll/LiabilitySheet';
 import { NewHireCard } from '@/components/payroll/NewHireCard';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { isMissingTables } from '@/hooks/usePayPackages';
 import { useEmployerInfo } from '@/hooks/useTaxHubData';
 import { toCsv } from '@/lib/csv';
@@ -190,8 +191,9 @@ function OffCycleDialog({ open, onOpenChange, orgId, userId, onCreated }: { open
 }
 
 function NewRunDialog({ open, onOpenChange, orgId, userId, onCreated }: { open: boolean; onOpenChange: (v: boolean) => void; orgId: string | null; userId: string | null; onCreated: (id: string) => void }) {
+  const { startsOn } = useSettlementWeekSetting();
   const [payDate, setPayDate] = useState(todayLocal());
-  const periods = useMemo(() => suggestedPeriods(parseISO(payDate || todayLocal())), [payDate]);
+  const periods = useMemo(() => suggestedPeriods(parseISO(payDate || todayLocal()), startsOn), [payDate, startsOn]);
   const [driverStart, setDriverStart] = useState<string | null>(null);
   const [driverEnd, setDriverEnd] = useState<string | null>(null);
   const [staffStart, setStaffStart] = useState<string | null>(null);

@@ -48,8 +48,11 @@ interface WeeklyProofProps {
   onTick?: (ids: string[]) => void;
 }
 
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
+
 export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
   const queryClient = useQueryClient();
+  const weekSetting = useSettlementWeekSetting();
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
   const [result, setResult] = useState<ProofResult | null>(null);
@@ -233,7 +236,7 @@ export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
     >
       {!result ? (
         <p className="border-t px-4 py-3 text-sm text-muted-foreground">
-          Choose the Freight Bill Details file from Landstar. Use the year-to-date export to prove every week so far, or the weekly export each Wednesday.
+          Choose the Freight Bill Details file from Landstar. Use the year-to-date export to prove every week so far, or the weekly export each {weekSetting.endName}.
         </p>
       ) : (
         <>

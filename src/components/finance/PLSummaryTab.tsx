@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/formatters';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { usePLTrend, type PeriodRollup, type RunwayMetrics } from '@/hooks/usePLTrend';
 import { workbookMetrics, type DriverPayTotals, type FuelStats } from '@/lib/pl-metrics';
 
@@ -130,6 +131,7 @@ export function PLSummaryTab({
 }: PLSummaryTabProps) {
   const { costPerMile } = useOperationalCPM();
   const [timeframe, setTimeframe] = useState<Timeframe>('week');
+  const weekSetting = useSettlementWeekSetting();
   const { data: trend, isLoading: trendLoading } = usePLTrend();
 
   const truckPct = getSetting('truck_percentage', '65');
@@ -334,7 +336,7 @@ export function PLSummaryTab({
       {/* ============ 12-week trend ============ */}
       <Panel
         title="Revenue and costs by settlement week"
-        description="Twelve weeks, each ending on a Wednesday. Revenue is yours, not gross."
+        description={`Twelve weeks, each ending on a ${weekSetting.endName}. Revenue is yours, not gross.`}
         aside={
           <div className="flex items-center gap-4 text-[13px] text-muted-foreground">
             <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-sm bg-primary" /> Revenue</span>

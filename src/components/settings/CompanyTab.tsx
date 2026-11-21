@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Building2 } from 'lucide-react';
+import { Building2, CalendarRange } from 'lucide-react';
+import { SETTLEMENT_WEEK_KEY, useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
+import { LANDSTAR_WEEK_END_DAY, toWeekDay, WEEKDAY_NAMES, weekdayName, weekStartsOnFor } from '@/lib/settlement-week';
 import { ORG_DISPLAY_KEY, useOrgDisplaySettings } from '@/hooks/useOrgDisplaySettings';
 import { DATE_FORMATS, formatOrgDate, timezoneOptions, toDateFormat, toTimezone } from '@/lib/display-settings';
 import { todayLocal } from '@/lib/datetime';
@@ -44,6 +46,30 @@ export function CompanyTab() {
     }
   };
 
+
+  // Settlement week
+  const weekSetting = useSettlementWeekSetting();
+  const [weekEndDay, setWeekEndDay] = useState<string>(String(LANDSTAR_WEEK_END_DAY));
+  const [isSavingWeek, setIsSavingWeek] = useState(false);
+  useEffect(() => { setWeekEndDay(String(weekSetting.endDay)); }, [weekSetting.endDay]);
+
+  const handleSaveWeek = async () => {
+    if (!orgId) return;
+    const day = toWeekDay(weekEndDay);
+    setIsSavingWeek(true);
+    try {
+      const { error } = await (supabase as any).from('organizations').update({ settlement_week_end_day: day }).eq('id', orgId);
+      if (error) throw error;
+      // Every weekly view works from this one value, so refresh them all.
+      await queryClient.invalidateQueries({ queryKey: [SETTLEMENT_WEEK_KEY] });
+      await queryClient.invalidateQueries();
+      toast.success(`Settlement week now runs ${weekdayName(weekStartsOnFor(day))} to ${weekdayName(day)}`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save the settlement week');
+    } finally {
+      setIsSavingWeek(false);
+    }
+  };
 
   // Time zone and date format
   const display = useOrgDisplaySettings();
@@ -149,6 +175,51 @@ export function CompanyTab() {
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             {isSavingRegional ? 'Saving...' : 'Save Time Zone & Date Format'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Settlement week */}
+      <Card className="bg-card border border-border rounded-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarRange className="h-5 w-5 text-primary" />
+            Settlement Week
+          </CardTitle>
+          <CardDescription>The seven-day week your settlements and weekly numbers are counted in</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2 max-w-xs">
+            <Label htmlFor="settlement-week-end">Settlement week ends on</Label>
+            <Select value={weekEndDay} onValueChange={setWeekEndDay} disabled={!weekSetting.available || isSavingWeek}>
+              <SelectTrigger id="settlement-week-end">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WEEKDAY_NAMES.map((name, i) => (
+                  <SelectItem key={name} value={String(i)}>{name}{i === LANDSTAR_WEEK_END_DAY ? ' (Landstar)' : ''}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Today the week runs {weekSetting.startName} to {weekSetting.endName}.
+              {weekEndDay !== String(weekSetting.endDay) && <> It will run {weekdayName(weekStartsOnFor(toWeekDay(weekEndDay)))} to {weekdayName(toWeekDay(weekEndDay))} once you save.</>}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Controls the weekly settlement periods, pay runs for drivers, the logbook columns, the weekly P&amp;L and revenue views, and the week Landstar
+            statements are checked against. Landstar BCOs use Wednesday, so only change this if your settlements end on a different day. Settlements
+            you already saved are not changed.
+          </p>
+          {!weekSetting.available && (
+            <p className="text-xs text-warning">This setting is not switched on yet. The database update for it has not been applied.</p>
+          )}
+          <Button
+            onClick={handleSaveWeek}
+            disabled={isSavingWeek || !weekSetting.available || weekEndDay === String(weekSetting.endDay)}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {isSavingWeek ? 'Saving...' : 'Save Settlement Week'}
           </Button>
         </CardContent>
       </Card>

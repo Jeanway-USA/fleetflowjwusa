@@ -51,7 +51,10 @@ function Sparkline({ values }: { values: number[] }) {
  * The owner's view of the money, laid out the way Landstar's BCO Analytics lays it out: the all-in gross before
  * Landstar's cut, what you actually earn after it, where that revenue comes from, and how it compares with last year.
  */
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
+
 export function RevenueOverview() {
+  const { endDay: weekEndDay } = useSettlementWeekSetting();
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
   const [period, setPeriod] = useState<OverviewPeriod>('week');
@@ -75,7 +78,7 @@ export function RevenueOverview() {
     const yearLoads = loads.filter((l) => l.delivery_date?.startsWith(String(year)));
     const totals = summarize(yearLoads);
     const pair = yearToDatePair(loads, year, new Date());
-    const series = bySeries(yearLoads, period);
+    const series = bySeries(yearLoads, period, weekEndDay);
     const top = series.reduce<(typeof series)[number] | null>((best, row) => (!best || row.yours > best.yours ? row : best), null);
     const monthly = MONTHS.map((month, i) => {
       const key = `${String(i + 1).padStart(2, '0')}`;
@@ -85,7 +88,7 @@ export function RevenueOverview() {
       return { month, thisYear: ahead ? null : sum(year), lastYear: sum(year - 1) };
     });
     return { totals, pair, series, top, monthly };
-  }, [loads, year, period]);
+  }, [loads, year, period, weekEndDay]);
 
   const { totals, pair, series, top, monthly } = view;
   const singular = PERIODS.find((p) => p.value === period)!.singular;

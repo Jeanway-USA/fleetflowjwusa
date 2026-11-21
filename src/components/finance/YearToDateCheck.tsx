@@ -6,7 +6,8 @@ import { CurrencyInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, cityState } from '@/lib/formatters';
 import { Panel, StatementLine } from '@/components/finance/statement-ui';
-import { latestSettlementWednesday } from '@/lib/settlement-reconciliation';
+import { latestSettlementEnd } from '@/lib/settlement-reconciliation';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 
 interface YtdLoad {
   id: string;
@@ -44,17 +45,18 @@ function writeSaved(year: string, value: string) {
 }
 
 export function YearToDateCheck({ loads }: YearToDateCheckProps) {
+  const { endDay } = useSettlementWeekSetting();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(String(currentYear));
   const [landstarText, setLandstarText] = useState(() => readSaved(String(currentYear)));
   // A statement prints year-to-date earnings as of its own date, so compare loads up to that date.
-  const [through, setThrough] = useState(() => latestSettlementWednesday(new Date()));
+  const [through, setThrough] = useState(() => latestSettlementEnd(new Date(), endDay));
 
   // The figure is saved per year in this browser, so it is there next time.
   useEffect(() => {
     setLandstarText(readSaved(year));
-    setThrough(Number(year) === currentYear ? latestSettlementWednesday(new Date()) : `${year}-12-31`);
-  }, [year, currentYear]);
+    setThrough(Number(year) === currentYear ? latestSettlementEnd(new Date(), endDay) : `${year}-12-31`);
+  }, [year, currentYear, endDay]);
   const onLandstarChange = (value: string) => {
     setLandstarText(value);
     writeSaved(year, value);

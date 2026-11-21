@@ -51,6 +51,7 @@ const SafetyBonusSettings = lazy(() => import('@/components/finance/SafetyBonusS
 const SafetyBonusPayouts = lazy(() => import('@/components/finance/SafetyBonusPayouts').then((m) => ({ default: m.SafetyBonusPayouts })));
 import { format, parseISO, endOfMonth, endOfQuarter, endOfDay, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { settlementWeek } from '@/lib/settlement-week';
+import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 
 const LoadProfitabilityTab = lazy(() =>
@@ -78,6 +79,7 @@ function TabFallback() {
 export default function Finance() {
   const queryClient = useQueryClient();
   const { orgId, hasRole } = useAuth();
+  const { startsOn: weekStartsOn } = useSettlementWeekSetting();
   const canManagePayroll = hasRole('owner') || hasRole('payroll_admin');
   // Default to current month
   // Opens on the current Landstar settlement week: "this week's settlement" is a top phone job.
@@ -300,11 +302,11 @@ export default function Finance() {
 
   // ===== PERIOD FILTERING =====
   // One place that turns the period picker into a date range.
-  // 'week' is the current Landstar settlement week (Thu to the period-ending Wed).
+  // 'week' is the current settlement week (Landstar: Thu to the period-ending Wed).
   const periodInterval = (): { start: Date; end: Date } | null => {
     if (selectedPeriod === 'all') return null;
     if (selectedPeriod === 'week') {
-      const w = settlementWeek(new Date());
+      const w = settlementWeek(new Date(), 0, weekStartsOn);
       return { start: w.start, end: endOfDay(w.end) };
     }
     const [year, period] = selectedPeriod.split('-');

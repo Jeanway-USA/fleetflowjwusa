@@ -1,3 +1,4 @@
+import { LANDSTAR_WEEK_END_DAY, periodEndOnOrAfter, type WeekDay } from '@/lib/settlement-week';
 import { addDays, format, parseISO } from 'date-fns';
 import { truckRevenueOf } from '@/lib/pl-metrics';
 
@@ -75,15 +76,13 @@ export function summarize(loads: OverviewLoad[]): OverviewTotals {
 
 export type OverviewPeriod = 'week' | 'month' | 'quarter';
 
-/** Landstar settles Thursday to Wednesday; a load belongs to the Wednesday that ends its week. */
-function settlementWednesday(date: string): string {
-  const d = parseISO(date);
-  const behind = (d.getDay() - 3 + 7) % 7; // days since Wednesday
-  return format(behind === 0 ? d : addDays(d, 7 - behind), 'yyyy-MM-dd');
+/** A load belongs to the settlement week that ends on or after its day (Landstar: the Wednesday that ends its week). */
+function settlementPeriodEnd(date: string, endDay: WeekDay): string {
+  return format(periodEndOnOrAfter(parseISO(date), endDay), 'yyyy-MM-dd');
 }
 
-export function periodKey(date: string, period: OverviewPeriod): string {
-  if (period === 'week') return settlementWednesday(date);
+export function periodKey(date: string, period: OverviewPeriod, weekEndDay: WeekDay = LANDSTAR_WEEK_END_DAY): string {
+  if (period === 'week') return settlementPeriodEnd(date, weekEndDay);
   if (period === 'month') return date.slice(0, 7);
   return `${date.slice(0, 4)}-Q${Math.floor((Number(date.slice(5, 7)) - 1) / 3) + 1}`;
 }
@@ -98,11 +97,11 @@ export interface PeriodRow extends OverviewTotals {
   key: string;
 }
 
-export function bySeries(loads: OverviewLoad[], period: OverviewPeriod): PeriodRow[] {
+export function bySeries(loads: OverviewLoad[], period: OverviewPeriod, weekEndDay: WeekDay = LANDSTAR_WEEK_END_DAY): PeriodRow[] {
   const groups = new Map<string, OverviewLoad[]>();
   for (const l of loads) {
     if (!l.delivery_date) continue;
-    const key = periodKey(l.delivery_date, period);
+    const key = periodKey(l.delivery_date, period, weekEndDay);
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(l);
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, list]) => ({ key, ...summarize(list) }));
