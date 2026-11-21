@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ThisWeekStatements } from '@/components/finance/ThisWeekStatements';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -619,7 +620,7 @@ export default function Finance() {
           className="h-11 sm:h-10 w-full sm:w-auto"
         >
           <Upload className="h-4 w-4 mr-2" />
-          Upload Statement
+          Prove a week
         </Button>
       </PageHeader>
 
@@ -652,6 +653,7 @@ export default function Finance() {
         <TabsContent value="settlement">
           <Suspense fallback={<TabFallback />}>
           <div className="animate-in fade-in-50">
+            <ThisWeekStatements onOpen={() => setUploadDialogOpen(true)} />
             {trucks.length > 1 && (
               <div className="mb-4">
                 <Select value={selectedTruck} onValueChange={setSelectedTruck}>
@@ -881,14 +883,15 @@ export default function Finance() {
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Upload Statement</DialogTitle>
+            <DialogTitle>Prove a settlement week</DialogTitle>
           </DialogHeader>
           <Suspense fallback={<DialogSkeleton />}>
             <StatementUpload
               existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, net_revenue: l.net_revenue, delivery_date: l.delivery_date, truck_id: l.truck_id }))}
               trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
               existingExpenses={expenses.filter((e: any) => !e.deleted_at).map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id, description: e.description }))}
-              onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
+              onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); queryClient.invalidateQueries({ queryKey: ['fleet_loads'] }); }}
+              onClose={() => setUploadDialogOpen(false)}
               orgId={orgId}
             />
           </Suspense>

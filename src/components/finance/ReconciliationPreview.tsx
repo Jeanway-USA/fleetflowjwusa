@@ -1,3 +1,4 @@
+import type { ImportOutcome } from '@/lib/week-import';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,8 @@ interface ReconciliationPreviewProps {
   trucks: Truck[];
   existingExpenses: ExistingExpense[];
   orgId: string | null;
-  onImported: () => void;
+  /** Called after a successful import, with what it did (for the week summary). */
+  onImported: (outcome?: ImportOutcome) => void;
   onCancel: () => void;
 }
 
@@ -218,6 +220,7 @@ export function ReconciliationPreview({
     exp.trip_number && !exp.matchedLoad ? advanceOnlyNote(exp.trip_number) : 'Advance (Non-P&L)';
 
   const handleImport = async () => {
+    const allRows = [...expenseRows, ...advanceRows, ...creditRows];
     const allSelected = [
       ...selectedExpenses.map(e => ({ ...e, importType: 'expense' as const })),
       ...selectedAdvances.map(e => ({ ...e, importType: 'advance' as const })),
@@ -302,7 +305,7 @@ export function ReconciliationPreview({
       if (insertedCount > 0) msgs.push(`${insertedCount} new`);
       if (updatedCount > 0) msgs.push(`${updatedCount} updated`);
       toast.success(`Successfully imported: ${msgs.join(', ')} items`);
-      onImported();
+      onImported({ inserted: insertedCount, updated: updatedCount, skipped: allRows.length - validItems.length });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to import');
     } finally {
