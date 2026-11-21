@@ -1,3 +1,4 @@
+import { getOrgDateFormat } from '@/lib/display-settings';
 import { format, parseISO } from 'date-fns';
 
 /**
@@ -14,12 +15,12 @@ export function formatCurrency(value: number | null | undefined, options?: { max
 }
 
 /**
- * Format an ISO date string to MM/dd/yyyy.
- * Returns '-' for null/undefined values.
+ * Format an ISO date string in the company's date format (Settings, Company; MM/dd/yyyy until chosen), or in `formatStr` when a
+ * call site asks for a specific one. Returns '-' for null/undefined values.
  */
-export function formatDate(date: string | null | undefined, formatStr: string = 'MM/dd/yyyy'): string {
+export function formatDate(date: string | null | undefined, formatStr?: string): string {
   if (!date) return '-';
-  return format(parseISO(date), formatStr);
+  return format(parseISO(date), formatStr ?? getOrgDateFormat());
 }
 
 /**
