@@ -3,12 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText } from 'lucide-react';
+import { ChevronDown, FileText } from 'lucide-react';
 
 import { PeriodSelector, TimePeriod } from '@/components/executive/PeriodSelector';
 import { type WeekDay } from '@/lib/settlement-week';
 import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { LogbookWeek } from '@/components/executive/LogbookWeek';
+import { WeekMoneyHero } from '@/components/executive/WeekMoneyHero';
+import { ActiveLoadsNow } from '@/components/executive/ActiveLoadsNow';
+import { NeedsYou } from '@/components/executive/NeedsYou';
+import { usePhoneLayout } from '@/hooks/usePhoneLayout';
 import { MoneyLines } from '@/components/executive/MoneyLines';
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
 const RevenueOverview = lazy(() =>
@@ -96,6 +100,9 @@ export default function ExecutiveDashboard() {
   // Defaults to the settlement week so the money matches the logbook above it.
   const [period, setPeriod] = useState<TimePeriod>('week');
   const [showReport, setShowReport] = useState(false);
+  // On a phone the page opens on the answers (alerts, this week's money, the load on the road) and keeps the analytics behind "More detail".
+  const isPhone = usePhoneLayout();
+  const [showMore, setShowMore] = useState(false);
   const { startsOn } = useSettlementWeekSetting();
   const dateRange = useMemo(() => getDateRange(period, startsOn), [period, startsOn]);
 
@@ -679,77 +686,102 @@ export default function ExecutiveDashboard() {
           </Button>
         </PageHeader>
 
-        {/* The week on a log page, and the period's money as statement lines */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6" data-tour="revenue-kpi">
-          <div className="lg:col-span-3">
+        {isPhone && (
+          <>
+            <NeedsYou alerts={criticalAlerts} actions={pendingActions} isLoading={alertsLoading || actionsLoading} />
+            <WeekMoneyHero data={kpiData} isLoading={kpiLoading} periodLabel={PERIOD_LABEL[period]} />
+            <ActiveLoadsNow fleet={fleetStatus} fleetLoading={fleetLoading} />
+            <Button
+              variant="outline"
+              className="h-12 w-full justify-between text-base"
+              onClick={() => setShowMore((v) => !v)}
+              aria-expanded={showMore}
+              aria-controls="today-more-detail"
+            >
+              {showMore ? 'Hide detail' : 'More detail'}
+              <ChevronDown className={`h-5 w-5 transition-transform ${showMore ? 'rotate-180' : ''}`} />
+            </Button>
+          </>
+        )}
+
+        {(!isPhone || showMore) && (
+          <div id="today-more-detail" className="space-y-4 lg:space-y-6">
+            {/* The week on a log page, and the period's money as statement lines */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6" data-tour="revenue-kpi">
+              <div className="lg:col-span-3">
+                <ErrorBoundary compact>
+                  <LogbookWeek />
+                </ErrorBoundary>
+              </div>
+              <div className="lg:col-span-2">
+                <MoneyLines
+                  data={kpiData}
+                  isLoading={kpiLoading}
+                  periodLabel={PERIOD_LABEL[period]}
+                  controls={<PeriodSelector value={period} onChange={setPeriod} />}
+                />
+              </div>
+            </div>
+
+            {/* Alerts are already at the top on a phone */}
+            {!isPhone && (
+              <ErrorBoundary compact>
+                <CriticalAlertsBar alerts={criticalAlerts} isLoading={alertsLoading} />
+              </ErrorBoundary>
+            )}
+
             <ErrorBoundary compact>
-              <LogbookWeek />
+              <MorningBriefingWidget />
             </ErrorBoundary>
+
+            {/* Fleet & Driver Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+              <ErrorBoundary compact>
+                <FleetStatusCard data={fleetStatus} isLoading={fleetLoading} />
+              </ErrorBoundary>
+              <ErrorBoundary compact>
+                <DriverAvailabilityCard data={driverAvailability} isLoading={driverLoading} />
+              </ErrorBoundary>
+            </div>
+
+            {/* Revenue Trends Chart */}
+            <ErrorBoundary compact>
+              <Suspense fallback={<ChartSkeleton height={320} />}>
+                <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+              </Suspense>
+            </ErrorBoundary>
+
+            {/* The all-in rate and the year against last year, the way Landstar's BCO Analytics shows it */}
+            <ErrorBoundary compact>
+              <Suspense fallback={<ChartSkeleton height={320} />}>
+                <RevenueOverview />
+              </Suspense>
+            </ErrorBoundary>
+
+            {/* Operations + Costs */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+              <ErrorBoundary compact>
+                <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
+              </ErrorBoundary>
+              <ErrorBoundary compact>
+                <Suspense fallback={<ChartSkeleton height={320} />}>
+                  <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+
+            {/* Actions + Performers + Insights (the to-do list is already at the top on a phone) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+              {!isPhone && <PendingActionsCard actions={pendingActions} isLoading={actionsLoading} />}
+              <TopPerformerCards
+                topDriver={topPerformers?.topDriver}
+                topTruck={topPerformers?.topTruck}
+                isLoading={performersLoading}
+              />
+              <QuickInsights insights={insights} isLoading={isLoading} />
+            </div>
           </div>
-          <div className="lg:col-span-2">
-            <MoneyLines
-              data={kpiData}
-              isLoading={kpiLoading}
-              periodLabel={PERIOD_LABEL[period]}
-              controls={<PeriodSelector value={period} onChange={setPeriod} />}
-            />
-          </div>
-        </div>
-
-        <ErrorBoundary compact>
-          <CriticalAlertsBar alerts={criticalAlerts} isLoading={alertsLoading} />
-        </ErrorBoundary>
-
-        <ErrorBoundary compact>
-          <MorningBriefingWidget />
-        </ErrorBoundary>
-
-        {/* Row 3: Fleet & Driver Status */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-          <ErrorBoundary compact>
-            <FleetStatusCard data={fleetStatus} isLoading={fleetLoading} />
-          </ErrorBoundary>
-          <ErrorBoundary compact>
-            <DriverAvailabilityCard data={driverAvailability} isLoading={driverLoading} />
-          </ErrorBoundary>
-        </div>
-
-        {/* Row 4: Revenue Trends Chart */}
-        <ErrorBoundary compact>
-          <Suspense fallback={<ChartSkeleton height={320} />}>
-            <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
-          </Suspense>
-        </ErrorBoundary>
-
-        {/* Row 4b: the all-in rate and the year against last year, the way Landstar's BCO Analytics shows it */}
-        <ErrorBoundary compact>
-          <Suspense fallback={<ChartSkeleton height={320} />}>
-            <RevenueOverview />
-          </Suspense>
-        </ErrorBoundary>
-
-        {/* Row 5: Operations + Costs */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          <ErrorBoundary compact>
-            <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
-          </ErrorBoundary>
-          <ErrorBoundary compact>
-            <Suspense fallback={<ChartSkeleton height={320} />}>
-              <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
-            </Suspense>
-          </ErrorBoundary>
-        </div>
-
-        {/* Row 6: Actions + Performers + Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-          <PendingActionsCard actions={pendingActions} isLoading={actionsLoading} />
-          <TopPerformerCards
-            topDriver={topPerformers?.topDriver}
-            topTruck={topPerformers?.topTruck}
-            isLoading={performersLoading}
-          />
-          <QuickInsights insights={insights} isLoading={isLoading} />
-        </div>
+        )}
       </div>
 
       <Dialog open={showReport} onOpenChange={setShowReport}>
