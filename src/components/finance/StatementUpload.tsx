@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, FileSpreadsheet, FileScan, Trash2 } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, FileSpreadsheet, FileScan, Trash2, CalendarRange, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { parseLandstarXlsx } from '@/lib/parse-landstar-xlsx';
@@ -14,6 +14,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { readSettlementLines } from '@/lib/read-settlement-lines';
+import { proveTrips } from '@/lib/weekly-proof';
+import { fetchProofInputs } from '@/lib/proof-inputs';
+import { weekdayName } from '@/lib/settlement-week';
+import { WEEK_DOCUMENTS, documentStates, missingDocuments, periodMatchNote, summarizeWeek, weekChoices, weekFrame } from '@/lib/week-import';
+import type { ImportOutcome, WeekSummary } from '@/lib/week-import';
+import { WeekStatementSummary } from './WeekStatementSummary';
 
 interface FleetLoad {
   id: string;
@@ -45,6 +53,8 @@ interface StatementUploadProps {
   existingExpenses: ExistingExpense[];
   onExpensesImported: () => void;
   orgId: string | null;
+  /** Closes the window that holds this (the summary's Done button). */
+  onClose?: () => void;
 }
 
 const DOCUMENT_TYPES: StagedFile['type'][] = [
@@ -63,8 +73,14 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 
 import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 
-export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId }: StatementUploadProps) {
-  const { endDay: weekEndDay } = useSettlementWeekSetting();
+export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId, onClose }: StatementUploadProps) {
+  const { endDay: weekEndDay, startsOn, startName, endName } = useSettlementWeekSetting();
+  // The settlement week being worked. Statements arrive after a week ends, so it opens on the last finished week.
+  const [weekOffset, setWeekOffset] = useState(-1);
+  const [summary, setSummary] = useState<WeekSummary | null>(null);
+  const [isProving, setIsProving] = useState(false);
+  const frame = useMemo(() => weekFrame(new Date(), weekOffset, startsOn), [weekOffset, startsOn]);
+  const choices = useMemo(() => weekChoices(new Date(), startsOn, 8), [startsOn]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { landstarSplit } = usePaySettings();
@@ -259,13 +275,40 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
   const handleCancel = () => {
     setStagedFiles([]);
     setReconciliationResult(null);
+    setSummary(null);
     setError(null);
   };
 
-  const handleImported = () => {
-    handleCancel();
+  /** After the import: prove the week against Landstar's Freight Bill Details (if it was read) and show the result. */
+  const handleImported = async (outcome?: ImportOutcome) => {
     onExpensesImported();
+    setIsProving(true);
+    try {
+      const freight = stagedFiles.find((f) => f.type === 'freight_bill_xlsx' && f.status === 'parsed');
+      let proof = null;
+      if (freight) {
+        const lines = await readSettlementLines(await freight.file.arrayBuffer());
+        const { loads, expenses } = await fetchProofInputs();
+        proof = proveTrips(lines, loads, expenses);
+      }
+      setSummary(summarizeWeek(frame, proof, outcome ?? null));
+    } catch (err) {
+      // Never leave the office with a silent import: say the proof could not be run.
+      toast.error(err instanceof Error ? `The week was imported but could not be proven: ${err.message}` : 'The week was imported but could not be proven');
+      setSummary(summarizeWeek(frame, null, outcome ?? null));
+    } finally {
+      setIsProving(false);
+    }
   };
+
+  const handleDone = () => {
+    handleCancel();
+    onClose?.();
+  };
+
+  const docStates = documentStates(stagedFiles);
+  const missing = missingDocuments(stagedFiles);
+  const periodNote = reconciliationResult ? periodMatchNote(frame, reconciliationResult.periodStart, reconciliationResult.periodEnd) : null;
 
   // Which types are staged?
   const stagedTypes = new Set(stagedFiles.map(f => f.type));
@@ -275,15 +318,40 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <FileText className="h-5 w-5" />
-          Import from Landstar Statements
+          Prove a Landstar settlement week
         </CardTitle>
         <CardDescription>
-          Upload multiple documents at once — we'll cross-reference and deduplicate before importing
+          Add the week's Landstar documents, then prove the week. Nothing is imported twice, and anything left out is listed.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* The settlement week being worked */}
+        <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <CalendarRange className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <p className="font-condensed text-xl font-bold leading-tight">{frame.label}</p>
+              <p className="text-[13px] text-muted-foreground">
+                Landstar settlement week, {startName} to {endName} ({frame.range}), not a calendar Monday to Sunday week.
+              </p>
+            </div>
+          </div>
+          <Select value={String(weekOffset)} onValueChange={(v) => setWeekOffset(Number(v))} disabled={isProcessing || isProving || !!reconciliationResult}>
+            <SelectTrigger className="h-11 sm:h-10 sm:w-56" aria-label="Settlement week">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {choices.map((c) => (
+                <SelectItem key={c.offset} value={String(c.offset)}>
+                  {c.offset === 0 ? 'This week' : c.offset === -1 ? 'Last week' : `${-c.offset} weeks ago`}: ends {c.endIso.slice(5).replace('-', '/')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Show dropzone + checklist when no reconciliation result */}
-        {!reconciliationResult && (
+        {!reconciliationResult && !summary && (
           <>
             {/* Multi-File Drop Zone */}
             <div
@@ -314,99 +382,129 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
               onChange={handleFileSelect}
             />
 
-            {/* Document Checklist */}
-            {stagedFiles.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Document Checklist</p>
-                <div className="grid gap-2">
-                  {DOCUMENT_TYPES.map(type => {
-                    const staged = stagedFiles.find(f => f.type === type);
-                    const hasIt = !!staged;
-                    return (
-                      <div
-                        key={type}
-                        className={cn(
-                          'flex items-center justify-between rounded-lg border px-3 py-2 text-sm',
-                          hasIt ? 'border-success/40 bg-success/5' : 'border-border bg-muted/30'
+            {/* Document checklist: all four, from the start, so what is missing is plain */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Documents for this week</p>
+              <div className="grid gap-2">
+                {WEEK_DOCUMENTS.map((doc) => {
+                  const st = docStates.find((d) => d.type === doc.type)!;
+                  const staged = st.file;
+                  const has = st.status !== 'missing';
+                  return (
+                    <div
+                      key={doc.type}
+                      className={cn(
+                        'flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm',
+                        st.status === 'parsed' && 'border-success/40 bg-success/5',
+                        st.status === 'error' && 'border-destructive/40 bg-destructive/5',
+                        (st.status === 'missing') && 'border-border bg-muted/30',
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        {st.status === 'parsed' ? (
+                          <CheckCircle className="h-4 w-4 text-success" />
+                        ) : st.status === 'error' ? (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        ) : has ? (
+                          <div className="h-4 w-4 rounded-full border-2 border-primary" />
+                        ) : (
+                          <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
                         )}
-                      >
-                        <div className="flex items-center gap-2">
-                          {hasIt ? (
-                            <CheckCircle className="h-4 w-4 text-success" />
-                          ) : (
-                            <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
-                          )}
-                          <span className="flex items-center gap-1.5">
-                            {TYPE_ICONS[type]}
-                            {getFileTypeLabel(type)}
-                          </span>
-                        </div>
+                        <span className="flex items-center gap-1.5">
+                          {TYPE_ICONS[doc.type]}
+                          {doc.label} <span className="text-muted-foreground">({doc.short})</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         {staged && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground truncate max-w-[160px]">
-                              {staged.file.name}
-                            </span>
-                            {staged.status === 'parsing' && (
-                              <Badge variant="outline" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Reading…</Badge>
-                            )}
-                            {staged.status === 'error' && (
-                              <>
-                                <Badge variant="destructive" className="text-xs" title={staged.error}>Error</Badge>
-                                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={isProcessing} onClick={(e) => { e.stopPropagation(); void processDocuments(); }}>
-                                  Try again
-                                </Button>
-                              </>
-                            )}
-                            {staged.status === 'parsed' && (
-                              <Badge className="text-xs bg-success/20 text-success border-success/30">Parsed</Badge>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeFile(stagedFiles.indexOf(staged));
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
+                          <span className="max-w-[160px] truncate text-xs text-muted-foreground">{staged.file.name}</span>
+                        )}
+                        {st.status === 'missing' && <Badge variant="outline" className="text-xs">Missing</Badge>}
+                        {st.status === 'staged' && <Badge variant="outline" className="text-xs">Added</Badge>}
+                        {st.status === 'parsing' && (
+                          <Badge variant="outline" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Reading…</Badge>
+                        )}
+                        {st.status === 'error' && (
+                          <>
+                            <Badge variant="destructive" className="text-xs" title={staged?.error}>Failed</Badge>
+                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={isProcessing} onClick={(e) => { e.stopPropagation(); void processDocuments(); }}>
+                              Try again
                             </Button>
-                          </div>
+                          </>
+                        )}
+                        {st.status === 'parsed' && (
+                          <Badge className="text-xs bg-success/20 text-success border-success/30">Read OK</Badge>
+                        )}
+                        {staged && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Remove ${staged.file.name}`}
+                            disabled={isProcessing}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(stagedFiles.indexOf(staged));
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-                {isProcessing && (
-                  <p className="text-sm text-muted-foreground" aria-live="polite">
-                    Reading your files. The PDFs can take a minute or two. You can leave this window open.
+              {stagedFiles.some((f) => f.type === 'unknown') && (
+                <p className="flex items-start gap-2 text-sm text-warning">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  {stagedFiles.filter((f) => f.type === 'unknown').map((f) => f.file.name).join(', ')}: could not tell which Landstar document this is yet. PDFs are identified once read.
+                </p>
+              )}
+
+              {stagedFiles.length > 0 && missing.length > 0 && (
+                <div className="rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
+                  <p className="mb-1 flex items-center gap-2 font-medium">
+                    <AlertTriangle className="h-4 w-4 text-warning" /> You can still prove the week, with these gaps
                   </p>
-                )}
-                {stagedFiles.some((f) => f.status === 'error') && !isProcessing && (
-                  <ul className="space-y-1 text-sm text-destructive">
-                    {stagedFiles.filter((f) => f.status === 'error').map((f) => (
-                      <li key={f.file.name}>{f.file.name}: {f.error}</li>
+                  <ul className="space-y-1 text-[13px] text-muted-foreground">
+                    {missing.map((m) => (
+                      <li key={m.label}><span className="font-medium text-foreground">{m.label}:</span> {m.meaning}</li>
                     ))}
                   </ul>
-                )}
-
-                {/* Process Button */}
-                <div className="flex gap-2 justify-end">
-                  <Button variant="outline" onClick={handleCancel} disabled={isProcessing}>
-                    Clear All
-                  </Button>
-                  <Button
-                    onClick={processDocuments}
-                    disabled={isProcessing || stagedFiles.length === 0}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Process {stagedFiles.length} Document{stagedFiles.length !== 1 ? 's' : ''}
-                  </Button>
                 </div>
+              )}
+
+              {isProcessing && (
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                  Reading your files. The PDFs can take a minute or two. You can leave this window open.
+                </p>
+              )}
+              {stagedFiles.some((f) => f.status === 'error') && !isProcessing && (
+                <ul className="space-y-1 text-sm text-destructive">
+                  {stagedFiles.filter((f) => f.status === 'error').map((f) => (
+                    <li key={f.file.name}>{f.file.name}: {f.error}</li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Prove button */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" className="h-12 sm:h-10" onClick={handleCancel} disabled={isProcessing || stagedFiles.length === 0}>
+                  Clear all
+                </Button>
+                <Button
+                  onClick={processDocuments}
+                  disabled={isProcessing || stagedFiles.length === 0}
+                  className="h-12 sm:h-10 bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Prove this week
+                  {stagedFiles.length > 0 && ` (${stagedFiles.length} file${stagedFiles.length !== 1 ? 's' : ''})`}
+                </Button>
               </div>
-            )}
+            </div>
           </>
         )}
 
@@ -426,23 +524,39 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           </div>
         )}
 
+        {/* Proving after the import */}
+        {isProving && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+            <Loader2 className="h-4 w-4 animate-spin" /> Proving {frame.label.toLowerCase()} against Landstar…
+          </p>
+        )}
+
+        {/* What matched, what was imported, what is still open */}
+        {summary && <WeekStatementSummary summary={summary} onDone={handleDone} />}
+
         {/* Reconciliation Preview */}
-        {reconciliationResult && (
+        {reconciliationResult && !summary && !isProving && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-success" />
               <div>
                 <p className="text-sm font-medium">
-                  Reconciled {stagedFiles.filter(f => f.status === 'parsed').length} documents
+                  Read {stagedFiles.filter(f => f.status === 'parsed').length} documents for the {frame.label.toLowerCase()}. Review below, then import.
                 </p>
                 {reconciliationResult.periodStart && (
                   <p className="text-xs text-muted-foreground">
-                    Period: {reconciliationResult.periodStart} to {reconciliationResult.periodEnd}
+                    Statements cover: {reconciliationResult.periodStart} to {reconciliationResult.periodEnd}
                     {reconciliationResult.unitNumber && ` • Unit ${reconciliationResult.unitNumber}`}
                   </p>
                 )}
               </div>
             </div>
+            {periodNote && (
+              <p className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                {periodNote}
+              </p>
+            )}
             <ReconciliationPreview
               result={reconciliationResult}
               existingLoads={existingLoads}
