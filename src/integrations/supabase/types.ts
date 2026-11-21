@@ -5281,6 +5281,7 @@ export type Database = {
           business_state: string | null
           business_zip: string | null
           company_timezone: string
+          date_format: string
           complimentary_ends_at: string | null
           created_at: string
           dot_number: string | null
@@ -5315,6 +5316,7 @@ export type Database = {
           business_state?: string | null
           business_zip?: string | null
           company_timezone?: string
+          date_format?: string
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
@@ -5349,6 +5351,7 @@ export type Database = {
           business_state?: string | null
           business_zip?: string | null
           company_timezone?: string
+          date_format?: string
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
