@@ -17,7 +17,6 @@ import {
   Contact,
   AlertTriangle,
   Award,
-  Fuel,
   BarChart,
   Receipt,
   Archive,
@@ -260,7 +259,6 @@ export function AppSidebar() {
     { title: 'Money', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss', tourId: 'nav-finance' },
     { title: 'Payroll', icon: Banknote, path: '/payroll', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
     { title: 'Tax Hub', icon: Receipt, path: '/admin/tax-hub', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
-    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta' },
   ];
 
   const complianceItems: NavItem[] = [
