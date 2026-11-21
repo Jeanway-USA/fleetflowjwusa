@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 
 interface IntermediateStop {
   stop_number: number;
@@ -69,7 +68,6 @@ interface RateConfirmationUploadProps {
 export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers, trucks }: RateConfirmationUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { isLandstar } = useOrganizationMode();
   const [fileName, setFileName] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedLoadData | null>(null);
   const [matchingLoad, setMatchingLoad] = useState<ExistingLoad | null>(null);
@@ -414,7 +412,7 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-xs text-muted-foreground">{isLandstar ? 'Landstar Load ID' : 'Load ID'}</p>
+                <p className="text-xs text-muted-foreground">Landstar Load ID</p>
                 <p className="font-mono font-medium">{extractedData.landstar_load_id || '-'}</p>
               </div>
               <div>

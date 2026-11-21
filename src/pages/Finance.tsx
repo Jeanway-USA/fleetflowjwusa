@@ -1,7 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -54,8 +53,6 @@ import { format, parseISO, endOfMonth, endOfQuarter, endOfDay, isWithinInterval,
 import { settlementWeek } from '@/lib/settlement-week';
 import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-const InvoicingTab = lazy(() => import('@/components/finance/InvoicingTab').then((m) => ({ default: m.InvoicingTab })));
-const FactoringTab = lazy(() => import('@/components/finance/FactoringTab').then((m) => ({ default: m.FactoringTab })));
 
 const LoadProfitabilityTab = lazy(() =>
   import('@/components/finance/LoadProfitabilityTab').then(m => ({ default: m.LoadProfitabilityTab })),
@@ -84,7 +81,6 @@ export default function Finance() {
   const { orgId, hasRole } = useAuth();
   const { startsOn: weekStartsOn } = useSettlementWeekSetting();
   const canManagePayroll = hasRole('owner') || hasRole('payroll_admin');
-  const { isIndependent } = useOrganizationMode();
   // Default to current month
   // Opens on the current Landstar settlement week: "this week's settlement" is a top phone job.
   const defaultPeriod = 'week';
@@ -743,7 +739,6 @@ export default function Finance() {
                 totalPayroll={totalPayroll}
                 revenueTotals={revenueTotals}
                 allLoads={loads}
-                isIndependent={isIndependent}
               />
             </Suspense>
           </div>
@@ -875,12 +870,6 @@ export default function Finance() {
           <Suspense fallback={<TabFallback />}>
           <div className="space-y-8 animate-in fade-in-50">
             <CompensationSettingsTab getSetting={getSetting} />
-            {isIndependent && (
-              <>
-                <InvoicingTab />
-                <FactoringTab />
-              </>
-            )}
             <SafetyBonusSettings />
           </div>
         </Suspense>

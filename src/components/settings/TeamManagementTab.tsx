@@ -515,7 +515,7 @@ export function TeamManagementTab() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="w2">Company driver (W-2 employee)</SelectItem>
-                    <SelectItem value="1099">Owner-operator (1099 contractor)</SelectItem>
+                    <SelectItem value="1099">Contractor (1099)</SelectItem>
                     <SelectItem value="lease_purchase">Lease purchase (1099 contractor)</SelectItem>
                   </SelectContent>
                 </Select>
