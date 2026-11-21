@@ -1180,7 +1180,7 @@ export default function DriverOnboarding() {
                   value: '1099' as const,
                   label: 'Independent Contractor',
                   tag: '1099',
-                  description: 'You operate under your own authority or as an owner-operator. You receive a 1099 at year-end and handle your own taxes.',
+                  description: 'You contract with JeanWay and drive under the Landstar lease. You receive a 1099 at year-end and handle your own taxes.',
                   Icon: Briefcase,
                 },
                 {

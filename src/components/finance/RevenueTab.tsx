@@ -1,7 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 
 interface RevenueTabProps {
   filteredLoads: any[];
@@ -9,8 +8,6 @@ interface RevenueTabProps {
 }
 
 export function RevenueTab({ filteredLoads, revenueTotals }: RevenueTabProps) {
-  const { isIndependent } = useOrganizationMode();
-
   return (
     <div className="space-y-6">
       <Card className="bg-card border border-border rounded-lg">
@@ -24,7 +21,7 @@ export function RevenueTab({ filteredLoads, revenueTotals }: RevenueTabProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>{isIndependent ? 'Load ID' : 'Landstar Load ID'}</TableHead>
+                  <TableHead>Landstar Load ID</TableHead>
                   <TableHead>Route</TableHead>
                   <TableHead className="text-right">Linehaul</TableHead>
                   <TableHead className="text-right">FSC</TableHead>

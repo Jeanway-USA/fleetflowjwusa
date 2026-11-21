@@ -72,7 +72,7 @@ export function TaxAndYtdPanel({ ytd, ytdLoading }: Props) {
       </Panel>
 
       <Panel>
-        <PanelHead title="1099 tax statements" aside="Owner-operators" />
+        <PanelHead title="1099 tax statements" aside="1099 contractors" />
         <div className="space-y-3 px-4 pb-4">
           {taxLoading ? (
             <Skeleton className="h-11 w-full" />

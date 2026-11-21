@@ -5,7 +5,6 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { calculateRevenue as calculateRevenueFn } from '@/lib/revenue-calculator';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -16,8 +15,6 @@ import { Field, FormSection } from '@/components/shared/FormParts';
 import { summarize } from '@/lib/revenue-overview';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
-import { SmartLoadCreator } from '@/components/loads/SmartLoadCreator';
-import { IndependentLoadBuilder } from '@/components/loads/IndependentLoadBuilder';
 import { IntermediateStopsView } from '@/components/loads/IntermediateStopsView';
 import { StopTime } from '@/components/shared/StopTime';
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
@@ -47,7 +44,6 @@ import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
-import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
 import { AgencyCRMStatusBadge } from '@/components/loads/AgencyCRMStatusBadge';
 import { findPickupNumber } from '@/lib/loads/pickupNumber';
 import { FeetInchesInput } from '@/components/shared/FeetInchesInput';
@@ -81,7 +77,6 @@ export default function FleetLoads() {
   // Opening /fleet-loads?highlight=<id> (e.g. from the Today logbook) flashes that load.
   useHighlightRow();
   const { hasRole, isAdmin, orgId } = useAuth();
-  const { isIndependent, isLandstar } = useOrganizationMode();
   const isDriverOnly = hasRole('driver') && !isAdmin;
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -992,7 +987,7 @@ export default function FleetLoads() {
   const exportCsv = () =>
     downloadCsv(
       'loads',
-      ['Date', isLandstar ? 'Landstar ID' : 'Load ID', 'Agent', 'Origin', 'Destination', 'Linehaul', 'Fuel surcharge', 'Accessorials', 'Billed in all', 'Your share', 'Miles', 'Status', 'Driver', 'Truck'],
+      ['Date', 'Landstar ID', 'Agent', 'Origin', 'Destination', 'Linehaul', 'Fuel surcharge', 'Accessorials', 'Billed in all', 'Your share', 'Miles', 'Status', 'Driver', 'Truck'],
       filteredLoads.map((l: any) => [l.pickup_date, l.landstar_load_id, l.agency_code, l.origin, l.destination, l.rate, l.fuel_surcharge, getLoadAccessorialsTotal(l.id), l.gross_revenue, l.net_revenue, getDisplayMiles(l), l.status, l.driver_name, l.truck_unit]),
     );
 
@@ -1010,21 +1005,12 @@ export default function FleetLoads() {
 
       {showRateConUpload && (
         <div className="mb-5">
-          {isIndependent ? (
-            <SmartLoadCreator
-              onDataExtracted={handleRateConfirmationData}
-              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, pickup_date: l.pickup_date }))}
-              drivers={drivers}
-              trucks={trucks}
-            />
-          ) : (
-            <RateConfirmationUpload
-              onDataExtracted={handleRateConfirmationData}
-              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, pickup_date: l.pickup_date }))}
-              drivers={drivers}
-              trucks={trucks}
-            />
-          )}
+          <RateConfirmationUpload
+            onDataExtracted={handleRateConfirmationData}
+            existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, pickup_date: l.pickup_date }))}
+            drivers={drivers}
+            trucks={trucks}
+          />
         </div>
       )}
 
@@ -1138,57 +1124,6 @@ export default function FleetLoads() {
           <DialogHeader>
             <DialogTitle>{editingLoad ? `Edit load ${editingLoad.landstar_load_id || ''}`.trim() : 'Add a load'}</DialogTitle>
           </DialogHeader>
-          {isIndependent && !editingLoad ? (
-            <IndependentLoadBuilder
-              onSave={(data) => {
-                const intermediateStopsText = formatIntermediateStops(
-                  (data.intermediate_stops || []).map((s: any, i: number) => ({
-                    stop_number: i + 1,
-                    stop_type: 'intermediate',
-                    facility_name: s.facility_name,
-                    address: s.address,
-                    date: s.date,
-                  }))
-                );
-                const notes = [
-                  data.shipper_facility ? `Shipper: ${data.shipper_facility}` : '',
-                  data.consignee_facility ? `Consignee: ${data.consignee_facility}` : '',
-                  data.commodity ? `Commodity: ${data.commodity}` : '',
-                  data.weight ? `Weight: ${data.weight} lbs` : '',
-                  data.equipment ? `Equipment: ${data.equipment}` : '',
-                  data.broker_name ? `Broker: ${data.broker_name}` : '',
-                  data.factoring_approved ? 'Factoring: Approved' : '',
-                  intermediateStopsText,
-                ].filter(Boolean).join('\n');
-
-                const payload = {
-                  landstar_load_id: data.landstar_load_id || null,
-                  origin: data.origin,
-                  destination: data.destination,
-                  pickup_date: data.pickup_date || null,
-                  pickup_time: data.pickup_time || null,
-                  delivery_date: data.delivery_date || null,
-                  delivery_time: data.delivery_time || null,
-                  rate: data.rate || 0,
-                  fuel_surcharge: 0,
-                  notes,
-                  status: 'pending',
-                  is_power_only: false,
-                  org_id: orgId,
-                };
-                const calculated = calculateRevenueLocal(payload);
-                const structuredStops = (data.intermediate_stops || []).map((s: any, i: number) => ({
-                  stop_number: i + 1,
-                  stop_type: 'intermediate',
-                  facility_name: s.facility_name,
-                  address: s.address,
-                  date: s.date,
-                }));
-                createMutation.mutate({ load: { ...payload, ...calculated }, accessorials: [], intermediateStops: structuredStops });
-              }}
-              onCancel={closeDialog}
-            />
-          ) : (
           <form onSubmit={handleSubmit}>
             {(() => {
               const editing = !!editingLoad?.id;
@@ -1233,7 +1168,7 @@ export default function FleetLoads() {
                   <TabsContent value="trip" className="mt-4 space-y-6">
                     <FormSection title="The load">
                       <div className="grid gap-4 sm:grid-cols-3">
-                        <Field label={isLandstar ? 'Landstar load ID' : 'Load ID'} htmlFor="landstar_load_id">
+                        <Field label="Landstar load ID" htmlFor="landstar_load_id">
                           <Input id="landstar_load_id" value={formData.landstar_load_id || ''} onChange={(e) => set({ landstar_load_id: e.target.value })} placeholder="8941232" />
                         </Field>
                         <Field label="Agent code" htmlFor="agency_code">
@@ -1469,24 +1404,6 @@ export default function FleetLoads() {
                       )}
                     </FormSection>
 
-                    {isIndependent && (
-                      <FormSection title="Negotiation">
-                        <div className="mb-4 flex items-baseline justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-                          <div>
-                            <div className="text-sm font-medium">Total negotiated rate</div>
-                            <div className="text-xs text-muted-foreground">Linehaul, fuel surcharge, extra charges and lumper</div>
-                          </div>
-                          <span className="figure text-xl font-bold text-primary">
-                            {formatCurrency((parseFloat(formData.rate) || 0) + (parseFloat(formData.fuel_surcharge) || 0) + calculateAccessorialsTotal() + (parseFloat(formData.lumper) || 0))}
-                          </span>
-                        </div>
-                        <Field label="Notes" htmlFor="negotiation_notes">
-                          <Textarea id="negotiation_notes" value={formData.negotiation_notes || ''} onChange={(e) => set({ negotiation_notes: e.target.value })} placeholder="Counter-offers, what the broker agreed to" rows={3} />
-                        </Field>
-                        {formData.agency_code && <div className="mt-4"><BrokerRateHistoryCard agencyCode={formData.agency_code} currentLoads={loads} /></div>}
-                      </FormSection>
-                    )}
-
                     <FormSection title="Advance">
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Field label="Advance taken" htmlFor="advance_taken">
@@ -1637,7 +1554,6 @@ export default function FleetLoads() {
               </Button>
             </DialogFooter>
           </form>
-          )}
         </DialogContent>
       </Dialog>
     </>
