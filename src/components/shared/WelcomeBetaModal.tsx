@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, Rocket } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { isInternalProduct } from '@/lib/internal-product';
 
 interface WelcomeBetaModalProps {
   open: boolean;
@@ -32,6 +33,9 @@ export function WelcomeBetaModal({ open, userId, onStartTour, onClose }: Welcome
     await markCompleted();
     onClose();
   };
+
+  // The beta welcome never opens for JeanWay's internal product.
+  if (isInternalProduct(hidePromotions)) return null;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleSkip(); }}>

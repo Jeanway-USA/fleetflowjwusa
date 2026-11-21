@@ -9,6 +9,8 @@ export interface TourStep {
 export interface TourDefinition {
   id: string;
   steps: TourStep[];
+  /** Only operational tours are offered for replay and may auto-start; marketing/beta tours never are. */
+  replayable?: boolean;
 }
 
 const dispatcherTour: TourDefinition = {
@@ -62,17 +64,12 @@ const bcoTour: TourDefinition = {
       title: 'Automated Accounting',
       description: 'Upload your weekly statements here. We will automatically parse your deductions, fuel costs, and settlements.',
     },
-    {
-      id: 'beta-feedback',
-      targetSelector: '[data-tour="beta-feedback"]',
-      title: 'Shape the Platform',
-      description: 'Your input drives our updates. Click here anytime to report a bug or request a new feature for your operation.',
-    },
   ],
 };
 
 const driverTour: TourDefinition = {
   id: 'driver_v2',
+  replayable: true,
   steps: [
     {
       id: 'welcome',
