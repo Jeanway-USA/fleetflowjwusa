@@ -252,7 +252,7 @@ IMPORTANT:
 - Always populate the "revenue" array for contractor PDFs; use an empty array [] for card_activity PDFs
 
 CONTRACTOR STATEMENT SPECIFICS:
-- Landstar contractor statements are WEEKLY. period_end is the "Period Ending" date (a Wednesday) and period_start is 6 days earlier. Do not report the whole month.
+- Landstar contractor statements are WEEKLY. period_end is the "Period Ending" date as printed (Landstar periods end on a Wednesday) and period_start is 6 days earlier. Do not report the whole month.
 - Deductions & Charges are printed as positive numbers; return them as positive amounts.
 - List every scheduled deduction separately, even when two lines share a description (e.g. two "NTP TRUCK WARRANTY PROG." lines with different amounts, or two "EOBR - AIRTIME" lines). Never sum them.
 - Use the line's own Transaction Date for scheduled deductions and other adjustments; use the P/U Date for trip lines.
