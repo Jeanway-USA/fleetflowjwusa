@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
@@ -173,8 +174,8 @@ export default function AgencyLoads() {
         </>
       ),
       facts: [
-        { label: 'Broker', value: l.broker_name || <span className="font-normal text-muted-foreground">Not set</span> },
-        { label: 'Carrier', value: l.carrier_name || <span className="font-normal text-muted-foreground">Not set</span> },
+        { label: 'Customer', value: l.broker_name || <span className="font-normal text-muted-foreground">Not set</span> },
+        { label: 'Hauled by', value: l.carrier_name || <span className="font-normal text-muted-foreground">Not set</span> },
         { label: 'Margin', value: `${formatCurrency(margin)}${pct !== null ? `, ${pct.toFixed(1)}%` : ''}`, tone: margin >= 0 ? ('good' as const) : ('bad' as const) },
         ...(landstarSide ? [{ label: 'You are paid', value: formatCurrency(bcoPayout(l)) }] : []),
       ],
@@ -198,7 +199,7 @@ export default function AgencyLoads() {
   const exportCsv = () =>
     downloadCsv(
       'agency-loads',
-      ['Reference', 'Status', 'Broker', 'Carrier', 'Pickup', 'Delivery', 'Pickup date', 'Delivery date', 'Broker rate', 'Carrier rate', 'Margin', 'Gross linehaul', 'Fuel surcharge', 'Tarp fee', 'Split %', 'You are paid'],
+      ['Reference', 'Status', 'Customer', 'Hauled by', 'Pickup', 'Delivery', 'Pickup date', 'Delivery date', 'Customer rate', 'Hauler rate', 'Margin', 'Gross linehaul', 'Fuel surcharge', 'Tarp fee', 'Split %', 'You are paid'],
       filtered.map((l) => [l.load_reference, l.status, l.broker_name, l.carrier_name, l.origin, l.destination, l.pickup_date, l.delivery_date, l.broker_rate, l.carrier_rate, l.margin, l.gross_linehaul, l.fuel_surcharge, l.tarp_fee, l.bco_split_pct, bcoPayout(l)]),
     );
 
@@ -208,20 +209,23 @@ export default function AgencyLoads() {
 
   return (
     <>
-      <PageHeader title="Agency Loads" description="Brokerage loads, and what each one leaves you" action={{ label: 'Add load', onClick: () => openDialog() }} />
+      <PageHeader title="Agency Loads" description="Freight booked under your Landstar agency code, and what each load leaves the agency" action={{ label: 'Add agency load', onClick: () => openDialog() }} />
+      <p className="-mt-2 mb-5 text-[13px] text-muted-foreground">
+        Loads your own truck hauls are under <Link to="/fleet-loads" className="font-medium text-foreground underline underline-offset-4">Loads</Link>. This page is the agency side.
+      </p>
 
       {!isLoading && loads.length === 0 ? (
-        <EmptyState icon={Briefcase} title="No agency loads yet" description="Add your first brokerage load to start tracking margins." action={{ label: 'Add first load', onClick: () => openDialog() }} />
+        <EmptyState icon={Briefcase} title="No agency loads yet" description="Add a load your Landstar agency booked to track what the customer pays, what the hauler is paid, and the agency's margin." action={{ label: 'Add first agency load', onClick: () => openDialog() }} />
       ) : (
         <>
           <Panel title="Margin on these loads" description="Cancelled loads are left out." className="mb-5">
-            <StatementLine label="Brokers pay" note={`${totals.loads} ${totals.loads === 1 ? 'load' : 'loads'}, ${totals.open} not delivered`} value={isLoading ? '…' : wholeDollars(totals.brokerPays)} />
-            <StatementLine label="Carriers are paid" value={isLoading ? '…' : `−${wholeDollars(totals.carrierCost)}`} rule="single" />
-            <StatementLine label="Margin" note={totals.brokerPays > 0 ? `${((totals.margin / totals.brokerPays) * 100).toFixed(1)}% of what brokers pay` : undefined} value={isLoading ? '…' : wholeDollars(totals.margin)} strong rule="double" />
-            {totals.bcoPayout > 0 && <StatementLine label="Paid to you on Landstar loads" note="Your split of linehaul, plus fuel surcharge and tarp fee in full" value={wholeDollars(totals.bcoPayout)} muted rule="single" />}
+            <StatementLine label="Customers pay" note={`${totals.loads} ${totals.loads === 1 ? 'load' : 'loads'}, ${totals.open} not delivered`} value={isLoading ? '…' : wholeDollars(totals.brokerPays)} />
+            <StatementLine label="Haulers are paid" value={isLoading ? '…' : `−${wholeDollars(totals.carrierCost)}`} rule="single" />
+            <StatementLine label="Margin" note={totals.brokerPays > 0 ? `${((totals.margin / totals.brokerPays) * 100).toFixed(1)}% of what customers pay` : undefined} value={isLoading ? '…' : wholeDollars(totals.margin)} strong rule="double" />
+            {totals.bcoPayout > 0 && <StatementLine label="Paid to you when your truck hauls" note="Your split of linehaul, plus fuel surcharge and tarp fee in full" value={wholeDollars(totals.bcoPayout)} muted rule="single" />}
           </Panel>
 
-          <RosterToolbar search={search} onSearch={setSearch} placeholder="Search reference, broker, carrier, city">
+          <RosterToolbar search={search} onSearch={setSearch} placeholder="Search reference, customer, hauler, city">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-11 w-full sm:w-[170px]" aria-label="Status">
                 <SelectValue placeholder="Status" />
@@ -308,10 +312,10 @@ export default function AgencyLoads() {
                     <SelectContent>{STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
-                <Field label="Broker" htmlFor="broker_name">
+                <Field label="Customer" htmlFor="broker_name">
                   <Input id="broker_name" value={formData.broker_name || ''} onChange={(e) => set({ broker_name: e.target.value })} />
                 </Field>
-                <Field label="Carrier" htmlFor="carrier_name">
+                <Field label="Hauled by" htmlFor="carrier_name">
                   <Input id="carrier_name" value={formData.carrier_name || ''} onChange={(e) => set({ carrier_name: e.target.value })} />
                 </Field>
               </div>
@@ -334,18 +338,18 @@ export default function AgencyLoads() {
               </div>
             </FormSection>
 
-            <FormSection title="Rates" description="What the broker pays and what the carrier is paid. The difference is your margin.">
+            <FormSection title="Rates" description="What the customer pays and what the hauler is paid. The difference is the agency's margin.">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Broker rate" htmlFor="broker_rate">
+                <Field label="Customer rate" htmlFor="broker_rate">
                   <CurrencyInput id="broker_rate" value={formData.broker_rate ?? ''} onChange={(v) => money(v, 'broker_rate')} placeholder="0.00" />
                 </Field>
-                <Field label="Carrier rate" htmlFor="carrier_rate">
+                <Field label="Hauler rate" htmlFor="carrier_rate">
                   <CurrencyInput id="carrier_rate" value={formData.carrier_rate ?? ''} onChange={(v) => money(v, 'carrier_rate')} placeholder="0.00" />
                 </Field>
               </div>
             </FormSection>
 
-            <FormSection title="If it runs on Landstar" description="Leave these empty for a load you broker to another carrier.">
+            <FormSection title="When your truck hauls it" description="Landstar pays you your split of linehaul. Leave these empty when another Landstar BCO hauls the load.">
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Gross linehaul" htmlFor="gross_linehaul">
                   <CurrencyInput id="gross_linehaul" value={formData.gross_linehaul ?? ''} onChange={(v) => money(v, 'gross_linehaul')} placeholder="0.00" />

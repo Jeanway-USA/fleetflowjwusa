@@ -1,7 +1,8 @@
 /**
- * The money on an agency (brokerage) load. The broker pays one rate and the carrier is paid another; the
- * difference is the margin. A load run on Landstar's authority also pays the BCO a split of its linehaul
- * (65 to 75 percent), while fuel surcharge and the tarp fee pass through at 100 percent.
+ * The money on a Landstar agency load. The customer pays one rate and the hauler is paid another; the difference
+ * is the agency's margin. (The fields are still named broker_rate and carrier_rate in the database.) When the BCO's
+ * own truck hauls the load, Landstar pays the BCO a split of its linehaul (65 to 75 percent), while fuel surcharge
+ * and the tarp fee pass through at 100 percent.
  */
 
 export const DEFAULT_BCO_SPLIT_PCT = 72;
@@ -31,7 +32,7 @@ export function bcoPayout(l: AgencyMoney): number {
   return round2(n(l.gross_linehaul) * (split / 100) + n(l.fuel_surcharge) + n(l.tarp_fee));
 }
 
-/** Margin as a percent of what the broker pays, or null when there is no broker rate. */
+/** Margin as a percent of what the customer pays, or null when there is no customer rate. */
 export function marginPercent(l: AgencyMoney): number | null {
   const broker = n(l.broker_rate);
   return broker ? (n(l.margin) / broker) * 100 : null;
