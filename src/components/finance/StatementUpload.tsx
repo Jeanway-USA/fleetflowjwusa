@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,8 @@ interface StatementUploadProps {
   orgId: string | null;
   /** Closes the window that holds this (the summary's Done button). */
   onClose?: () => void;
+  /** Open on the settlement week ending this day (YYYY-MM-DD), e.g. when coming from a load's detail. */
+  initialWeekEnd?: string;
 }
 
 const DOCUMENT_TYPES: StagedFile['type'][] = [
@@ -73,14 +75,21 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 
 import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 
-export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId, onClose }: StatementUploadProps) {
+export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId, onClose, initialWeekEnd }: StatementUploadProps) {
   const { endDay: weekEndDay, startsOn, startName, endName } = useSettlementWeekSetting();
   // The settlement week being worked. Statements arrive after a week ends, so it opens on the last finished week.
   const [weekOffset, setWeekOffset] = useState(-1);
   const [summary, setSummary] = useState<WeekSummary | null>(null);
   const [isProving, setIsProving] = useState(false);
   const frame = useMemo(() => weekFrame(new Date(), weekOffset, startsOn), [weekOffset, startsOn]);
-  const choices = useMemo(() => weekChoices(new Date(), startsOn, 8), [startsOn]);
+  const choices = useMemo(() => weekChoices(new Date(), startsOn, Math.max(8, 1 - weekOffset)), [startsOn, weekOffset]);
+  useEffect(() => {
+    if (!initialWeekEnd) return;
+    const thisWeekEnd = weekFrame(new Date(), 0, startsOn).endIso;
+    const diffDays = Math.round((new Date(`${initialWeekEnd}T00:00:00`).getTime() - new Date(`${thisWeekEnd}T00:00:00`).getTime()) / 86_400_000);
+    const offset = Math.round(diffDays / 7);
+    if (offset <= 0 && offset >= -52) setWeekOffset(offset);
+  }, [initialWeekEnd, startsOn]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { landstarSplit } = usePaySettings();
