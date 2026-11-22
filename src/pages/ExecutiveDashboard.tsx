@@ -33,6 +33,7 @@ import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/Critica
 import { MorningBriefingWidget } from '@/components/executive/MorningBriefingWidget';
 import { PendingActionsCard, PendingAction } from '@/components/executive/PendingActionsCard';
 import { weekFrame } from '@/lib/week-import';
+import { useTruckNote } from '@/hooks/useTruckNote';
 import { parseRecord, proveWeekActions, provedWeekKey, sortActions } from '@/lib/prove-week-actions';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -107,6 +108,8 @@ export default function ExecutiveDashboard() {
   const [showMore, setShowMore] = useState(false);
   const { startsOn } = useSettlementWeekSetting();
   const dateRange = useMemo(() => getDateRange(period, startsOn), [period, startsOn]);
+  // The truck note for the period on screen, by the one rule in lib/truck-note.
+  const truckNote = useTruckNote(format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd'));
 
   // Fetch KPI data
   // NOTE: In this business model:
@@ -718,7 +721,7 @@ export default function ExecutiveDashboard() {
         {isPhone && (
           <>
             <NeedsYou alerts={criticalAlerts} actions={pendingActions} isLoading={alertsLoading || actionsLoading} />
-            <WeekMoneyHero data={kpiData} isLoading={kpiLoading} periodLabel={PERIOD_LABEL[period]} />
+            <WeekMoneyHero data={kpiData} isLoading={kpiLoading} periodLabel={PERIOD_LABEL[period]} truckNote={truckNote} />
             <ActiveLoadsNow fleet={fleetStatus} fleetLoading={fleetLoading} />
             <Button
               variant="outline"
@@ -747,6 +750,7 @@ export default function ExecutiveDashboard() {
                   data={kpiData}
                   isLoading={kpiLoading}
                   periodLabel={PERIOD_LABEL[period]}
+                  truckNote={truckNote}
                   controls={<PeriodSelector value={period} onChange={setPeriod} />}
                 />
               </div>

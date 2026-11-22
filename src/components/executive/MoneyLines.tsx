@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
+import type { TruckNote } from '@/lib/truck-note';
 
 export interface MoneyLinesData {
   grossRevenue: number;
@@ -20,6 +21,8 @@ interface MoneyLinesProps {
   periodLabel: string;
   /** Controls that scope these figures (the period picker) sit in the header. */
   controls?: React.ReactNode;
+  /** The truck note for the same period, taken off before profit. Omit or pass none for no line. */
+  truckNote?: TruckNote;
 }
 
 const usd = (v: number, cents = false) =>
@@ -57,7 +60,7 @@ function Line({ label, note, value, negative, strong, rule }: {
           negative && 'text-muted-foreground',
         )}
       >
-        {negative && value > 0 ? '−' : ''}
+        {(negative && value > 0) || value < 0 ? '−' : ''}
         {usd(Math.abs(value))}
       </div>
     </div>
@@ -69,7 +72,7 @@ function Line({ label, note, value, negative, strong, rule }: {
  * down one edge. Operating cost is an estimate (miles × the owner's cost per
  * mile) and is labeled as one.
  */
-export function MoneyLines({ data, isLoading, periodLabel, controls }: MoneyLinesProps) {
+export function MoneyLines({ data, isLoading, periodLabel, controls, truckNote }: MoneyLinesProps) {
   const { costPerMile } = useOperationalCPM();
 
   if (isLoading || !data) {
@@ -88,11 +91,14 @@ export function MoneyLines({ data, isLoading, periodLabel, controls }: MoneyLine
   const landstarShare = data.grossRevenue - data.netRevenue;
   const miles = data.totalMiles ?? 0;
   const operatingCost = miles * costPerMile;
-  const profit = data.netRevenue - operatingCost;
+  const note = truckNote && truckNote.amount > 0 ? truckNote : null;
+  const profitBeforeNote = data.netRevenue - operatingCost;
+  const profit = profitBeforeNote - (note?.amount ?? 0);
   const margin = data.netRevenue > 0 ? (profit / data.netRevenue) * 100 : 0;
 
+  // The comparison with last period is made before the truck note on both sides, so it is like for like.
   const prevProfit = (data.prevNetRevenue ?? 0) - (data.prevTotalMiles ?? 0) * costPerMile;
-  const change = prevProfit !== 0 ? ((profit - prevProfit) / Math.abs(prevProfit)) * 100 : null;
+  const change = prevProfit !== 0 ? ((profitBeforeNote - prevProfit) / Math.abs(prevProfit)) * 100 : null;
 
   return (
     <section aria-labelledby="money-title" className="rounded-lg border bg-card px-4 pt-3 pb-2">
@@ -119,6 +125,14 @@ export function MoneyLines({ data, isLoading, periodLabel, controls }: MoneyLine
           value={operatingCost}
           negative
         />
+        {note && (
+          <Line
+            label={note.source === 'recorded' ? 'Truck payments' : 'Truck payment'}
+            note={note.rule}
+            value={note.amount}
+            negative
+          />
+        )}
         <Line label="Operating profit (est.)" value={profit} strong rule="double" />
       </div>
       <p className="border-t pt-2 pb-1 text-[13px] text-muted-foreground tabular-nums">
