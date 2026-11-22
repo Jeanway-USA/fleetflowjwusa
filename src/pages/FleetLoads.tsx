@@ -715,7 +715,7 @@ export default function FleetLoads() {
     ];
 
     // Only pass intermediateStops when the user actually provided a fresh set
-    // (from rate-conf extraction or independent builder). Otherwise leave them
+    // (from rate-conf extraction). Otherwise leave them
     // untouched on edit.
     const stopsArg = pendingIntermediateStops.length > 0 ? pendingIntermediateStops : undefined;
 
