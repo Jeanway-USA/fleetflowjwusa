@@ -3,6 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 import type { MoneyLinesData } from './MoneyLines';
+import type { TruckNote } from '@/lib/truck-note';
 
 const usd = (v: number) =>
   v.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -12,13 +13,15 @@ interface WeekMoneyHeroProps {
   isLoading: boolean;
   /** e.g. "settlement week", shown with the headline so it is clear which period the figure covers. */
   periodLabel: string;
+  /** The truck note for the same period; taken off the profit shown and listed under it. */
+  truckNote?: TruckNote;
 }
 
 /**
  * The phone's answer to "what did we make": one large figure (truck revenue, what the truck keeps after Landstar's
  * share) with the three numbers behind it underneath. It reads the same data as the Money lines, so the figures match.
  */
-export function WeekMoneyHero({ data, isLoading, periodLabel }: WeekMoneyHeroProps) {
+export function WeekMoneyHero({ data, isLoading, periodLabel, truckNote }: WeekMoneyHeroProps) {
   const { costPerMile } = useOperationalCPM();
 
   if (isLoading || !data) {
@@ -33,7 +36,8 @@ export function WeekMoneyHero({ data, isLoading, periodLabel }: WeekMoneyHeroPro
 
   const landstarShare = data.grossRevenue - data.netRevenue;
   const operatingCost = (data.totalMiles ?? 0) * costPerMile;
-  const profit = data.netRevenue - operatingCost;
+  const note = truckNote && truckNote.amount > 0 ? truckNote : null;
+  const profit = data.netRevenue - operatingCost - (note?.amount ?? 0);
 
   return (
     <section aria-labelledby="week-money-title" className="rounded-lg border bg-card p-4">
@@ -49,6 +53,11 @@ export function WeekMoneyHero({ data, isLoading, periodLabel }: WeekMoneyHeroPro
         <Stat label="Landstar's share" value={usd(landstarShare)} muted />
         <Stat label="Profit (est.)" value={usd(profit)} negative={profit < 0} />
       </dl>
+      {note && (
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          <span className="font-semibold text-foreground tabular-nums">Truck {note.source === 'recorded' ? 'payments' : 'payment'} −{usd(note.amount)}</span>, taken off the profit. {note.rule}
+        </p>
+      )}
       <Link to="/finance" className="mt-2 flex min-h-[44px] items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
         Open Money
       </Link>
