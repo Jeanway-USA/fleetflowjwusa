@@ -74,13 +74,21 @@ Deno.serve(async (req) => {
     }
 
 
-    // Check if requesting user is an owner
-    const { data: roleData } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
+    // Resolve the caller's organization first, then require owner in THAT org
+    const { data: callerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('org_id')
       .eq('user_id', requestingUser.id)
-      .eq('role', 'owner')
       .maybeSingle();
+    const { data: roleData } = callerProfile?.org_id
+      ? await supabaseAdmin
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', requestingUser.id)
+          .eq('role', 'owner')
+          .eq('org_id', callerProfile.org_id)
+          .maybeSingle()
+      : { data: null };
 
     if (!roleData) {
       console.log('Caller is not an owner');

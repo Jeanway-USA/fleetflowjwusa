@@ -86,6 +86,7 @@ export function DriverBankingDetails({ driverId }: Props) {
 
   const { data: attachment } = useQuery({
     queryKey: ['driver_dd_attachment', driverId],
+    gcTime: 0,
     enabled: canView && !!driverId,
     queryFn: async () => {
       const { data: drv, error: drvErr } = await supabase
@@ -96,10 +97,12 @@ export function DriverBankingDetails({ driverId }: Props) {
       if (drvErr) throw drvErr;
       const path = (drv?.direct_deposit_attachment_url as string | null) || null;
       if (!path) return null;
-      const { data: signed, error: signErr } = await supabase.storage
+      // Download with the viewer's own session and show a local copy, so no
+      // shareable link to the bank document is ever created.
+      const { data: blob, error: dlErr } = await supabase.storage
         .from('signed-documents')
-        .createSignedUrl(path, 300);
-      return { path, url: signErr ? null : signed.signedUrl };
+        .download(path);
+      return { path, url: dlErr || !blob ? null : URL.createObjectURL(blob) };
     },
   });
 
