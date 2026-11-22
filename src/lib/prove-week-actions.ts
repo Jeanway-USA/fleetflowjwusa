@@ -40,6 +40,32 @@ export function recordFromSummary(summary: WeekSummary, missingDocuments: string
 
 export const serializeRecord = (r: ProvedWeekRecord) => JSON.stringify(r);
 
+/** The one slice of the database client the writer needs, so it can be tested without a database. */
+export interface SettingsClient {
+  from(table: 'company_settings'): {
+    upsert(row: { org_id: string; setting_key: string; setting_value: string }, options: { onConflict: string }): PromiseLike<{ error: unknown }>;
+  };
+}
+
+/**
+ * Saves how a week ended after "Prove this week", under the same key and in the same shape proveWeekActions reads.
+ * Proving the week again replaces the note, which is how a week with open trips stops being listed once it is clean.
+ */
+export async function saveProvedWeek(
+  client: SettingsClient,
+  orgId: string | null,
+  summary: WeekSummary,
+  missingDocuments: string[],
+  now: Date = new Date(),
+): Promise<{ saved: boolean; error?: unknown }> {
+  if (!orgId) return { saved: false, error: new Error('No organization') };
+  const record = recordFromSummary(summary, missingDocuments, now);
+  const { error } = await client
+    .from('company_settings')
+    .upsert({ org_id: orgId, setting_key: provedWeekKey(summary.frame.endIso), setting_value: serializeRecord(record) }, { onConflict: 'org_id,setting_key' });
+  return error ? { saved: false, error } : { saved: true };
+}
+
 /** Reads a saved record; anything unreadable counts as no record, so the week is simply offered for proving again. */
 export function parseRecord(value: string | null | undefined): ProvedWeekRecord | null {
   if (!value) return null;
@@ -99,6 +125,17 @@ export function proveWeekActions({ frame, record, deliveredInWeek, unresolvedDis
       count: record.open,
       priority: 'high',
       link: GAPS_PATH,
+    });
+  } else if (record.hadFreightBill && record.trips === 0 && deliveredInWeek > 0) {
+    // The Freight Bill file held no trips for this week (wrong week or wrong file), so nothing was actually proved.
+    out.push({
+      id: 'prove-week',
+      type: 'settlement',
+      title: `Prove ${weekName(frame)}`,
+      detail: 'The Freight Bill file had no trips for this week. Use the file for this week.',
+      count: deliveredInWeek,
+      priority: 'high',
+      link: proveWeekPath(frame.endIso),
     });
   } else if (!record.hadFreightBill) {
     out.push({

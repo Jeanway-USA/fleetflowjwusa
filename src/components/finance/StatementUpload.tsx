@@ -22,7 +22,7 @@ import { weekdayName } from '@/lib/settlement-week';
 import { WEEK_DOCUMENTS, documentStates, missingDocuments, periodMatchNote, summarizeWeek, weekChoices, weekFrame } from '@/lib/week-import';
 import type { ImportOutcome, WeekSummary } from '@/lib/week-import';
 import { WeekStatementSummary } from './WeekStatementSummary';
-import { provedWeekKey, recordFromSummary, serializeRecord } from '@/lib/prove-week-actions';
+import { saveProvedWeek } from '@/lib/prove-week-actions';
 
 interface FleetLoad {
   id: string;
@@ -317,17 +317,13 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
 
   /** Remember how this week ended, so Today can ask for it again if it is not proved or trips are still open. */
   const rememberProvedWeek = async (week: WeekSummary) => {
-    if (!orgId) return;
-    try {
-      const record = recordFromSummary(week, missingDocuments(stagedFiles).map((m) => m.label));
-      const { error: saveError } = await supabase
-        .from('company_settings')
-        .upsert({ org_id: orgId, setting_key: provedWeekKey(week.frame.endIso), setting_value: serializeRecord(record) }, { onConflict: 'org_id,setting_key' });
-      if (saveError) throw saveError;
+    const { saved, error: saveError } = await saveProvedWeek(supabase, orgId, week, missingDocuments(stagedFiles).map((m) => m.label));
+    if (saved) {
+      // Today's to-do list reads this note, so refresh it now instead of on the next visit.
       queryClient.invalidateQueries({ queryKey: ['executive-pending-actions'] });
-    } catch (err) {
-      // Not worth interrupting the office: the import itself worked, Today just will not remember it.
-      console.warn('[Statement] Could not save the proved-week note', err);
+    } else {
+      console.warn('[Statement] Could not save the proved-week note', saveError);
+      toast.warning('The week was imported, but it could not be marked as proved, so Today may still list it.');
     }
   };
 
