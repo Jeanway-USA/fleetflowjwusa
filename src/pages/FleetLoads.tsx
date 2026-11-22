@@ -44,6 +44,7 @@ import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
+import { LoadDetailSheet } from '@/components/loads/LoadDetailSheet';
 import { AgencyCRMStatusBadge } from '@/components/loads/AgencyCRMStatusBadge';
 import { findPickupNumber } from '@/lib/loads/pickupNumber';
 import { findTripMatch, flagText, flaggedInputIds, reviewFlags, type ReviewFlag } from '@/lib/rate-con-review';
@@ -110,6 +111,8 @@ export default function FleetLoads() {
   // chose to create a second load on a trip number that already exists.
   const [rateConFlags, setRateConFlags] = useState<ReviewFlag[]>([]);
   const [allowDuplicateTrip, setAllowDuplicateTrip] = useState(false);
+  // The load open in the read-only detail sheet (Edit opens the form).
+  const [detailLoad, setDetailLoad] = useState<any | null>(null);
   const [duplicateTrip, setDuplicateTrip] = useState<any | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
@@ -555,7 +558,7 @@ export default function FleetLoads() {
       setSearchParams({}, { replace: true });
     } else if (loadId) {
       const load = loads?.find((l: any) => l.id === loadId);
-      if (load) openDialog(load);
+      if (load) setDetailLoad(load);
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, loads]);
@@ -986,7 +989,7 @@ export default function FleetLoads() {
     return {
       id: load.id,
       title: loadId,
-      onOpen: () => openDialog(load),
+      onOpen: () => setDetailLoad(load),
       chips: (
         <>
           <StatusBadge status={load.status} />
@@ -1161,6 +1164,17 @@ export default function FleetLoads() {
           { value: 'delivered', label: 'Delivered' },
           { value: 'cancelled', label: 'Cancelled' },
         ]}
+      />
+
+      {/* One load, read in full: identity, schedule, money, settlement proof, activity */}
+      <LoadDetailSheet
+        load={detailLoad}
+        open={!!detailLoad}
+        onOpenChange={(o) => { if (!o) setDetailLoad(null); }}
+        driverName={detailLoad?.driver_id ? (drivers.find((d: any) => d.id === detailLoad.driver_id) ? `${(drivers.find((d: any) => d.id === detailLoad.driver_id) as any).first_name} ${(drivers.find((d: any) => d.id === detailLoad.driver_id) as any).last_name}` : null) : null}
+        truckUnit={(trucks.find((t: any) => t.id === detailLoad?.truck_id) as any)?.unit_number ?? null}
+        trailerNumber={(trailers.find((t: any) => t.id === detailLoad?.trailer_id) as any)?.trailer_number ?? null}
+        onEdit={(l) => { setDetailLoad(null); openDialog(l); }}
       />
 
       {/* A load with this Landstar trip number already exists */}
