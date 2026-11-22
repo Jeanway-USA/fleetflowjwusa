@@ -211,6 +211,13 @@
       "when": 1795385682252,
       "tag": "0029_maintenance_temp_invoice_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795386518114,
+      "tag": "0030_harden_tier_reads_assignments_doc_completion",
+      "breakpoints": true
     }
   ]
 }

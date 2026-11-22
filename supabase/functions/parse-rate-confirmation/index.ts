@@ -269,7 +269,7 @@ serve(async (req) => {
           .select('org_id')
           .eq('user_id', userId)
           .single();
-        if (!profile?.org_id || typeof filePath !== 'string' || !filePath.startsWith(`${profile.org_id}/temp-rc/`) || filePath.includes('..')) {
+        if (!profile?.org_id || typeof filePath !== 'string' || !filePath.startsWith(`${profile.org_id}/temp-rc/${userId}/`) || filePath.includes('..')) {
           return new Response(
             JSON.stringify({ error: 'Forbidden: path does not belong to your organization' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

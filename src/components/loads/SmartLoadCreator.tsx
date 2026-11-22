@@ -132,7 +132,8 @@ export function SmartLoadCreator({ onDataExtracted, existingLoads, drivers, truc
     pendingFileRef.current = file;
 
     try {
-      const tempPath = `${orgId}/temp-rc/${Date.now()}-${file.name}`;
+      const { data: { user: rcUser } } = await supabase.auth.getUser();
+      const tempPath = `${orgId}/temp-rc/${rcUser?.id}/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(tempPath, file, { contentType: 'application/pdf' });
