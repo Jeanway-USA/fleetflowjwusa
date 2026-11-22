@@ -24,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
 import { archiveWithUndo } from '@/lib/soft-delete';
+import { parseLandstarPdf } from '@/lib/parse-landstar-pdf';
 
 interface Settlement {
   id: string;
@@ -362,11 +363,7 @@ export function SettlementsTab() {
         reader.readAsDataURL(file);
       });
 
-      const { data, error } = await supabase.functions.invoke('parse-landstar-statement', {
-        body: { pdfBase64: base64 },
-      });
-
-      if (error) throw error;
+      const data = await parseLandstarPdf(base64);
 
       // Map parsed expenses to settlement deduction fields
       const expenses = data.expenses || [];

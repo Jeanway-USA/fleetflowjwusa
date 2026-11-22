@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { readGatewayContent } from "./stream.ts";
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
@@ -111,7 +112,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { pdfBase64 } = await req.json();
+    const { pdfBase64, stream: wantsStream } = await req.json();
 
     if (!pdfBase64 || typeof pdfBase64 !== "string") {
       return new Response(
@@ -262,16 +263,18 @@ CONTRACTOR STATEMENT SPECIFICS:
 - Do NOT include "TRIP% ESCROW PAYMENT (VOLUNTARY)" lines; escrow is the contractor's savings, not an expense.
 - Ignore the "Pending Adjustments" and "Outstanding Trips" sections; they are not part of this week's settlement.`;
 
-    // Give up after two minutes instead of leaving the screen waiting on the document service.
+    const abort = new AbortController();
+    const processStatement = async () => {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      signal: AbortSignal.timeout(120_000),
+      signal: abort.signal,
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
+        stream: true,
         messages: [
           { role: "system", content: systemPrompt },
           { 
@@ -279,10 +282,11 @@ CONTRACTOR STATEMENT SPECIFICS:
             content: [
               { type: "text", text: userPrompt },
               { 
-                type: "image_url", 
-                image_url: { 
-                  url: `data:application/pdf;base64,${pdfBase64}` 
-                } 
+                type: "file",
+                file: {
+                  filename: "statement.pdf",
+                  file_data: `data:application/pdf;base64,${pdfBase64}`
+                }
               }
             ]
           },
@@ -291,32 +295,18 @@ CONTRACTOR STATEMENT SPECIFICS:
       }),
     });
 
+    console.log("Statement AI request", response.status, response.headers.get("X-Lovable-AIG-Run-ID"));
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      throw new Error('Document processing service is temporarily unavailable.');
+      const body = await response.json().catch(() => null);
+      const message = body?.error?.message ?? body?.message;
+      const status = response.status;
+      const fallback = status === 429 ? "Rate limit exceeded. Please try again in a moment."
+        : status === 402 ? "AI credits exhausted. Please add credits to continue."
+        : "Document processing service is temporarily unavailable.";
+      throw Object.assign(new Error(typeof message === "string" ? message : fallback), { status, safe: true });
     }
-
-    const aiResponse = await response.json();
-    const content = aiResponse.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("No response from AI");
-    }
+    if (!response.body) throw new Error("No response from AI");
+    const content = await readGatewayContent(response.body);
 
     console.log("AI response received, length:", content?.length ?? 0);
 
@@ -340,17 +330,58 @@ CONTRACTOR STATEMENT SPECIFICS:
 
         console.log("Total expenses extracted:", extractedData.expenses?.length || 0);
 
+    if (!Array.isArray(extractedData.expenses) ||
+        !['card_activity', 'contractor'].includes(extractedData.statement_type)) {
+      throw new Error("Failed to parse extracted data");
+    }
+    return extractedData;
+    };
+
+    // Return immediately: keep-alives cover PDF reading and reasoning before the first output token.
+    // Do not restart billed work or discard a valid result just because a local timer expired.
+    if (wantsStream === true) {
+      const encoder = new TextEncoder();
+      let heartbeat: ReturnType<typeof setInterval> | undefined;
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const emit = (event: unknown) => {
+            if (!cancelled) controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          };
+          emit({ status: 'reading' });
+          heartbeat = setInterval(() => emit({ status: 'reading' }), 10_000);
+          void processStatement().then(
+            result => emit({ result }),
+            error => {
+              console.error('Statement processing failed', error instanceof Error ? error.name : 'UnknownError');
+              const known = error instanceof Error && (
+                error.message.startsWith('The document service') ||
+                error.message === 'Failed to parse extracted data' ||
+                error.message === 'Document processing service is temporarily unavailable.'
+              );
+              emit({ error: error?.safe || known ? error.message : 'Could not read this statement. Please try again.', status: error?.status ?? 500 });
+            },
+          ).finally(() => {
+            clearInterval(heartbeat);
+            if (!cancelled) controller.close();
+          });
+        },
+        cancel() {
+          cancelled = true;
+          clearInterval(heartbeat);
+          abort.abort();
+        },
+      });
+      return new Response(body, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' },
+      });
+    }
+    // Compatibility for previously published clients; the upstream leg still streams.
+    const extractedData = await processStatement();
     return new Response(JSON.stringify(extractedData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      console.error("Parse Landstar statement timed out");
-      return new Response(
-        JSON.stringify({ error: "Reading this PDF took too long. Please try again." }),
-        { status: 504, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-      );
-    }
     console.error("Parse Landstar statement error:", error);
     const safeMessage = (error instanceof Error && (
       error.message === 'Failed to parse extracted data' ||

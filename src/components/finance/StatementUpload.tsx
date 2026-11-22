@@ -7,6 +7,7 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, FileSpreadsheet
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { parseLandstarXlsx } from '@/lib/parse-landstar-xlsx';
+import { parseLandstarPdf } from '@/lib/parse-landstar-pdf';
 import { detectFileType, reconcileDocuments, getFileTypeLabel, mergeStagedFiles, typeFromParsedPdf } from '@/lib/settlement-reconciliation';
 import type { StagedFile, ReconciliationResult } from '@/lib/settlement-reconciliation';
 import { ReconciliationPreview } from './ReconciliationPreview';
@@ -192,19 +193,6 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     }
   };
 
-  // A PDF is read by an AI service and can take a minute. Every file is read at the same time, each with its own
-  // status and time limit, so one slow or stuck file can no longer freeze the whole import.
-  const PDF_TIMEOUT_MS = 150_000;
-
-  const withTimeout = <T,>(work: Promise<T>, ms: number, message: string): Promise<T> =>
-    new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(message)), ms);
-      work.then(
-        (v) => { clearTimeout(timer); resolve(v); },
-        (e) => { clearTimeout(timer); reject(e); },
-      );
-    });
-
   const parseOne = async (sf: StagedFile): Promise<StagedFile> => {
     try {
       const isExcel = isExcelFile(sf.file);
@@ -216,14 +204,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       } else {
         const pdfBase64 = await convertFileToBase64(sf.file);
         if (!pdfBase64 || pdfBase64.length < 100) throw new Error('Could not read PDF file.');
-        const { data: fnData, error: fnError } = await withTimeout(
-          supabase.functions.invoke('parse-landstar-statement', { body: { pdfBase64 } }),
-          PDF_TIMEOUT_MS,
-          'Reading this PDF took too long. Press Try again.',
-        );
-        if (fnError) throw new Error(fnError.message || 'Failed to parse statement');
-        if (fnData.error) throw new Error(fnData.error);
-        data = fnData;
+        data = await parseLandstarPdf(pdfBase64);
       }
 
       // A PDF's real type is what the parser found, not what its filename suggested.
