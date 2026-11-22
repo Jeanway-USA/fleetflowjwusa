@@ -10,6 +10,8 @@ export interface PendingAction {
   count: number;
   priority: 'high' | 'medium' | 'low';
   link?: string;
+  /** One line under the title; replaces the type label when present. */
+  detail?: string;
 }
 
 interface PendingActionsCardProps {
@@ -52,7 +54,7 @@ export function PendingActionsCard({ actions, isLoading }: PendingActionsCardPro
               <div className="flex min-h-[48px] items-center gap-3 py-2">
                 <div className="min-w-0 flex-1">
                   <p className={cn('text-[15px] font-medium', action.priority === 'high' && 'text-destructive')}>{action.title}</p>
-                  <p className="text-[13px] text-muted-foreground">{typeLabel[action.type]}</p>
+                  <p className="text-[13px] text-muted-foreground">{action.detail ?? typeLabel[action.type]}</p>
                 </div>
                 <span className={cn('figure text-lg font-semibold', action.priority === 'high' && 'text-destructive')}>
                   {action.count}

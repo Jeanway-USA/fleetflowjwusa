@@ -32,6 +32,8 @@ import { DriverAvailabilityCard } from '@/components/executive/DriverAvailabilit
 import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/CriticalAlertsBar';
 import { MorningBriefingWidget } from '@/components/executive/MorningBriefingWidget';
 import { PendingActionsCard, PendingAction } from '@/components/executive/PendingActionsCard';
+import { weekFrame } from '@/lib/week-import';
+import { parseRecord, proveWeekActions, provedWeekKey, sortActions } from '@/lib/prove-week-actions';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -406,7 +408,7 @@ export default function ExecutiveDashboard() {
 
   // Fetch pending actions
   const { data: pendingActions = [], isLoading: actionsLoading } = useQuery({
-    queryKey: ['executive-pending-actions'],
+    queryKey: ['executive-pending-actions', startsOn],
     queryFn: async () => {
       const actions: PendingAction[] = [];
       const now = new Date();
@@ -471,7 +473,34 @@ export default function ExecutiveDashboard() {
         });
       }
 
-      return actions;
+      // Landstar money: is the last finished settlement week proved, and is anything still open? Each read is
+      // allowed to fail on its own so a missing table or setting never hides the rest of the list.
+      try {
+        const frame = weekFrame(new Date(), -1, startsOn);
+        const [delivered, setting, discrepancies] = await Promise.all([
+          supabase
+            .from('fleet_loads')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'delivered')
+            .is('deleted_at', null)
+            .gte('delivery_date', frame.startIso)
+            .lte('delivery_date', frame.endIso),
+          supabase.from('company_settings').select('setting_value').eq('setting_key', provedWeekKey(frame.endIso)).maybeSingle(),
+          supabase.from('settlement_discrepancies').select('id', { count: 'exact', head: true }).is('resolved_at', null),
+        ]);
+        actions.push(
+          ...proveWeekActions({
+            frame,
+            record: parseRecord(setting.data?.setting_value),
+            deliveredInWeek: delivered.count ?? 0,
+            unresolvedDiscrepancies: discrepancies.count ?? 0,
+          }),
+        );
+      } catch {
+        // leave the other actions as they are
+      }
+
+      return sortActions(actions);
     },
   });
 

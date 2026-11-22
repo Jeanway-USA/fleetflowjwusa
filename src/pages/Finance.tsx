@@ -90,6 +90,18 @@ export default function Finance() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  // Arriving from a load's detail with ?prove=1&weekEnd=YYYY-MM-DD opens the prove window on that settlement week.
+  const [proveWeekEnd, setProveWeekEnd] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (searchParams.get('prove') !== '1') return;
+    setProveWeekEnd(searchParams.get('weekEnd') ?? undefined);
+    setUploadDialogOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('prove');
+    next.delete('weekEnd');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [showW2Batch, setShowW2Batch] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
@@ -892,6 +904,7 @@ export default function Finance() {
               existingExpenses={expenses.filter((e: any) => !e.deleted_at).map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id, description: e.description }))}
               onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); queryClient.invalidateQueries({ queryKey: ['fleet_loads'] }); }}
               onClose={() => setUploadDialogOpen(false)}
+              initialWeekEnd={proveWeekEnd}
               orgId={orgId}
             />
           </Suspense>

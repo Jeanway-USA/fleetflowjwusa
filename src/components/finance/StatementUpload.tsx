@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { weekdayName } from '@/lib/settlement-week';
 import { WEEK_DOCUMENTS, documentStates, missingDocuments, periodMatchNote, summarizeWeek, weekChoices, weekFrame } from '@/lib/week-import';
 import type { ImportOutcome, WeekSummary } from '@/lib/week-import';
 import { WeekStatementSummary } from './WeekStatementSummary';
+import { provedWeekKey, recordFromSummary, serializeRecord } from '@/lib/prove-week-actions';
 
 interface FleetLoad {
   id: string;
@@ -55,6 +56,8 @@ interface StatementUploadProps {
   orgId: string | null;
   /** Closes the window that holds this (the summary's Done button). */
   onClose?: () => void;
+  /** Open on the settlement week ending this day (YYYY-MM-DD), e.g. when coming from a load's detail. */
+  initialWeekEnd?: string;
 }
 
 const DOCUMENT_TYPES: StagedFile['type'][] = [
@@ -73,14 +76,21 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 
 import { useSettlementWeekSetting } from '@/hooks/useSettlementWeekSetting';
 
-export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId, onClose }: StatementUploadProps) {
+export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId, onClose, initialWeekEnd }: StatementUploadProps) {
   const { endDay: weekEndDay, startsOn, startName, endName } = useSettlementWeekSetting();
   // The settlement week being worked. Statements arrive after a week ends, so it opens on the last finished week.
   const [weekOffset, setWeekOffset] = useState(-1);
   const [summary, setSummary] = useState<WeekSummary | null>(null);
   const [isProving, setIsProving] = useState(false);
   const frame = useMemo(() => weekFrame(new Date(), weekOffset, startsOn), [weekOffset, startsOn]);
-  const choices = useMemo(() => weekChoices(new Date(), startsOn, 8), [startsOn]);
+  const choices = useMemo(() => weekChoices(new Date(), startsOn, Math.max(8, 1 - weekOffset)), [startsOn, weekOffset]);
+  useEffect(() => {
+    if (!initialWeekEnd) return;
+    const thisWeekEnd = weekFrame(new Date(), 0, startsOn).endIso;
+    const diffDays = Math.round((new Date(`${initialWeekEnd}T00:00:00`).getTime() - new Date(`${thisWeekEnd}T00:00:00`).getTime()) / 86_400_000);
+    const offset = Math.round(diffDays / 7);
+    if (offset <= 0 && offset >= -52) setWeekOffset(offset);
+  }, [initialWeekEnd, startsOn]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { landstarSplit } = usePaySettings();
@@ -291,13 +301,33 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
         const { loads, expenses } = await fetchProofInputs();
         proof = proveTrips(lines, loads, expenses);
       }
-      setSummary(summarizeWeek(frame, proof, outcome ?? null));
+      const week = summarizeWeek(frame, proof, outcome ?? null);
+      setSummary(week);
+      void rememberProvedWeek(week);
     } catch (err) {
       // Never leave the office with a silent import: say the proof could not be run.
       toast.error(err instanceof Error ? `The week was imported but could not be proven: ${err.message}` : 'The week was imported but could not be proven');
-      setSummary(summarizeWeek(frame, null, outcome ?? null));
+      const week = summarizeWeek(frame, null, outcome ?? null);
+      setSummary(week);
+      void rememberProvedWeek(week);
     } finally {
       setIsProving(false);
+    }
+  };
+
+  /** Remember how this week ended, so Today can ask for it again if it is not proved or trips are still open. */
+  const rememberProvedWeek = async (week: WeekSummary) => {
+    if (!orgId) return;
+    try {
+      const record = recordFromSummary(week, missingDocuments(stagedFiles).map((m) => m.label));
+      const { error: saveError } = await supabase
+        .from('company_settings')
+        .upsert({ org_id: orgId, setting_key: provedWeekKey(week.frame.endIso), setting_value: serializeRecord(record) }, { onConflict: 'org_id,setting_key' });
+      if (saveError) throw saveError;
+      queryClient.invalidateQueries({ queryKey: ['executive-pending-actions'] });
+    } catch (err) {
+      // Not worth interrupting the office: the import itself worked, Today just will not remember it.
+      console.warn('[Statement] Could not save the proved-week note', err);
     }
   };
 
