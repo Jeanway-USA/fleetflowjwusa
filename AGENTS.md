@@ -3,3 +3,4 @@
 - Google Drive upload paths are relative to the authenticated organization's configured root; built-in paths remain tenant-prefixed, and upload validation must not weaken read/delete ownership checks.
 - Let Vite automatically split production dependencies; manual vendor groups can create circular React/UI initialization through shared CommonJS helpers and blank the live site.
 - Landstar PDF parsing streams keep-alives and returns only a completed result through one shared client reader; timer races and buffered AI requests can strand imports while paid processing continues.
+- Dashboard queries that use the settlement range must wait for its setting and include the week start in their cache keys so cached money cannot outlive a week-setting change.

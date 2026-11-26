@@ -106,7 +106,7 @@ export default function ExecutiveDashboard() {
   // On a phone the page opens on the answers (alerts, this week's money, the load on the road) and keeps the analytics behind "More detail".
   const isPhone = usePhoneLayout();
   const [showMore, setShowMore] = useState(false);
-  const { startsOn } = useSettlementWeekSetting();
+  const { startsOn, loading: weekLoading } = useSettlementWeekSetting();
   const dateRange = useMemo(() => getDateRange(period, startsOn), [period, startsOn]);
   // The truck note for the period on screen, by the one rule in lib/truck-note.
   const truckNote = useTruckNote(format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd'));
@@ -119,7 +119,8 @@ export default function ExecutiveDashboard() {
   // - Operating Profit = Net Revenue (the company's take)
   // - Profit Margin = Net Revenue / Gross Revenue (company retention rate)
   const { data: kpiData, isLoading: kpiLoading } = useQuery({
-    queryKey: ['executive-kpi', period],
+    queryKey: ['executive-kpi', period, startsOn],
+    enabled: !weekLoading,
     queryFn: async () => {
       const formatDate = (d: Date) => format(d, 'yyyy-MM-dd');
 
@@ -221,7 +222,8 @@ export default function ExecutiveDashboard() {
 
   // Fetch operational metrics
   const { data: operationalData, isLoading: operationalLoading } = useQuery({
-    queryKey: ['executive-operational', period],
+    queryKey: ['executive-operational', period, startsOn],
+    enabled: !weekLoading,
     queryFn: async () => {
       const formatDate = (d: Date) => format(d, 'yyyy-MM-dd');
 
@@ -509,7 +511,8 @@ export default function ExecutiveDashboard() {
 
   // Fetch cost breakdown - grouped into broader categories
   const { data: costBreakdown = [], isLoading: costLoading } = useQuery({
-    queryKey: ['executive-costs', period],
+    queryKey: ['executive-costs', period, startsOn],
+    enabled: !weekLoading,
     queryFn: async () => {
       const formatDate = (d: Date) => format(d, 'yyyy-MM-dd');
 
@@ -573,7 +576,8 @@ export default function ExecutiveDashboard() {
 
   // Fetch top performers
   const { data: topPerformers, isLoading: performersLoading } = useQuery({
-    queryKey: ['executive-performers', period],
+    queryKey: ['executive-performers', period, startsOn],
+    enabled: !weekLoading,
     queryFn: async () => {
       const formatDate = (d: Date) => format(d, 'yyyy-MM-dd');
 
